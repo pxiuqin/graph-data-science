@@ -24,10 +24,11 @@ import org.neo4j.graphalgo.core.loading.HugeGraphUtil;
 import java.util.Comparator;
 import java.util.Objects;
 
+//相似度结果
 public class SimilarityResult implements Comparable<SimilarityResult>, HugeGraphUtil.Relationship {
 
-    static Comparator<SimilarityResult> ASCENDING = SimilarityResult::compareTo;
-    static Comparator<SimilarityResult> DESCENDING = ASCENDING.reversed();
+    static Comparator<SimilarityResult> ASCENDING = SimilarityResult::compareTo;  //正序
+    static Comparator<SimilarityResult> DESCENDING = ASCENDING.reversed();    //逆序
 
     public long node1;
     public long node2;
@@ -54,6 +55,7 @@ public class SimilarityResult implements Comparable<SimilarityResult>, HugeGraph
         return similarity;
     }
 
+    //求相反
     public SimilarityResult reverse() {
         return new SimilarityResult(node2, node1, similarity);
     }

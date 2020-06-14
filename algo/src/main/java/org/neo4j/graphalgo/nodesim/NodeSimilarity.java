@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
+//节点相似度算法
 public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResult> {
 
     private final Graph graph;
@@ -82,6 +83,7 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
 
     @Override
     public NodeSimilarityResult compute() {
+        //返回一个流数据
         if (config.computeToStream()) {
             return ImmutableNodeSimilarityResult.of(
                 Optional.of(computeToStream()),
@@ -287,6 +289,7 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
         return topKMap;
     }
 
+    //计算TopN
     private Stream<SimilarityResult> computeTopN() {
         progressLogger.logMessage("Start :: NodeSimilarity#computeTopN");
 

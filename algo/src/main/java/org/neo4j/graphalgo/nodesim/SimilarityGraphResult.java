@@ -21,6 +21,7 @@ package org.neo4j.graphalgo.nodesim;
 
 import org.neo4j.graphalgo.api.Graph;
 
+//相似图结果
 public class SimilarityGraphResult {
     private final Graph similarityGraph;
     private final long comparedNodes;

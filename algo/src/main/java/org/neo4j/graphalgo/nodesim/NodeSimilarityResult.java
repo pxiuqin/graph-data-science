@@ -24,6 +24,7 @@ import org.neo4j.graphalgo.annotation.ValueClass;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+//相似节点结果
 @ValueClass
 public interface NodeSimilarityResult {
     Optional<Stream<SimilarityResult>> maybeStreamResult();

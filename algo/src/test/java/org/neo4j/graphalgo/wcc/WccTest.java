@@ -49,6 +49,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.neo4j.graphalgo.compat.GraphDatabaseApiProxy.runInTransaction;
 
+/**
+ * 弱连通分量测试
+ */
 class WccTest extends AlgoTestBase {
 
     static final RelationshipType RELATIONSHIP_TYPE = RelationshipType.withName("TYPE");

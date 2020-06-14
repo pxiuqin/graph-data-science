@@ -37,7 +37,7 @@ public abstract class FilterGraph implements Graph {
 
     @Override
     public long relationshipCount() {
-        return graph.relationshipCount();
+        return graph.relationshipCount();  //关系数量
     }
 
     @Override

@@ -28,6 +28,7 @@ import java.util.PrimitiveIterator;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+//
 public class TopNList {
 
     static MemoryEstimation memoryEstimation(int topN) {
@@ -68,6 +69,7 @@ public class TopNList {
             }
         };
 
+        //基于
         return StreamSupport.stream(iterable.spliterator(), false);
     }
 }
