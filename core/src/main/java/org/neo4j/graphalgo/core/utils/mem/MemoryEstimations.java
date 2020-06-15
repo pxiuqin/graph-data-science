@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfInstance;
 
+//内存评估
 public final class MemoryEstimations {
 
     @FunctionalInterface

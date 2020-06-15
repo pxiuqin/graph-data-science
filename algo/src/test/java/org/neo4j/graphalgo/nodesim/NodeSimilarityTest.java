@@ -123,6 +123,8 @@ final class NodeSimilarityTest extends AlgoTestBase {
             .writeRelationshipType("writeRelationshipType")
             .similarityCutoff(0.0);
     }
+
+    //构建好图后每个节点会分配一个long型的id作为标识
     private static String resultString(long node1, long node2, double similarity) {
         return formatWithLocale("%d,%d %f%n", node1, node2, similarity);
     }
@@ -136,7 +138,7 @@ final class NodeSimilarityTest extends AlgoTestBase {
     }
 
     static {
-        EXPECTED_OUTGOING.add(resultString(0, 1, 2 / 3.0));
+        EXPECTED_OUTGOING.add(resultString(0, 1, 2 / 3.0));   //通过连接的共同节点作为交集，所有关系为并集
         EXPECTED_OUTGOING.add(resultString(0, 2, 1 / 3.0));
         EXPECTED_OUTGOING.add(resultString(0, 3, 1.0));
         EXPECTED_OUTGOING.add(resultString(1, 2, 0.0));

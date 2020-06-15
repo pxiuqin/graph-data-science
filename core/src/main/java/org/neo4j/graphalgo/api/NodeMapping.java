@@ -23,6 +23,7 @@ import org.neo4j.graphalgo.NodeLabel;
 
 import java.util.Set;
 
+//给定一个Node的信息描述
 public interface NodeMapping extends IdMapping, NodeIterator, BatchNodeIterable {
 
     Set<NodeLabel> nodeLabels(long nodeId);

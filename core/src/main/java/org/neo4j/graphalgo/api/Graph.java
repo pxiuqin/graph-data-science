@@ -23,7 +23,7 @@ import org.neo4j.graphalgo.NodeLabel;
 
 import java.util.Set;
 
-//图接口构建
+//图接口构建，如何表示一个图的基本信息
 public interface Graph extends NodeMapping, NodePropertyContainer, Degrees, RelationshipIterator, RelationshipProperties, RelationshipAccess {
 
     NodeMapping nodeMapping();

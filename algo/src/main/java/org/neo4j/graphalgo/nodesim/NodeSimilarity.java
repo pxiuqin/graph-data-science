@@ -49,8 +49,8 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
 
     private final BitSet nodeFilter;
 
-    private HugeObjectArray<long[]> vectors;
-    private HugeObjectArray<double[]> weights;
+    private HugeObjectArray<long[]> vectors;  //节点连边数组[可以理解成一个节点连边数也是一个集合]
+    private HugeObjectArray<double[]> weights;  //连边权重数组[连边权重]
     private long nodesToCompare;
 
     private final boolean weighted;
@@ -322,17 +322,19 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
         return topNList.stream();
     }
 
+    //Jaccard 系数定义为A与B交集的大小与A与B并集的大小的比值
     private double jaccard(long[] vector1, long[] vector2) {
-        long intersection = Intersections.intersection3(vector1, vector2);
-        double union = vector1.length + vector2.length - intersection;
-        double similarity = union == 0 ? 0 : intersection / union;
+        long intersection = Intersections.intersection3(vector1, vector2);  //取交集
+        double union = vector1.length + vector2.length - intersection;  //取并集
+        double similarity = union == 0 ? 0 : intersection / union;   //交集/并集
         getProgressLogger().logProgress();
         return similarity >= config.similarityCutoff() ? similarity : Double.NaN;
 
     }
 
+    //使用Jaccand系数来计算相似度：Jaccard 系数定义为A与B交集的大小与A与B并集的大小的比值，广义Jaccard系数：最小值和/最大值和
     private double weightedJaccard(long[] vector1, long[] vector2, double[] weights1, double[] weights2) {
-        assert vector1.length == weights1.length;
+        assert vector1.length == weights1.length;   //验证权重和节点数是相同的
         assert vector2.length == weights2.length;
 
         int offset1 = 0;
@@ -364,12 +366,15 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
                 offset2++;
             }
         }
+        //补全不能对称的项作为并集
         for (; offset1 < length1; offset1++) {
             max += weights1[offset1];
         }
+        //补全不能对称的项作为并集
         for (; offset2 < length2; offset2++) {
             max += weights2[offset2];
         }
+
         return min / max;
     }
 

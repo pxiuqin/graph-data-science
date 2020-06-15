@@ -24,6 +24,7 @@ import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.RelationshipConsumer;
 import org.neo4j.graphalgo.api.RelationshipWithPropertyConsumer;
 
+//给定取TopK的图结构
 public class TopKGraph extends FilterGraph {
 
     private final TopKMap topKMap;

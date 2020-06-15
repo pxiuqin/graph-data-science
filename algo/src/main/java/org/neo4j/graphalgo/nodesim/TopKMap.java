@@ -38,18 +38,19 @@ public class TopKMap {
 
     private final BitSet nodeFilter;
 
+    //给定内存评估
     static MemoryEstimation memoryEstimation(long nodes, int topK) {
         return MemoryEstimations.builder(TopKMap.class)
             .add("topK lists",
                 MemoryEstimations.builder("topK lists", TopKList.class)
-                    .add("queues", BoundedLongPriorityQueue.memoryEstimation(topK))
+                    .add("queues", BoundedLongPriorityQueue.memoryEstimation(topK))  //设定内存评估
                     .build()
                     .times(nodes)
             )
             .build();
     }
 
-    private final HugeObjectArray<TopKList> topKLists;
+    private final HugeObjectArray<TopKList> topKLists;  //构建一个大的TopKList的数组
 
     TopKMap(
         long items,
@@ -107,6 +108,7 @@ public class TopKMap {
             .flatMap(node1 -> topKLists.get(node1).stream(node1));
     }
 
+    //使用优先级队列来完成TopK的列表保存
     public static final class TopKList {
 
         private final BoundedLongPriorityQueue queue;

@@ -24,6 +24,7 @@ import org.neo4j.values.storable.NumberType;
 
 import java.util.OptionalLong;
 
+//节点属性信息描述
 @FunctionalInterface
 public interface NodeProperties {
 

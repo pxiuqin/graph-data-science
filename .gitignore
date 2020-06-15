@@ -86,3 +86,8 @@ tmp
 
 # Ignore user-specific Gradle configuration
 /gradle.properties
+
+# vscode
+.vscode
+.bloop
+.metals

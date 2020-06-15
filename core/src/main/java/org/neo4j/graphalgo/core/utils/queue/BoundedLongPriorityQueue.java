@@ -30,7 +30,7 @@ import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfDoubleArray;
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfLongArray;
 
 public abstract class BoundedLongPriorityQueue {
-
+    //内存评估
     public static MemoryEstimation memoryEstimation(int capacity) {
         return MemoryEstimations.builder(BoundedLongPriorityQueue.class)
             .fixed("elements", sizeOfLongArray(capacity))
@@ -45,10 +45,11 @@ public abstract class BoundedLongPriorityQueue {
     private final int bound;
     private double minValue = Double.NaN;
 
-    final long[] elements;
-    final double[] priorities;
-    int elementCount = 0;
+    final long[] elements;  //记录元素
+    final double[] priorities;  //记录优先级
+    int elementCount = 0;  //记录元素的数量
 
+    //构造一个有大小范围的优先级队列
     BoundedLongPriorityQueue(int bound) {
         this.bound = bound;
         this.elements = new long[bound];
@@ -77,6 +78,7 @@ public abstract class BoundedLongPriorityQueue {
 
     protected boolean add(long element, double priority) {
         if (elementCount < bound || Double.isNaN(minValue) || priority < minValue) {
+            //基于二分查找确定给定优先级值的下标
             int idx = Arrays.binarySearch(priorities, 0, elementCount, priority);
             idx = (idx < 0) ? -idx : idx + 1;
             int length = bound - idx;

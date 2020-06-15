@@ -26,6 +26,7 @@ import org.neo4j.graphalgo.config.RelationshipWeightConfig;
 
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
+//节点相似配置
 public interface NodeSimilarityBaseConfig extends AlgoBaseConfig, RelationshipWeightConfig {
 
     String TOP_K_KEY = "topK";
