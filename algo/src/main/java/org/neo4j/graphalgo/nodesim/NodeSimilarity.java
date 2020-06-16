@@ -269,6 +269,7 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
             stream -> stream
                 .forEach(node1 -> {
                     long[] vector1 = vectors.get(node1);
+                    // 以下注释内容很关键
                     // We deliberately compute the full matrix (except the diagonal).
                     // The parallel workload is partitioned based on the outer stream.
                     // The TopKMap stores a priority queue for each node. Writing

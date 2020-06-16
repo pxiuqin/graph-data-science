@@ -34,6 +34,7 @@ import java.util.PrimitiveIterator;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+//在TopKMap中处理单个节点的所有对
 public class TopKMap {
 
     private final BitSet nodeFilter;
