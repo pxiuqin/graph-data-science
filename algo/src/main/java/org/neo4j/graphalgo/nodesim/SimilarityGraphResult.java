@@ -24,7 +24,7 @@ import org.neo4j.graphalgo.api.Graph;
 //相似图结果
 public class SimilarityGraphResult {
     private final Graph similarityGraph;
-    private final long comparedNodes;
+    private final long comparedNodes;  //确定比较的数量
     private final boolean isTopKGraph;
 
     SimilarityGraphResult(Graph similarityGraph, long comparedNodes, boolean isTopKGraph) {

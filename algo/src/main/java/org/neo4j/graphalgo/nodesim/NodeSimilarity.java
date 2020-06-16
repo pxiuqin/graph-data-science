@@ -47,7 +47,7 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
     private final ExecutorService executorService;
     private final AllocationTracker tracker;
 
-    private final BitSet nodeFilter;
+    private final BitSet nodeFilter;  //节点数量
 
     private HugeObjectArray<long[]> vectors;  //节点连边数组[可以理解成一个节点连边数也是一个集合]
     private HugeObjectArray<double[]> weights;  //连边权重数组[连边权重]
@@ -120,6 +120,7 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
         }
     }
 
+    //
     public SimilarityGraphResult computeToGraph() {
         Graph similarityGraph;
         boolean isTopKGraph = false;
@@ -144,15 +145,17 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
         return new SimilarityGraphResult(similarityGraph, nodesToCompare, isTopKGraph);
     }
 
+    //计算前准备：节点数组和权重数组初始化
     private void prepare() {
         progressLogger.logMessage("Start :: NodeSimilarity#prepare");
 
         vectors = HugeObjectArray.newArray(long[].class, graph.nodeCount(), tracker);
         if (weighted) {
-            weights = HugeObjectArray.newArray(double[].class, graph.nodeCount(), tracker);
+            //构建权重数组，大小为图的节点数，这里的大小表示每个节点要计算它的边权重
+            weights = HugeObjectArray.newArray(double[].class, graph.nodeCount(), tracker); 
         }
 
-        DegreeComputer degreeComputer = new DegreeComputer();
+        DegreeComputer degreeComputer = new DegreeComputer();   //计算节点度信息
         VectorComputer vectorComputer = VectorComputer.of(graph, weighted);
         vectors.setAll(node -> {
             graph.forEachRelationship(node, degreeComputer);
@@ -161,7 +164,7 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
             vectorComputer.reset(degree);
 
             if (degree >= config.degreeCutoff()) {
-                nodesToCompare++;
+                nodesToCompare++;  //需要比较的节点数累加
                 nodeFilter.set(node);
 
                 progressLogger.logProgress(graph.degree(node));
@@ -294,11 +297,13 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
         progressLogger.logMessage("Start :: NodeSimilarity#computeTopN");
 
         TopNList topNList = new TopNList(config.normalizedN());
+
+        //两层循环构建节点之间的相似性
         loggableAndTerminatableNodeStream()
             .forEach(node1 -> {
                 long[] vector1 = vectors.get(node1);
 
-                nodeStream(node1 + 1)
+                nodeStream(node1 + 1)  //因为nodeid是数值类型的，+1表示下一个ID
                     .forEach(node2 -> {
                         double similarity = weighted
                             ? weightedJaccard(vector1, vectors.get(node2), weights.get(node1), weights.get(node2))
@@ -382,6 +387,7 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
         return nodeStream(0);
     }
 
+    //可运行和跟踪的节点处理流
     private LongStream loggableAndTerminatableNodeStream() {
         return checkProgress(nodeStream());
     }
@@ -394,6 +400,7 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
         });
     }
 
+    //指定了offset构建流
     private LongStream nodeStream(long offset) {
         return new SetBitsIterable(nodeFilter, offset).stream();
     }
@@ -414,7 +421,7 @@ public class NodeSimilarity extends Algorithm<NodeSimilarity, NodeSimilarityResu
         @Override
         public boolean accept(long source, long target) {
             if (source != target && lastTarget != target) {
-                degree++;
+                degree++;  //有源和目标节点度自然+1
             }
             lastTarget = target;
             return true;
