@@ -19,6 +19,7 @@
  */
 package org.neo4j.graphalgo.pagerank;
 
+//PageRank算法类型
 public enum PageRankAlgorithmType implements PageRankAlgorithm {
 
     WEIGHTED {

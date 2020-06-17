@@ -38,7 +38,7 @@ public class PageRankFactory<CONFIG extends PageRankBaseConfig> extends Algorith
     private final PageRankAlgorithmType algorithmType;
 
     public PageRankFactory() {
-        this(PageRankAlgorithmType.NON_WEIGHTED);
+        this(PageRankAlgorithmType.NON_WEIGHTED);  //默认给定无权图
     }
 
     public PageRankFactory(PageRankAlgorithmType algorithmType) {
@@ -59,6 +59,7 @@ public class PageRankFactory<CONFIG extends PageRankBaseConfig> extends Algorith
             configuration.concurrency()
         );
 
+        //构建一个新图
         return algorithmType.create(
             graph,
             configuration.sourceNodeIds(),
@@ -76,7 +77,7 @@ public class PageRankFactory<CONFIG extends PageRankBaseConfig> extends Algorith
             .add(MemoryEstimations.setup("computeSteps", (dimensions, concurrency) -> {
                 // adjust concurrency, if necessary
                 long nodeCount = dimensions.nodeCount();
-                long nodesPerThread = ceilDiv(nodeCount, concurrency);
+                long nodesPerThread = ceilDiv(nodeCount, concurrency);  //除法
                 if (nodesPerThread > Partition.MAX_NODE_COUNT) {
                     concurrency = (int) ceilDiv(nodeCount, Partition.MAX_NODE_COUNT);
                     nodesPerThread = ceilDiv(nodeCount, concurrency);

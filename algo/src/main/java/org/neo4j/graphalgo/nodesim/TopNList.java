@@ -28,7 +28,7 @@ import java.util.PrimitiveIterator;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-//
+//构建TopN列表
 public class TopNList {
 
     static MemoryEstimation memoryEstimation(int topN) {
@@ -37,10 +37,10 @@ public class TopNList {
             .build();
     }
 
-    private final BoundedLongLongPriorityQueue queue;
+    private final BoundedLongLongPriorityQueue queue;  //优先级队列
 
     public TopNList(int top) {
-        int absTop = Math.abs(top);
+        int absTop = Math.abs(top);   //通过top的正负来理解是最大还是最小
 
         this.queue = top > 0
             ? BoundedLongLongPriorityQueue.max(absTop)
@@ -54,7 +54,7 @@ public class TopNList {
     public Stream<SimilarityResult> stream() {
         Iterable<SimilarityResult> iterable = () -> new Iterator<SimilarityResult>() {
 
-            PrimitiveIterator.OfLong elements1Iter = queue.elements1().iterator();
+            PrimitiveIterator.OfLong elements1Iter = queue.elements1().iterator();  //从队列中取数
             PrimitiveIterator.OfLong elements2Iter = queue.elements2().iterator();
             PrimitiveIterator.OfDouble prioritiesIter = queue.priorities().iterator();
 
@@ -69,7 +69,7 @@ public class TopNList {
             }
         };
 
-        //基于
+        //基于StreamSupport构建Stream流
         return StreamSupport.stream(iterable.spliterator(), false);
     }
 }

@@ -64,7 +64,7 @@ public class TopKMap {
         int boundedTopK = (int) Math.min(topK, items);
         topKLists = HugeObjectArray.newArray(TopKList.class, items, tracker);
         topKLists.setAll(node1 -> nodeFilter.get(node1)
-            ? new TopKList(comparator.equals(SimilarityResult.ASCENDING)
+            ? new TopKList(comparator.equals(SimilarityResult.ASCENDING)  //判断是否正序
                 ? BoundedLongPriorityQueue.min(boundedTopK)
                 : BoundedLongPriorityQueue.max(boundedTopK)
             ) : null
