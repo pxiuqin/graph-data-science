@@ -45,6 +45,7 @@ public interface PageRankBaseConfig extends
         return 20;
     }
 
+    //衰减因子
     @Value.Default
     default double dampingFactor() {
         return 0.85;

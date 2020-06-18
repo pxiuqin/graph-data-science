@@ -92,7 +92,7 @@ public interface PageRankAlgorithm extends Assessable {
         );
     }
 
-    PageRankVariant variant(PageRankBaseConfig config);
+    PageRankVariant variant(PageRankBaseConfig config); //基于配置来构建PageRank的各种变体
 
     Class<? extends BaseComputeStep> computeStepClass();
 

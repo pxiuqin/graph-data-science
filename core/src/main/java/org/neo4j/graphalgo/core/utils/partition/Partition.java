@@ -19,6 +19,7 @@
  */
 package org.neo4j.graphalgo.core.utils.partition;
 
+//分片处理，这里主要通过开始节点和节点数量来分区
 public class Partition {
 
     public static final int MAX_NODE_COUNT = (Integer.MAX_VALUE - 32) >> 1;

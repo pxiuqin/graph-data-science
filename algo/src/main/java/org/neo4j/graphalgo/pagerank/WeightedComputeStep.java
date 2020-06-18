@@ -29,6 +29,7 @@ import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
 import static org.neo4j.graphalgo.core.utils.ArrayUtil.binaryLookup;
 import static org.neo4j.graphalgo.pagerank.PageRank.DEFAULT_WEIGHT;
 
+//构建含权重的PageRank的计算单元
 public class WeightedComputeStep extends BaseComputeStep implements RelationshipWithPropertyConsumer {
 
     private final HugeDoubleArray aggregatedDegrees;

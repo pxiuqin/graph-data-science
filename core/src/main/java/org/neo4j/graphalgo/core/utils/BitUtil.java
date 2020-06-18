@@ -101,7 +101,7 @@ public final class BitUtil {
     }
 
     public static long ceilDiv(long dividend, long divisor) {
-        return 1L + (-1L + dividend) / divisor;
+        return 1L + (-1L + dividend) / divisor;  //求最大返回，比如0.x求大为1
     }
 
     private BitUtil() {

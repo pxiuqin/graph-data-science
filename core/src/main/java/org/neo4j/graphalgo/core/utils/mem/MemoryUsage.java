@@ -44,6 +44,7 @@ import static com.carrotsearch.hppc.HashContainers.MIN_HASH_ARRAY_LENGTH;
 import static java.lang.Integer.numberOfTrailingZeros;
 import static org.neo4j.graphalgo.core.utils.BitUtil.nextHighestPowerOfTwo;
 
+//内存使用情况通用类
 public final class MemoryUsage {
 
     private static final int SHIFT_BYTE = numberOfTrailingZeros(Byte.BYTES);
@@ -336,7 +337,7 @@ public final class MemoryUsage {
         for (String unit : UNITS) {
             // allow for a bit of overflow before going to the next unit to
             // show a diff between, say, 1.1 and 1.2 MiB as 1150 KiB vs 1250 KiB
-            if (bytes >> 14 == 0) {
+            if (bytes >> 14 == 0) {  //14表示2^14大小的bytes才开始做运算
                 return bytes + unit;
             }
             bytes = bytes >> 10;

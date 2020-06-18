@@ -35,6 +35,7 @@ import java.util.stream.LongStream;
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfDoubleArray;
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfFloatArray;
 
+//初步实现计算的单元的抽象类
 public abstract class BaseComputeStep implements ComputeStep {
     private static final int S_INIT = 0;
     private static final int S_CALC = 1;

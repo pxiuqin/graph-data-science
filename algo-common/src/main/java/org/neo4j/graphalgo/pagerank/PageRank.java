@@ -210,6 +210,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
                 executor);
     }
 
+    //调整分片数
     private int adjustBatchSize(int batchSize) {
         if (batchSize == 0) {
             return Partition.MAX_NODE_COUNT;
@@ -223,6 +224,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         return (int) Math.min(degreeBatchSize, Partition.MAX_NODE_COUNT);
     }
 
+    //创建计算单元
     private ComputeSteps createComputeSteps(
             int concurrency,
             long nodeCount,
@@ -247,21 +249,22 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         DegreeCache degreeCache = degreeComputer.degree(pool, concurrency, tracker);
 
         while (parts.hasNext()) {
-            Partition partition = parts.next();
-            int partitionSize = (int) partition.nodeCount;
-            long start = partition.startNode;
+            Partition partition = parts.next();  //获取一个分片
+            int partitionSize = (int) partition.nodeCount;  //当前分片的节点个数
+            long start = partition.startNode;  //当前分配的开始节点
             int i = 1;
             while (parts.hasNext()
-                   && i < partitionsPerThread
+                   && i < partitionsPerThread  //每个线程分片数量
                    && partition.fits(partitionSize)) {
                 partition = parts.next();
                 partitionSize += partition.nodeCount;
                 ++i;
             }
 
-            starts.add(start);
+            starts.add(start);  //开始节点保存
             lengths.add(partitionSize);
 
+            //添加一个可计算单元，使用PageRankVariant来创建计算单元
             computeSteps.add(pageRankVariant.createComputeStep(
                     dampingFactor,
                     toleranceValue,
@@ -279,7 +282,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         long[] startArray = starts.toArray();
         int[] lengthArray = lengths.toArray();
         for (ComputeStep computeStep : computeSteps) {
-            computeStep.setStarts(startArray, lengthArray);
+            computeStep.setStarts(startArray, lengthArray);  //每个计算单元都给定开始节点数组和长度数组
         }
         return new ComputeSteps(tracker, computeSteps, concurrency, pool);
     }
@@ -308,6 +311,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
                 concurrency,
                 availableMemory(),
                 partitions);
+
         if (concurrency > maxConcurrency) {
             if (log != null) {
                 long required = memoryUsageFor(concurrency, partitions);
@@ -361,11 +365,11 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         // TODO: run gc first to free up memory?
         Runtime rt = Runtime.getRuntime();
 
-        long max = rt.maxMemory(); // max allocated
-        long total = rt.totalMemory(); // currently allocated
-        long free = rt.freeMemory(); // unused portion of currently allocated
+        long max = rt.maxMemory(); // max allocated 内存分配上线xmx
+        long total = rt.totalMemory(); // currently allocated 当前分配的xms
+        long free = rt.freeMemory(); // unused portion of currently allocated 当前分配的还未用的
 
-        return max - total + free;
+        return max - total + free;  //如此来计算当前可用内存总量
     }
 
     private static long estimateMemoryUsagePerThread(long nodeCount, int concurrency) {
@@ -422,7 +426,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
     public final class ComputeSteps {
         private List<ComputeStep> steps;
         private final ExecutorService pool;
-        private float[][][] scores;
+        private float[][][] scores;  //等分最终构建起一个3维数组
         private final int concurrency;
 
         private ComputeSteps(
@@ -491,9 +495,9 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
                 l2Norm += ParallelUtil.parallelStream(
                         Arrays.stream(deltas),
                         concurrency,
-                        (stream) -> stream.map(score -> score * score).sum());
+                        (stream) -> stream.map(score -> score * score).sum());  //并行计算平方和
             }
-            l2Norm = Math.sqrt(l2Norm);
+            l2Norm = Math.sqrt(l2Norm);   //平方和在开平方
             l2Norm = l2Norm < 0 ? 1 : l2Norm;
             return l2Norm;
         }
@@ -511,7 +515,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
             step.prepareNextIteration(scores[idx]);
             float[][] nextScores = step.nextScores();
             for (int j = 0, len = nextScores.length; j < len; j++) {
-                scores[j][idx] = nextScores[j];
+                scores[j][idx] = nextScores[j];  //给出一个计算单元中的得分值
             }
         }
 

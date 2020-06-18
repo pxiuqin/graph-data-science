@@ -19,13 +19,13 @@
  */
 package org.neo4j.graphalgo.pagerank;
 
-//PageRank算法类型
+//PageRank算法的变体类型
 public enum PageRankAlgorithmType implements PageRankAlgorithm {
 
     WEIGHTED {
         @Override
         public PageRankVariant variant(final PageRankBaseConfig config) {
-            return new WeightedPageRankVariant(config.cacheWeights());
+            return new WeightedPageRankVariant(config.cacheWeights());  //创建带权重的PageRank算法
         }
 
         @Override
@@ -37,7 +37,7 @@ public enum PageRankAlgorithmType implements PageRankAlgorithm {
     NON_WEIGHTED {
         @Override
         public PageRankVariant variant(final PageRankBaseConfig config) {
-            return new NonWeightedPageRankVariant();
+            return new NonWeightedPageRankVariant();   //创建不含权重的PageRank算法
         }
 
         @Override

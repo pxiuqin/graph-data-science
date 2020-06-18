@@ -27,6 +27,7 @@ public interface ComputeStep extends Runnable {
 
     float[][] nextScores();
 
+    //设置开始数组
     void setStarts(long[] startArray, int[] lengthArray);
 
     double[] deltas();

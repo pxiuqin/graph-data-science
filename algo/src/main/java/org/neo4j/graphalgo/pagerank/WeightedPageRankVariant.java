@@ -23,6 +23,7 @@ import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 
+//含权重的的PageRank算法变体
 public class WeightedPageRankVariant implements PageRankVariant {
     private final boolean cacheWeights;
 
