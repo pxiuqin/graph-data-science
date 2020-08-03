@@ -65,9 +65,9 @@ public class WeightedComputeStep extends BaseComputeStep implements Relationship
         for (long nodeId = startNode; nodeId < endNode; ++nodeId) {
             delta = deltas[(int) (nodeId - startNode)];  //取出delta
             if (delta > 0.0) {
-                int degree = degrees.degree(nodeId);
+                int degree = degrees.degree(nodeId);  //出度
                 if (degree > 0) {
-                    sumOfWeights = aggregatedDegrees.get(nodeId); //权重和
+                    sumOfWeights = aggregatedDegrees.get(nodeId); //权重和代替delta/degree
                     rels.forEachRelationship(nodeId, DEFAULT_WEIGHT, this);
                 }
             }
@@ -81,7 +81,7 @@ public class WeightedComputeStep extends BaseComputeStep implements Relationship
             double proportion = property / sumOfWeights;
             float srcRankDelta = (float) (delta * proportion);  //乘以权重带过来的传播因子
             if (srcRankDelta != 0F) {
-                int idx = binaryLookup(targetNodeId, starts);  //找到索引位置
+                int idx = binaryLookup(targetNodeId, starts);  //找到索引位置【在开始节点数组中找位置】
                 nextScores[idx][(int) (targetNodeId - starts[idx])] += srcRankDelta;  //赋值出链携带pr值
             }
         }

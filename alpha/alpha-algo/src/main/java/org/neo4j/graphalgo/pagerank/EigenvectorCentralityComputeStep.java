@@ -27,6 +27,16 @@ import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 
 import static org.neo4j.graphalgo.core.utils.ArrayUtil.binaryLookup;
 
+/**
+ * 基于特征向量的中心性计算
+ * 一个节点的特征向量中心性与其邻近节点的中心性得分的总和成正比，与重要的节点连接的节点更重要，有少量有影响
+ * 的联系人的节点其中心性可能超过拥有大量平庸的联系人的节点
+ * 1.计算图中节点邻接矩阵的特征分解
+ * 2.选择有最大特征值的特征向量
+ * 3.第i个节点的中心性等于特征向量中第i元素
+ * 
+ * 另外PageRank算法是特征向量中心性的一个变种
+ */
 final class EigenvectorCentralityComputeStep extends BaseComputeStep implements RelationshipConsumer {
     private float srcRankDelta;
     private final double initialValue;
@@ -66,7 +76,7 @@ final class EigenvectorCentralityComputeStep extends BaseComputeStep implements 
             if (delta > 0.0) {
                 int degree = degrees.degree(nodeId);
                 if (degree > 0) {
-                    srcRankDelta = (float) delta;
+                    srcRankDelta = (float) delta;  //直接传递原pr值
                     rels.forEachRelationship(nodeId, this);
                 }
             }
@@ -98,7 +108,7 @@ final class EigenvectorCentralityComputeStep extends BaseComputeStep implements 
         for (int i = 0; i < length; i++) {
             double delta = 0.0;
             for (float[] scores : prevScores) {
-                delta += scores[i];
+                delta += scores[i];  //delta是入链pr求和
                 scores[i] = 0F;
             }
             if (delta > tolerance) {
@@ -114,7 +124,7 @@ final class EigenvectorCentralityComputeStep extends BaseComputeStep implements 
     @Override
     void normalizeDeltas() {
         for (int i = 0; i < deltas.length; i++) {
-            deltas[i] = deltas[i] / l2Norm;
+            deltas[i] = deltas[i] / l2Norm;  //正则化处理
         }
     }
 

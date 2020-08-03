@@ -122,7 +122,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
 
     private ComputeSteps computeSteps;   //并行计算单元
 
-    private final HugeDoubleArray result;
+    private final HugeDoubleArray result;  //每个计算单元的计算结果
 
     /**
      * Parallel Page Rank implementation.
@@ -183,7 +183,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         getProgressLogger().logMessage(":: Start");
 
         initializeSteps();
-        computeSteps.run(maxIterations);
+        computeSteps.run(maxIterations);   //基于迭代次数来计算
         computeSteps.mergeResults();
 
         getProgressLogger().logMessage(":: Finished");
@@ -243,7 +243,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
                 concurrency,
                 partitions.size());
 
-        List<ComputeStep> computeSteps = new ArrayList<>(expectedParallelism);
+        List<ComputeStep> computeSteps = new ArrayList<>(expectedParallelism);  //并行数
         LongArrayList starts = new LongArrayList(expectedParallelism);
         IntArrayList lengths = new IntArrayList(expectedParallelism);
         int partitionsPerThread = ParallelUtil.threadCount(
@@ -254,6 +254,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         DegreeComputer degreeComputer = pageRankVariant.degreeComputer(graph);
         DegreeCache degreeCache = degreeComputer.degree(pool, concurrency, tracker);
 
+        //对每个分片进行处理
         while (parts.hasNext()) {
             Partition partition = parts.next();  //获取一个分片
             int partitionSize = (int) partition.nodeCount;  //当前分片的节点个数
@@ -261,9 +262,9 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
             int i = 1;
             while (parts.hasNext()
                    && i < partitionsPerThread  //每个线程分片数量
-                   && partition.fits(partitionSize)) {
+                   && partition.fits(partitionSize)) {  //判断满足条件
                 partition = parts.next();
-                partitionSize += partition.nodeCount;
+                partitionSize += partition.nodeCount;  //处理的数量
                 ++i;
             }
 
@@ -459,10 +460,11 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         }
 
         private void run(int iterations) {
-            didConverge = false;
+            didConverge = false;  //标识是否停止迭代
             ParallelUtil.runWithConcurrency(concurrency, steps, terminationFlag, pool);
             for (ranIterations = 0; ranIterations < iterations && !didConverge; ranIterations++) {
                 getProgressLogger().logMessage(formatWithLocale(":: Iteration %d :: Start", ranIterations + 1));
+
                 // calculate scores
                 ParallelUtil.runWithConcurrency(concurrency, steps, terminationFlag, pool);
 
@@ -513,16 +515,19 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
             int stepSize = steps.size();
             float[][][] scores = this.scores;
             int i;
+
+            //每个并行步分别同步下相关得分
             for (i = 0; i < stepSize; i++) {
                 synchronizeScores(steps.get(i), i, scores);
             }
         }
 
+        //同步得分
         private void synchronizeScores(ComputeStep step, int idx, float[][][] scores) {
             step.prepareNextIteration(scores[idx]);
             float[][] nextScores = step.nextScores();
             for (int j = 0, len = nextScores.length; j < len; j++) {
-                scores[j][idx] = nextScores[j];  //给出一个计算单元中的得分值
+                scores[j][idx] = nextScores[j];  //给出一个计算单元中的得分值【同步的目的就是把入链值转换到出链值】
             }
         }
 

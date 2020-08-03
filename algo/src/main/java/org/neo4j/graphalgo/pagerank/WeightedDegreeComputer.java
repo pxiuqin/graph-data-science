@@ -24,6 +24,7 @@ import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 
 import java.util.concurrent.ExecutorService;
 
+//带权重的度计算处理【利用了带权重的度中心性计算结果】
 public class WeightedDegreeComputer implements DegreeComputer {
 
     private final Graph graph;

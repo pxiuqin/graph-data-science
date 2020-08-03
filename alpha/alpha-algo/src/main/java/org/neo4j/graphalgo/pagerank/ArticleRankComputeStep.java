@@ -27,8 +27,9 @@ import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 
 import static org.neo4j.graphalgo.core.utils.ArrayUtil.binaryLookup;
 
+//基于变种PageRank实现文章引用的重要性计算
 final class ArticleRankComputeStep extends BaseComputeStep implements RelationshipConsumer {
-    private double averageDegree;
+    private double averageDegree;  //添加平均度，添加到每次迭代出链的pr值上
     private float srcRankDelta;
 
     ArticleRankComputeStep(
@@ -53,6 +54,7 @@ final class ArticleRankComputeStep extends BaseComputeStep implements Relationsh
         this.averageDegree = degreeCache.average();
     }
 
+    //计算
     void singleIteration() {
         long startNode = this.startNode;
         long endNode = this.endNode;
@@ -62,7 +64,7 @@ final class ArticleRankComputeStep extends BaseComputeStep implements Relationsh
             if (delta > 0) {
                 int degree = degrees.degree(nodeId);
                 if (degree > 0) {
-                    srcRankDelta = (float) (delta / (degree + averageDegree));
+                    srcRankDelta = (float) (delta / (degree + averageDegree));  //把全图的平均度加入到出链pr值分配中
                     rels.forEachRelationship(nodeId, this);
                 }
             }

@@ -30,7 +30,7 @@ import static org.neo4j.graphalgo.core.utils.ArrayUtil.binaryLookup;
 //无权重计算步单元处理
 public class NonWeightedComputeStep extends BaseComputeStep implements RelationshipConsumer {
 
-    private float srcRankDelta;
+    private float srcRankDelta;   //记录每次计算中，把当前节点的pr值分配到出链的pr值
 
     NonWeightedComputeStep(
         double dampingFactor,
@@ -54,6 +54,7 @@ public class NonWeightedComputeStep extends BaseComputeStep implements Relations
         );
     }
 
+    //计算过程
     void singleIteration() {
         long startNode = this.startNode;
         long endNode = this.endNode;
@@ -63,7 +64,7 @@ public class NonWeightedComputeStep extends BaseComputeStep implements Relations
             if (delta > 0.0) {
                 int degree = degrees.degree(nodeId);
                 if (degree > 0) {
-                    srcRankDelta = (float) (delta / degree);
+                    srcRankDelta = (float) (delta / degree);  //直接将该节点的pr值均分到出度链
                     rels.forEachRelationship(nodeId, this);
                 }
             }
@@ -75,7 +76,7 @@ public class NonWeightedComputeStep extends BaseComputeStep implements Relations
     public boolean accept(long sourceNodeId, long targetNodeId) {
         if (srcRankDelta != 0F) {
             int idx = binaryLookup(targetNodeId, starts);
-            nextScores[idx][(int) (targetNodeId - starts[idx])] += srcRankDelta;
+            nextScores[idx][(int) (targetNodeId - starts[idx])] += srcRankDelta;   //保存到出链携带的pr
         }
         return true;
     }

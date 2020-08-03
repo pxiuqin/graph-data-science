@@ -131,6 +131,7 @@ public abstract class BaseComputeStep implements ComputeStep {
             .build();
     }
 
+    //设置开始节点和节点数量
     public void setStarts(long[] starts, int[] lengths) {
         this.starts = starts;
         this.lengths = lengths;
@@ -158,9 +159,9 @@ public abstract class BaseComputeStep implements ComputeStep {
 
     //初始化处理，给定初始的pr值
     private void initialize() {
-        this.nextScores = new float[starts.length][];
+        this.nextScores = new float[starts.length][];  //多少个开始节点来定义下一步得分？
         Arrays.setAll(nextScores, i -> {
-            int size = lengths[i];
+            int size = lengths[i];  //不同起始点对应的长度是不同，这里要针对每个具体的起点来确定
             tracker.add(sizeOfFloatArray(size));
             return new float[size];
         });
@@ -198,8 +199,9 @@ public abstract class BaseComputeStep implements ComputeStep {
         this.l2Norm = l2Norm;
     }
 
+    //给定入链pr值
     public void prepareNextIteration(float[][] prevScores) {
-        this.prevScores = prevScores;
+        this.prevScores = prevScores;  //行表示PR计算中初始的ComputeStemp个数，列表示入链
     }
 
     //同步
@@ -207,12 +209,12 @@ public abstract class BaseComputeStep implements ComputeStep {
         assert prevScores != null;
         assert prevScores.length >= 1;
 
-        int scoreDim = prevScores.length;
+        int scoreDim = prevScores.length;  //获取行数，score维度？可以理解成入链的个数
         float[][] prevScores = this.prevScores;
 
         boolean shouldBreak = true;
 
-        int length = prevScores[0].length;
+        int length = prevScores[0].length;  //分区中的节点数
         for (int i = 0; i < length; i++) {
             double sum = 0.0;
             for (int j = 0; j < scoreDim; j++) {

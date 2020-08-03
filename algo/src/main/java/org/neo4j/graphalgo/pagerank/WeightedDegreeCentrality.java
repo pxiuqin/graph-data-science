@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
+//基于权重的度中心性计算
 public class WeightedDegreeCentrality extends Algorithm<WeightedDegreeCentrality, WeightedDegreeCentrality> {
     private final long nodeCount;
     private Graph graph;
@@ -44,7 +45,7 @@ public class WeightedDegreeCentrality extends Algorithm<WeightedDegreeCentrality
     private final boolean cacheWeights;
 
     private HugeDoubleArray degrees;
-    private HugeObjectArray<HugeDoubleArray> weights;
+    private HugeObjectArray<HugeDoubleArray> weights;  //用来缓存权重
     private AllocationTracker tracker;
 
     public WeightedDegreeCentrality(
@@ -118,15 +119,17 @@ public class WeightedDegreeCentrality extends Algorithm<WeightedDegreeCentrality
                 }
 
                 double[] weightedDegree = new double[1];
+                
+                //迭代计算每条边
                 threadLocalGraph.forEachRelationship(nodeId, Double.NaN, (sourceNodeId, targetNodeId, weight) -> {
                     if(weight > 0) {
-                        weightedDegree[0] += weight;
+                        weightedDegree[0] += weight;  //累加权重
                     }
 
                     return true;
                 });
 
-                degrees.set(nodeId, weightedDegree[0]);
+                degrees.set(nodeId, weightedDegree[0]);  //度为其权重
 
             }
         }
@@ -144,7 +147,7 @@ public class WeightedDegreeCentrality extends Algorithm<WeightedDegreeCentrality
                 }
 
                 final HugeDoubleArray nodeWeights = HugeDoubleArray.newArray(graph.degree(nodeId), tracker);
-                weights.set(nodeId, nodeWeights);
+                weights.set(nodeId, nodeWeights);  //缓存权重值
 
                 int[] index = {0};
                 weightedDegree[0] = 0D;
