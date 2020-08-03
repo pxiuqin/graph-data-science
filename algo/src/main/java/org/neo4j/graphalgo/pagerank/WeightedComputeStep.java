@@ -57,16 +57,17 @@ public class WeightedComputeStep extends BaseComputeStep implements Relationship
         this.aggregatedDegrees = degreeCache.aggregatedDegrees();
     }
 
+    //计算
     void singleIteration() {
         long startNode = this.startNode;
         long endNode = this.endNode;
         RelationshipIterator rels = this.relationshipIterator;
         for (long nodeId = startNode; nodeId < endNode; ++nodeId) {
-            delta = deltas[(int) (nodeId - startNode)];
+            delta = deltas[(int) (nodeId - startNode)];  //取出delta
             if (delta > 0.0) {
                 int degree = degrees.degree(nodeId);
                 if (degree > 0) {
-                    sumOfWeights = aggregatedDegrees.get(nodeId);
+                    sumOfWeights = aggregatedDegrees.get(nodeId); //权重和
                     rels.forEachRelationship(nodeId, DEFAULT_WEIGHT, this);
                 }
             }
@@ -78,10 +79,10 @@ public class WeightedComputeStep extends BaseComputeStep implements Relationship
     public boolean accept(long sourceNodeId, long targetNodeId, double property) {
         if (property > 0) {
             double proportion = property / sumOfWeights;
-            float srcRankDelta = (float) (delta * proportion);
+            float srcRankDelta = (float) (delta * proportion);  //乘以权重带过来的传播因子
             if (srcRankDelta != 0F) {
-                int idx = binaryLookup(targetNodeId, starts);
-                nextScores[idx][(int) (targetNodeId - starts[idx])] += srcRankDelta;
+                int idx = binaryLookup(targetNodeId, starts);  //找到索引位置
+                nextScores[idx][(int) (targetNodeId - starts[idx])] += srcRankDelta;  //赋值出链携带pr值
             }
         }
 

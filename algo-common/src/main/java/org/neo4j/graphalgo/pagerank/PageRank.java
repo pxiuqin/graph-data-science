@@ -120,7 +120,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
     private final LongStream sourceNodeIds;
     private final PageRankVariant pageRankVariant;
 
-    private ComputeSteps computeSteps;
+    private ComputeSteps computeSteps;   //并行计算单元
 
     private final HugeDoubleArray result;
 
@@ -128,6 +128,11 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
      * Parallel Page Rank implementation.
      * Whether the algorithm actually runs in parallel depends on the given
      * executor and batchSize.
+     * 1.并行化处理使用Partition的格式（src_id,out_degress,[dst_id1,dst_id2,...,dst_idn]）
+     * 2.迭代计算把当前src_id的pr值传递到dst_id
+     * 3.累加dst_id的score
+     * 4.最终pr=(1-a)/T+a*V_score
+     * 
      */
     PageRank(
         Graph graph,
@@ -196,6 +201,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
             return;
         }
 
+        //确定分片
         List<Partition> partitions = PartitionUtils.degreePartition(graph, adjustBatchSize(batchSize));
 
         ExecutorService executor = ParallelUtil.canRunInParallel(this.executor)
@@ -423,6 +429,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         computeSteps.release();
     }
 
+    //并行计算单元组装
     public final class ComputeSteps {
         private List<ComputeStep> steps;
         private final ExecutorService pool;
@@ -439,7 +446,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
             this.steps = steps;
             this.pool = pool;
             int stepSize = steps.size();
-            scores = new float[stepSize][stepSize][];
+            scores = new float[stepSize][stepSize][];  //？
             if (AllocationTracker.isTracking(tracker)) {
                 tracker.add((stepSize + 1) * sizeOfObjectArray(stepSize));
             }
@@ -497,7 +504,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
                         concurrency,
                         (stream) -> stream.map(score -> score * score).sum());  //并行计算平方和
             }
-            l2Norm = Math.sqrt(l2Norm);   //平方和在开平方
+            l2Norm = Math.sqrt(l2Norm);   //平方和在开平方，计算L2范数
             l2Norm = l2Norm < 0 ? 1 : l2Norm;
             return l2Norm;
         }

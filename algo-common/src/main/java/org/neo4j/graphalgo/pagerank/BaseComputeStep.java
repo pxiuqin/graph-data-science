@@ -35,8 +35,11 @@ import java.util.stream.LongStream;
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfDoubleArray;
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfFloatArray;
 
-//初步实现计算的单元的抽象类
+//初步实现计算单元的抽象类，给定了计算的步骤和结果的组装，具体计算需要实现类来完成
 public abstract class BaseComputeStep implements ComputeStep {
+    /**
+     * 计算状态维护
+     */
     private static final int S_INIT = 0;
     private static final int S_CALC = 1;
     private static final int S_SYNC = 2;
@@ -53,13 +56,13 @@ public abstract class BaseComputeStep implements ComputeStep {
     final Degrees degrees;
     private final AllocationTracker tracker;
 
-    private final double alpha;
-    final double dampingFactor;
+    private final double alpha;  //用1-阻尼因子表示
+    final double dampingFactor;  //pr中的阻尼因子
 
     double[] pageRank;
     double[] deltas;
-    float[][] nextScores;
-    float[][] prevScores;
+    float[][] nextScores;  //出链分配的分值
+    float[][] prevScores;  //入链携带的分值
 
     final long startNode;
     final ProgressLogger progressLogger;
@@ -71,7 +74,7 @@ public abstract class BaseComputeStep implements ComputeStep {
     private boolean shouldBreak;
 
     BaseComputeStep(
-        double dampingFactor,
+        double dampingFactor,  //阻尼因子
         long[] sourceNodeIds,
         Graph graph,
         AllocationTracker tracker,
@@ -135,23 +138,25 @@ public abstract class BaseComputeStep implements ComputeStep {
 
     @Override
     public void run() {
+        //计算状态维护
         if (state == S_CALC) {
             singleIteration();
-            state = S_SYNC;
+            state = S_SYNC; //计算后可以进行同步
         } else if (state == S_SYNC) {
             this.shouldBreak = combineScores();
-            state = S_NORM;
+            state = S_NORM;  //同步后可以进行正则化表示
         } else if (state == S_NORM) {
             normalizeDeltas();
-            state = S_CALC;
+            state = S_CALC;  //正则化后继续可以进行计算
         } else if (state == S_INIT) {
             initialize();
-            state = S_CALC;
+            state = S_CALC;  //初始化后可以计算
         }
     }
 
     void normalizeDeltas() {}
 
+    //初始化处理，给定初始的pr值
     private void initialize() {
         this.nextScores = new float[starts.length][];
         Arrays.setAll(nextScores, i -> {
@@ -179,7 +184,7 @@ public abstract class BaseComputeStep implements ComputeStep {
         }
 
         this.pageRank = partitionRank;
-        this.deltas = Arrays.copyOf(partitionRank, partitionSize);
+        this.deltas = Arrays.copyOf(partitionRank, partitionSize);  //给定大小
     }
 
     double initialValue() {
@@ -197,6 +202,7 @@ public abstract class BaseComputeStep implements ComputeStep {
         this.prevScores = prevScores;
     }
 
+    //同步
     boolean combineScores() {
         assert prevScores != null;
         assert prevScores.length >= 1;
@@ -211,15 +217,15 @@ public abstract class BaseComputeStep implements ComputeStep {
             double sum = 0.0;
             for (int j = 0; j < scoreDim; j++) {
                 float[] scores = prevScores[j];
-                sum += scores[i];
+                sum += scores[i];  //对入链分配的值做求和
                 scores[i] = 0F;
             }
-            double delta = dampingFactor * sum;
+            double delta = dampingFactor * sum;  //乘以阻尼因子，为了避免Rank Leak【可以理解是等级泄露】和Rank Sink【可以理解是等级沉没】
             if (delta > tolerance) {
                 shouldBreak = false;
             }
             pageRank[i] += delta;
-            deltas[i] = delta;
+            deltas[i] = delta;  //同时把计算的值赋给delta
         }
 
         return shouldBreak;

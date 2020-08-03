@@ -51,10 +51,12 @@ public final class PartitionUtils {
         return tasks;
     }
 
+    //考虑基于出度来处理分片
     public static List<Partition> degreePartition(Graph graph, long batchSize) {
         return degreePartition(graph.nodeIterator(), graph, batchSize);
     }
 
+    //当前节点和出度节点作为分片中节点数量的说明
     public static List<Partition> degreePartition(
         PrimitiveLongIterator nodes,
         Degrees degrees,
@@ -68,11 +70,11 @@ public final class PartitionUtils {
             long nodeId = 0L;
             while (nodes.hasNext() && partitionSize <= batchSize && nodeId - start < MAX_NODE_COUNT) {
                 nodeId = nodes.next();
-                partitionSize += degrees.degree(nodeId);
+                partitionSize += degrees.degree(nodeId); //节点的度大小累加到分片大小
             }
 
             long end = nodeId + 1;
-            partitions.add(new Partition(start, end - start));
+            partitions.add(new Partition(start, end - start));  //完成一个分片
             start = end;
         }
         return partitions;

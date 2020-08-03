@@ -27,6 +27,7 @@ import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 
 import static org.neo4j.graphalgo.core.utils.ArrayUtil.binaryLookup;
 
+//无权重计算步单元处理
 public class NonWeightedComputeStep extends BaseComputeStep implements RelationshipConsumer {
 
     private float srcRankDelta;
