@@ -20,11 +20,10 @@
 package org.neo4j.graphalgo.triangle;
 
 import org.neo4j.graphalgo.AlgoBaseProc;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeAtomicLongArray;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
-import org.neo4j.graphalgo.triangle.IntersectingTriangleCount.TriangleCountResult;
 
 import java.util.Optional;
 
@@ -35,8 +34,8 @@ final class TriangleCountCompanion {
         "determine the number of triangles passing through each node in the graph.";
 
 
-    static PropertyTranslator<TriangleCountResult> nodePropertyTranslator() {
-        return (PropertyTranslator.OfLong<TriangleCountResult>) (data, nodeId) -> data.localTriangles().get(nodeId);
+    static <CONFIG extends TriangleCountBaseConfig> NodeProperties nodePropertyTranslator(AlgoBaseProc.ComputationResult<IntersectingTriangleCount, IntersectingTriangleCount.TriangleCountResult, CONFIG> computeResult) {
+        return computeResult.result().localTriangles().asNodeProperties();
     }
 
     static <PROC_RESULT, CONFIG extends TriangleCountBaseConfig> AbstractResultBuilder<PROC_RESULT> resultBuilder(
@@ -44,15 +43,15 @@ final class TriangleCountCompanion {
         AlgoBaseProc.ComputationResult<IntersectingTriangleCount, IntersectingTriangleCount.TriangleCountResult, CONFIG> computeResult
     ) {
         var result = Optional.ofNullable(computeResult.result()).orElse(EmptyResult.EMPTY_RESULT);
-        return procResultBuilder.withTriangleCount(result.globalTriangles());
+        return procResultBuilder.withGlobalTriangleCount(result.globalTriangles());
     }
 
     abstract static class TriangleCountResultBuilder<PROC_RESULT> extends AbstractResultBuilder<PROC_RESULT> {
 
-        long triangleCount = 0;
+        long globalTriangleCount = 0;
 
-        TriangleCountResultBuilder<PROC_RESULT> withTriangleCount(long triangleCount) {
-            this.triangleCount = triangleCount;
+        TriangleCountResultBuilder<PROC_RESULT> withGlobalTriangleCount(long globalTriangleCount) {
+            this.globalTriangleCount = globalTriangleCount;
             return this;
         }
 

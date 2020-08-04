@@ -38,9 +38,9 @@ public class GraphListProc extends CatalogProc {
 
     @Procedure(name = "gds.graph.list", mode = READ)
     @Description(DESCRIPTION)
-    public Stream<GraphInfo> list(@Name(value = "graphName", defaultValue = NO_VALUE) String graphName) {
+    public Stream<GraphInfoWithHistogram> list(@Name(value = "graphName", defaultValue = NO_VALUE) String graphName) {
         Stream<Map.Entry<GraphCreateConfig, GraphStore>> graphEntries = GraphStoreCatalog
-            .getGraphStores(getUsername())
+            .getGraphStores(username())
             .entrySet()
             .stream();
 
@@ -51,7 +51,11 @@ public class GraphListProc extends CatalogProc {
             graphEntries = graphEntries.filter(e -> e.getKey().graphName().equals(graphName));
         }
 
-        return graphEntries.map(e -> new GraphInfo(e.getKey(), e.getValue(), computeHistogram()));
+        return graphEntries.map(e -> {
+            GraphCreateConfig graphCreateConfig = e.getKey();
+            GraphStore graphStore = e.getValue();
+            return GraphInfoWithHistogram.of(graphCreateConfig, graphStore);
+        });
     }
 
 }

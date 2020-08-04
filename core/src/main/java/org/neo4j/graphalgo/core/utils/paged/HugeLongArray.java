@@ -19,11 +19,10 @@
  */
 package org.neo4j.graphalgo.core.utils.paged;
 
+import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
 import org.neo4j.graphalgo.core.utils.ArrayUtil;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 
 import java.util.Arrays;
-import java.util.function.IntToLongFunction;
 import java.util.function.LongFunction;
 import java.util.function.LongUnaryOperator;
 
@@ -33,6 +32,7 @@ import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfObjectArray;
 import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.PAGE_SHIFT;
 import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.PAGE_SIZE;
 import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.exclusiveIndexOfPage;
+import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.indexFromPageIndexAndIndexInPage;
 import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.indexInPage;
 import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.numberOfPages;
 import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.pageIndex;
@@ -104,14 +104,14 @@ public abstract class HugeLongArray extends HugeArray<long[], Long, HugeLongArra
     /**
      * Set all elements using the provided generator function to compute each element.
      * <p>
-     * The behavior is identical to {@link Arrays#setAll(long[], IntToLongFunction)}.
+     * The behavior is identical to {@link java.util.Arrays#setAll(long[], java.util.function.IntToLongFunction)}.
      */
     abstract public void setAll(LongUnaryOperator gen);
 
     /**
      * Assigns the specified long value to each element.
      * <p>
-     * The behavior is identical to {@link Arrays#fill(long[], long)}.
+     * The behavior is identical to {@link java.util.Arrays#fill(long[], long)}.
      */
     abstract public void fill(long value);
 
@@ -126,6 +126,15 @@ public abstract class HugeLongArray extends HugeArray<long[], Long, HugeLongArra
      */
     @Override
     abstract public long sizeOf();
+
+    /**
+     * Find the index where {@code (values[idx] <= searchValue) && (values[idx + 1] > searchValue)}.
+     * The result differs from that of {@link java.util.Arrays#binarySearch(long[], long)}
+     * in that this method returns a positive index even if the array does not
+     * directly contain the searched value.
+     * It returns -1 iff the value is smaller than the smallest one in the array.
+     */
+    public abstract long binarySearch(long searchValue);
 
     /**
      * {@inheritDoc}
@@ -195,6 +204,21 @@ public abstract class HugeLongArray extends HugeArray<long[], Long, HugeLongArra
         return dumpToArray(long[].class);
     }
 
+    @Override
+    public LongNodeProperties asNodeProperties() {
+        return new LongNodeProperties() {
+            @Override
+            public long getLong(long nodeId) {
+                return get(nodeId);
+            }
+
+            @Override
+            public long size() {
+                return HugeLongArray.this.size();
+            }
+        };
+    }
+
     /**
      * Creates a new array of the given size, tracking the memory requirements into the given {@link AllocationTracker}.
      * The tracker is no longer referenced, as the arrays do not dynamically change their size.
@@ -236,19 +260,6 @@ public abstract class HugeLongArray extends HugeArray<long[], Long, HugeLongArra
     /* test-only */
     static HugeLongArray newSingleArray(int size, AllocationTracker tracker) {
         return SingleHugeLongArray.of(size, tracker);
-    }
-
-    /**
-     * A {@link PropertyTranslator} for instances of {@link HugeLongArray}s.
-     */
-    public static class Translator implements PropertyTranslator.OfLong<HugeLongArray> {
-
-        public static final Translator INSTANCE = new Translator();
-
-        @Override
-        public long toLong(final HugeLongArray data, final long nodeId) {
-            return data.get(nodeId);
-        }
     }
 
     private static final class SingleHugeLongArray extends HugeLongArray {
@@ -350,6 +361,11 @@ public abstract class HugeLongArray extends HugeArray<long[], Long, HugeLongArra
         @Override
         public long sizeOf() {
             return sizeOfLongArray(size);
+        }
+
+        @Override
+        public long binarySearch(long searchValue) {
+            return ArrayUtil.binaryLookup(searchValue, page);
         }
 
         @Override
@@ -513,6 +529,21 @@ public abstract class HugeLongArray extends HugeArray<long[], Long, HugeLongArra
         @Override
         public long sizeOf() {
             return memoryUsed;
+        }
+
+        @Override
+        public long binarySearch(long searchValue) {
+            int value;
+
+            for (int pageIndex = pages.length - 1; pageIndex >= 0; pageIndex--) {
+                long[] page = pages[pageIndex];
+
+                value = ArrayUtil.binaryLookup(searchValue, page);
+                if (value != -1) {
+                    return indexFromPageIndexAndIndexInPage(pageIndex, value);
+                }
+            }
+            return -1;
         }
 
         @Override

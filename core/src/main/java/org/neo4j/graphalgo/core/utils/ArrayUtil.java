@@ -164,32 +164,12 @@ public final class ArrayUtil {
         return low - 1;
     }
 
-    /**
-     * Find the index where {@code (ids[idx] <= id) && (ids[idx + 1] > id)}.
-     * The result differs from that of {@link java.util.Arrays#binarySearch(long[], long)}
-     * in that this method returns a positive index even if the array does not
-     * directly contain the searched value.
-     * It returns -1 iff the value is smaller than the smallest one in the array.
-     */
-    public static int binaryLookup(int id, int ids[]) {
-        int length = ids.length;
-
-        int low = 0;
-        int high = length - 1;
-
-        while (low <= high) {
-            int mid = (low + high) >>> 1;
-            int midVal = ids[mid];
-
-            if (midVal < id) {
-                low = mid + 1;
-            } else if (midVal > id) {
-                high = mid - 1;
-            } else {
-                return mid;
-            }
+    public static double[] floatToDoubleArray(float[] floats) {
+        double[] doubles = new double[floats.length];
+        for (int i = 0; i < floats.length; i++) {
+            doubles[i] = floats[i];
         }
-        return low - 1;
+        return doubles;
     }
 
     private ArrayUtil() {

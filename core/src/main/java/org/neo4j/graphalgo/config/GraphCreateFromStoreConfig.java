@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 @ValueClass
-@Configuration("GraphCreateFromStoreConfigImpl")
+@Configuration
 @SuppressWarnings("immutables:subtype")
 public interface GraphCreateFromStoreConfig extends GraphCreateConfig {
 
@@ -144,6 +144,12 @@ public interface GraphCreateFromStoreConfig extends GraphCreateConfig {
                 type, type, propertyIntersection
             ));
         }
+    }
+
+    @Override
+    @Configuration.Ignore
+    default <R> R accept(Cases<R> visitor) {
+        return visitor.store(this);
     }
 
     static GraphCreateFromStoreConfig emptyWithName(String userName, String graphName) {

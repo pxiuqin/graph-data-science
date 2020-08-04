@@ -19,19 +19,16 @@
  */
 package org.neo4j.graphalgo.core.utils.paged;
 
+import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
 import org.neo4j.graphalgo.core.utils.ArrayUtil;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.Arrays;
-import java.util.function.IntToLongFunction;
 import java.util.function.LongUnaryOperator;
 
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfInstance;
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfLongArray;
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfObjectArray;
-import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.PAGE_SHIFT;
 import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.PAGE_SIZE;
 import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.exclusiveIndexOfPage;
 import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.indexInPage;
@@ -89,7 +86,7 @@ public abstract class HugeAtomicLongArray {
      * @param expect the expected value
      * @param update the new value
      * @return {@code true} if successful. False return indicates that
-     *         the actual value was not equal to the expected value.
+     *     the actual value was not equal to the expected value.
      */
     public abstract boolean compareAndSet(long index, long expect, long update);
 
@@ -115,7 +112,7 @@ public abstract class HugeAtomicLongArray {
 
     /**
      * @return the amount of memory used by the instance of this array, in bytes.
-     *         This should be the same as returned from {@link #release()} without actually releasing the array.
+     *     This should be the same as returned from {@link #release()} without actually releasing the array.
      */
     public abstract long sizeOf();
 
@@ -132,20 +129,34 @@ public abstract class HugeAtomicLongArray {
      */
     public abstract long release();
 
-    /**
-     * Creates a new array of the given size, tracking the memory requirements into the given {@link AllocationTracker}.
-     * The tracker is no longer referenced, as the arrays do not dynamically change their size.
-     */
-    public static HugeAtomicLongArray newArray(long size, AllocationTracker tracker) {
-        return newArray(size, PageFiller.passThrough(), tracker);
+    public LongNodeProperties asNodeProperties() {
+        return new LongNodeProperties() {
+            @Override
+            public long getLong(long nodeId) {
+                return get(nodeId);
+            }
+
+            @Override
+            public long size() {
+                return HugeAtomicLongArray.this.size();
+            }
+        };
     }
 
     /**
      * Creates a new array of the given size, tracking the memory requirements into the given {@link AllocationTracker}.
      * The tracker is no longer referenced, as the arrays do not dynamically change their size.
-     * The values are pre-calculated according to the semantics of {@link Arrays#setAll(long[], IntToLongFunction)}
      */
-    public static HugeAtomicLongArray newArray(long size, PageFiller pageFiller, AllocationTracker tracker) {
+    public static HugeAtomicLongArray newArray(long size, AllocationTracker tracker) {
+        return newArray(size, LongPageCreator.passThrough(1), tracker);
+    }
+
+    /**
+     * Creates a new array of the given size, tracking the memory requirements into the given {@link AllocationTracker}.
+     * The tracker is no longer referenced, as the arrays do not dynamically change their size.
+     * The values are pre-calculated according to the semantics of {@link java.util.Arrays#setAll(long[], java.util.function.IntToLongFunction)}
+     */
+    public static HugeAtomicLongArray newArray(long size, LongPageCreator pageFiller, AllocationTracker tracker) {
         if (size <= ArrayUtil.MAX_ARRAY_LENGTH) {
             return SingleHugeAtomicLongArray.of(size, pageFiller, tracker);
         }
@@ -167,38 +178,25 @@ public abstract class HugeAtomicLongArray {
     }
 
     /* test-only */
-    static HugeAtomicLongArray newPagedArray(long size, final PageFiller pageFiller, AllocationTracker tracker) {
+    static HugeAtomicLongArray newPagedArray(long size, final LongPageCreator pageFiller, AllocationTracker tracker) {
         return PagedHugeAtomicLongArray.of(size, pageFiller, tracker);
     }
 
     /* test-only */
-    static HugeAtomicLongArray newSingleArray(int size, final PageFiller pageFiller, AllocationTracker tracker) {
+    static HugeAtomicLongArray newSingleArray(int size, final LongPageCreator pageFiller, AllocationTracker tracker) {
         return SingleHugeAtomicLongArray.of(size, pageFiller, tracker);
-    }
-
-    /**
-     * A {@link PropertyTranslator} for instances of {@link HugeAtomicLongArray}s.
-     */
-    public static class Translator implements PropertyTranslator.OfLong<HugeAtomicLongArray> {
-
-        public static final Translator INSTANCE = new Translator();
-
-        @Override
-        public long toLong(final HugeAtomicLongArray data, final long nodeId) {
-            return data.get(nodeId);
-        }
     }
 
     private static final class SingleHugeAtomicLongArray extends HugeAtomicLongArray {
 
         private static final VarHandle ARRAY_HANDLE = MethodHandles.arrayElementVarHandle(long[].class);
 
-        private static HugeAtomicLongArray of(long size, PageFiller pageFiller, AllocationTracker tracker) {
+        private static HugeAtomicLongArray of(long size, LongPageCreator pageCreator, AllocationTracker tracker) {
             assert size <= ArrayUtil.MAX_ARRAY_LENGTH;
             final int intSize = (int) size;
             tracker.add(sizeOfLongArray(intSize));
             long[] page = new long[intSize];
-            pageFiller.accept(page);
+            pageCreator.fillPage(page, 0);
             return new SingleHugeAtomicLongArray(intSize, page);
         }
 
@@ -258,20 +256,12 @@ public abstract class HugeAtomicLongArray {
 
         private static final VarHandle ARRAY_HANDLE = MethodHandles.arrayElementVarHandle(long[].class);
 
-        private static HugeAtomicLongArray of(long size, PageFiller pageFiller, AllocationTracker tracker) {
+        private static HugeAtomicLongArray of(long size, LongPageCreator pageCreator, AllocationTracker tracker) {
             int numPages = numberOfPages(size);
-            int lastPage = numPages - 1;
             final int lastPageSize = exclusiveIndexOfPage(size);
 
             long[][] pages = new long[numPages][];
-            for (int i = 0; i < lastPage; i++) {
-                pages[i] = new long[PAGE_SIZE];
-                long base = ((long) i) << PAGE_SHIFT;
-                pageFiller.accept(pages[i], base);
-            }
-            pages[lastPage] = new long[lastPageSize];
-            long base = ((long) lastPage) << PAGE_SHIFT;
-            pageFiller.accept(pages[lastPage], base);
+            pageCreator.fill(pages, lastPageSize);
 
             long memoryUsed = memoryUsageOfData(size);
             tracker.add(memoryUsed);

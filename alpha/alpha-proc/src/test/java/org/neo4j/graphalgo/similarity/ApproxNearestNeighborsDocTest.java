@@ -25,7 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.BaseProcTest;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
-import org.neo4j.graphalgo.functions.GetNodeFunc;
+import org.neo4j.graphalgo.functions.AsNodeFunc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -68,7 +68,7 @@ public class ApproxNearestNeighborsDocTest extends BaseProcTest {
     @BeforeEach
     void setupGraph() throws Exception {
         registerProcedures(ApproxNearestNeighborsProc.class);
-        registerFunctions(GetNodeFunc.class);
+        registerFunctions(AsNodeFunc.class);
         runQuery(DB_CYPHER);
     }
 
@@ -83,8 +83,6 @@ public class ApproxNearestNeighborsDocTest extends BaseProcTest {
                        " WITH {item:id(p), categories: collect(id(cuisine))} AS userData " +
                        " WITH collect(userData) AS data " +
                        " CALL gds.alpha.ml.ann.stream({" +
-                       "   nodeProjection: '*'," +
-                       "   relationshipProjection: '*', " +
                        "   data: data," +
                        "   algorithm: 'jaccard'," +
                        "   similarityCutoff: 0.1," +
@@ -121,8 +119,6 @@ public class ApproxNearestNeighborsDocTest extends BaseProcTest {
             " WITH {item:id(p), categories: collect(id(cuisine))} AS userData " +
             " WITH collect(userData) AS data " +
             " CALL gds.alpha.ml.ann.write({ " +
-            "  nodeProjection: '*', " +
-            "  relationshipProjection: '*', " +
             "  algorithm: 'jaccard', " +
             "  data: data, " +
             "  similarityCutoff: 0.1, " +

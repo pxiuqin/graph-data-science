@@ -26,11 +26,15 @@ import org.junit.jupiter.api.extension.ExtensionConfigurationException;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.annotation.ValueClass;
+import org.neo4j.graphalgo.api.CSRGraph;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
+import org.neo4j.graphalgo.core.loading.CSRGraphStore;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
 import org.neo4j.graphalgo.gdl.GdlFactory;
 import org.neo4j.graphalgo.gdl.ImmutableGraphCreateFromGdlConfig;
+import org.neo4j.kernel.database.DatabaseIdFactory;
+import org.neo4j.kernel.database.NamedDatabaseId;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -38,6 +42,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
@@ -45,6 +50,8 @@ import static org.junit.platform.commons.support.AnnotationSupport.isAnnotated;
 import static org.mockito.internal.util.reflection.FieldSetter.setField;
 
 public class GdlSupportExtension implements BeforeEachCallback, AfterEachCallback {
+
+    public static final NamedDatabaseId DATABASE_ID = DatabaseIdFactory.from("GDL", UUID.fromString("42-42-42-42-42"));
 
     @Override
     public void beforeEach(ExtensionContext context) {
@@ -68,8 +75,8 @@ public class GdlSupportExtension implements BeforeEachCallback, AfterEachCallbac
                     if (setups.contains(setup)) {
                         throw new ExtensionConfigurationException(String.format(
                             Locale.ENGLISH,
-                            "Graph names must be unique. Found duplicate graph name '%s'.",
-                            setup.graphName()
+                            "Graph names prefixes must be unique. Found duplicate graph name prefixes '%s'.",
+                            setup.graphNamePrefix()
                         ));
                     }
                 })
@@ -127,7 +134,7 @@ public class GdlSupportExtension implements BeforeEachCallback, AfterEachCallbac
 
         return annotations
             .map(annotation -> ImmutableGdlGraphSetup.of(
-                annotation.graphName(),
+                annotation.graphNamePrefix(),
                 gdl,
                 annotation.username(),
                 annotation.orientation(),
@@ -136,7 +143,8 @@ public class GdlSupportExtension implements BeforeEachCallback, AfterEachCallbac
     }
 
     private static void injectGraphStore(GdlGraphSetup gdlGraphSetup, ExtensionContext context) {
-        String graphName = gdlGraphSetup.graphName();
+        String graphNamePrefix = gdlGraphSetup.graphNamePrefix();
+        String graphName = graphNamePrefix.isBlank() ? "graph" : graphNamePrefix + "Graph";
 
         var createConfig = ImmutableGraphCreateFromGdlConfig.builder()
             .username(gdlGraphSetup.username())
@@ -145,29 +153,31 @@ public class GdlSupportExtension implements BeforeEachCallback, AfterEachCallbac
             .orientation(gdlGraphSetup.orientation())
             .build();
 
-        GdlFactory gdlFactory = GdlFactory.of(createConfig);
-        GraphStore graphStore = gdlFactory.build().graphStore();
-        Graph graph = graphStore.getUnion();
+        GdlFactory gdlFactory = GdlFactory.of(createConfig, DATABASE_ID);
+        CSRGraphStore graphStore = gdlFactory.build().graphStore();
+        CSRGraph graph = graphStore.getUnion();
         IdFunction idFunction = gdlFactory::nodeId;
+        TestGraph testGraph = new TestGraph(graph, idFunction, graphName);
 
         if (gdlGraphSetup.addToCatalog()) {
             GraphStoreCatalog.set(createConfig, graphStore);
         }
 
         context.getRequiredTestInstances().getAllInstances().forEach(testInstance -> {
-            injectInstance(testInstance, graphName, graph, Graph.class);
-            injectInstance(testInstance, graphName, graphStore, GraphStore.class);
-            injectInstance(testInstance, graphName, idFunction, IdFunction.class);
+            injectInstance(testInstance, graphNamePrefix, graph, Graph.class, "Graph");
+            injectInstance(testInstance, graphNamePrefix, testGraph, TestGraph.class, "Graph");
+            injectInstance(testInstance, graphNamePrefix, graphStore, GraphStore.class, "GraphStore");
+            injectInstance(testInstance, graphNamePrefix, idFunction, IdFunction.class, "IdFunction");
         });
     }
 
-    private static <T> void injectInstance(Object testInstance, String graphName, T instance, Class<T> clazz) {
+    private static <T> void injectInstance(Object testInstance, String graphNamePrefix, T instance, Class<T> clazz, String suffix) {
         Class<?> testClass = testInstance.getClass();
         do {
             stream(testClass.getDeclaredFields())
                 .filter(field -> field.getType() == clazz)
                 .filter(field -> isAnnotated(field, Inject.class))
-                .filter(field -> field.getAnnotation(Inject.class).graphName().equals(graphName))
+                .filter(field -> field.getName().equalsIgnoreCase(graphNamePrefix + suffix))
                 .forEach(field -> setField(testInstance, field, instance));
             testClass = testClass.getSuperclass();
         }
@@ -176,7 +186,7 @@ public class GdlSupportExtension implements BeforeEachCallback, AfterEachCallbac
 
     @ValueClass
     interface GdlGraphSetup {
-        String graphName();
+        String graphNamePrefix();
 
         @Value.Auxiliary
         String gdlGraph();

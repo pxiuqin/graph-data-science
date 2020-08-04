@@ -26,6 +26,7 @@ import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.PropertyMapping;
 import org.neo4j.graphalgo.PropertyMappings;
 import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.compat.Neo4jProxy;
 import org.neo4j.graphalgo.core.GraphDimensions;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
@@ -33,7 +34,7 @@ import org.neo4j.internal.kernel.api.CursorFactory;
 import org.neo4j.internal.kernel.api.PropertyCursor;
 import org.neo4j.internal.kernel.api.Read;
 import org.neo4j.io.pagecache.tracing.cursor.PageCursorTracer;
-import org.neo4j.memory.EmptyMemoryTracker;
+import org.neo4j.memory.MemoryTracker;
 import org.neo4j.values.storable.NumberValue;
 import org.neo4j.values.storable.Value;
 import org.neo4j.values.storable.Values;
@@ -74,9 +75,11 @@ public final class NativeNodePropertyImporter {
         long[] labelIds,
         long propertiesReference,
         CursorFactory cursors,
-        Read read
+        Read read,
+        PageCursorTracer cursorTracer,
+        MemoryTracker memoryTracker
     ) {
-        try (PropertyCursor pc = Neo4jProxy.allocatePropertyCursor(cursors, PageCursorTracer.NULL, EmptyMemoryTracker.INSTANCE)) {
+        try (PropertyCursor pc = Neo4jProxy.allocatePropertyCursor(cursors, cursorTracer, memoryTracker)) {
             read.nodeProperties(neoNodeId, propertiesReference, pc);
             int nodePropertiesRead = 0;
             while (pc.next()) {
@@ -160,7 +163,6 @@ public final class NativeNodePropertyImporter {
         private long nodeCount;
         private Map<NodeLabel, PropertyMappings> propertyMappingsByLabel;
         private GraphDimensions dimensions;
-        private int concurrency;
         private AllocationTracker tracker = AllocationTracker.EMPTY;
 
 
@@ -179,11 +181,6 @@ public final class NativeNodePropertyImporter {
 
         public Builder dimensions(GraphDimensions dimensions) {
             this.dimensions = dimensions;
-            return this;
-        }
-
-        public Builder concurrency(int concurrency) {
-            this.concurrency = concurrency;
             return this;
         }
 
@@ -210,12 +207,7 @@ public final class NativeNodePropertyImporter {
                     builders.putIfAbsent(nodeLabel, new HashMap<>());
                     for (PropertyMapping propertyMapping : propertyMappings) {
                         NodePropertiesBuilder builder = NodePropertiesBuilder.of(
-                            nodeCount,
-                            tracker,
-                            propertyMapping.defaultValue(),
-                            dimensions.nodePropertyTokens().get(propertyMapping.neoPropertyKey()),
-                            propertyMapping.propertyKey(),
-                            concurrency
+                            nodeCount, ValueType.DOUBLE, tracker, propertyMapping.defaultValue()
                         );
                         builders.get(nodeLabel).put(propertyMapping, builder);
                     }

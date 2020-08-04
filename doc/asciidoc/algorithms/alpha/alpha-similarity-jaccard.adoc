@@ -9,6 +9,9 @@ This section describes the Jaccard Similarity algorithm in the Neo4j Graph Data 
 
 Jaccard Similarity (coefficient), a term coined by https://en.wikipedia.org/wiki/Paul_Jaccard[Paul Jaccard^], measures similarities between sets.
 It is defined as the size of the intersection divided by the size of the union of two sets.
+This notion has been generalized for multisets, where duplicate elements are counted as weights.
+
+The GDS Jaccard Similarity function is defined for lists, which are interpreted as multisets.
 
 include::alpha-note.adoc[]
 
@@ -71,12 +74,12 @@ RETURN gds.alpha.similarity.jaccard([1,2,3], [1,2,4,5]) AS similarity
 These two lists of numbers have a Jaccard Similarity of 0.4.
 We can see how this result is derived by breaking down the formula:
 
-```
+----
 J(A,B) = ∣A ∩ B∣ / ∣A∣ + ∣B∣ - ∣A ∩ B|
 J(A,B) = 2 / 3 + 4 - 2
        = 2 / 5
        = 0.4
-```
+----
 
 We can also use it to compute the similarity of nodes based on lists computed by a Cypher query.
 

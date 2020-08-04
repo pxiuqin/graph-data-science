@@ -86,11 +86,14 @@ public class LocalClusteringCoefficient extends Algorithm<LocalClusteringCoeffic
         long nodeCount = graph.nodeCount();
         localClusteringCoefficients = HugeDoubleArray.newArray(nodeCount, tracker);
 
+        ThreadLocal<Graph> concurrentGraphCopy = ThreadLocal.withInitial(() -> graph.concurrentCopy());
         DoubleAdder localClusteringCoefficientSum = new DoubleAdder();
         ParallelUtil.parallelForEachNode(graph, concurrency, nodeId -> {
             double localClusteringCoefficient = calculateCoefficient(
                 propertyValueFunction.apply(nodeId),
-                graph.degree(nodeId)
+                graph.isMultiGraph() ?
+                    concurrentGraphCopy.get().degreeWithoutParallelRelationships(nodeId) :
+                    graph.degree(nodeId)
             );
             localClusteringCoefficients.set(nodeId, localClusteringCoefficient);
             localClusteringCoefficientSum.add(localClusteringCoefficient);
@@ -152,6 +155,10 @@ public class LocalClusteringCoefficient extends Algorithm<LocalClusteringCoeffic
                 .localClusteringCoefficients(localClusteringCoefficients)
                 .averageClusteringCoefficient(averageClusteringCoefficient)
                 .build();
+        }
+
+        default NodeProperties asNodeProperties() {
+            return localClusteringCoefficients().asNodeProperties();
         }
     }
 }

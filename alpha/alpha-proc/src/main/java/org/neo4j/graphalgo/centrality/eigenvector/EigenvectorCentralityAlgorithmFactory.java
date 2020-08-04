@@ -28,7 +28,7 @@ import org.neo4j.graphalgo.pagerank.LabsPageRankAlgorithmType;
 import org.neo4j.graphalgo.pagerank.PageRank;
 import org.neo4j.logging.Log;
 
-class EigenvectorCentralityAlgorithmFactory extends AlphaAlgorithmFactory<PageRank, EigenvectorCentralityConfig> {
+class EigenvectorCentralityAlgorithmFactory implements AlphaAlgorithmFactory<PageRank, EigenvectorCentralityConfig> {
 
     @Override
     public PageRank build(
@@ -50,7 +50,6 @@ class EigenvectorCentralityAlgorithmFactory extends AlphaAlgorithmFactory<PageRa
                 graph,
                 configuration.sourceNodeIds(),
                 configuration,
-                configuration.concurrency(),
                 Pools.DEFAULT,
                 new BatchingProgressLogger(log, 0, "PageRank", configuration.concurrency()),
                 tracker

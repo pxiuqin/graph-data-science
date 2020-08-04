@@ -21,10 +21,10 @@ package org.neo4j.graphalgo.triangle;
 
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.MutateProc;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.internal.kernel.api.procs.ProcedureCallContext;
@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import static org.neo4j.graphalgo.triangle.LocalClusteringCoefficientCompanion.warnOnGraphWithParallelRelationships;
 import static org.neo4j.procedure.Mode.READ;
 import static org.neo4j.procedure.Mode.WRITE;
 
@@ -75,9 +76,7 @@ public class LocalClusteringCoefficientMutateProc extends MutateProc<LocalCluste
     }
 
     @Override
-    protected AlgorithmFactory<LocalClusteringCoefficient, LocalClusteringCoefficientMutateConfig> algorithmFactory(
-        LocalClusteringCoefficientMutateConfig config
-    ) {
+    protected AlgorithmFactory<LocalClusteringCoefficient, LocalClusteringCoefficientMutateConfig> algorithmFactory() {
         return new LocalClusteringCoefficientFactory<>();
     }
 
@@ -86,13 +85,14 @@ public class LocalClusteringCoefficientMutateProc extends MutateProc<LocalCluste
         GraphCreateConfig graphCreateConfig, LocalClusteringCoefficientMutateConfig config
     ) {
         validateIsUndirectedGraph(graphCreateConfig, config);
+        warnOnGraphWithParallelRelationships(graphCreateConfig, config, log);
     }
 
     @Override
-    protected PropertyTranslator<LocalClusteringCoefficient.Result> nodePropertyTranslator(
+    protected NodeProperties getNodeProperties(
         ComputationResult<LocalClusteringCoefficient, LocalClusteringCoefficient.Result, LocalClusteringCoefficientMutateConfig> computationResult
     ) {
-        return LocalClusteringCoefficientCompanion.nodePropertyTranslator();
+        return LocalClusteringCoefficientCompanion.nodeProperties(computationResult);
     }
 
     @Override

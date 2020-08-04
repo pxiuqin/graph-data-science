@@ -22,6 +22,7 @@ package org.neo4j.graphalgo.core.utils.paged.dss;
 import com.carrotsearch.hppc.IntIntHashMap;
 import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.api.nodeproperties.DoubleNodeProperties;
 import org.neo4j.graphalgo.core.utils.mem.MemoryRange;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 
@@ -93,7 +94,7 @@ class IncrementalDisjointSetStructTest extends DisjointSetStructTest {
         assertMemoryEstimation(memoryEstimation(), 100_000_000_000L, MemoryRange.of(2_400_366_211_280L));
     }
 
-    static final class TestNodeProperties implements NodeProperties {
+    static final class TestNodeProperties implements DoubleNodeProperties {
         private final IntIntHashMap weights;
 
         private TestNodeProperties(final IntIntHashMap weights) {
@@ -116,12 +117,12 @@ class IncrementalDisjointSetStructTest extends DisjointSetStructTest {
         }
 
         @Override
-        public double nodeProperty(long nodeId) {
-            return nodeProperty(nodeId, 0.0);
+        public double getDouble(long nodeId) {
+            return getDouble(nodeId, 0.0);
         }
 
         @Override
-        public double nodeProperty(long nodeId, double defaultValue) {
+        public double getDouble(long nodeId, double defaultValue) {
             int key = Math.toIntExact(nodeId);
             int index = weights.indexOf(key);
             if (weights.indexExists(index)) {

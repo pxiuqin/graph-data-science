@@ -26,12 +26,10 @@ import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.utils.ProgressTimer;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.core.write.RelationshipExporter;
 import org.neo4j.graphalgo.impl.spanningTrees.Prim;
 import org.neo4j.graphalgo.impl.spanningTrees.SpanningGraph;
 import org.neo4j.graphalgo.impl.spanningTrees.SpanningTree;
-import org.neo4j.logging.Log;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
@@ -130,18 +128,10 @@ public class SpanningTreeProc extends AlgoBaseProc<Prim, SpanningTree, SpanningT
     }
 
     @Override
-    protected AlgorithmFactory<Prim, SpanningTreeConfig> algorithmFactory(SpanningTreeConfig config) {
-        return new AlphaAlgorithmFactory<Prim, SpanningTreeConfig>() {
-            @Override
-            public Prim buildAlphaAlgo(
-                Graph graph,
-                SpanningTreeConfig configuration,
-                AllocationTracker tracker,
-                Log log
-            ) {
-                validateStartNode(configuration.startNodeId(), graph);
-                return new Prim(graph, graph, minMax, configuration.startNodeId());
-            }
+    protected AlgorithmFactory<Prim, SpanningTreeConfig> algorithmFactory() {
+        return (AlphaAlgorithmFactory<Prim, SpanningTreeConfig>) (graph, configuration, tracker, log) -> {
+            validateStartNode(configuration.startNodeId(), graph);
+            return new Prim(graph, graph, minMax, configuration.startNodeId());
         };
     }
 }

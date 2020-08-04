@@ -31,7 +31,6 @@ import org.neo4j.graphalgo.core.SecureTransaction;
 import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.utils.Pointer;
 import org.neo4j.graphalgo.core.utils.ProgressTimer;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.impl.shortestpaths.WeightedPathExporter;
 import org.neo4j.graphalgo.impl.shortestpaths.YensKShortestPaths;
 import org.neo4j.graphalgo.impl.shortestpaths.YensKShortestPathsConfig;
@@ -39,7 +38,6 @@ import org.neo4j.graphalgo.impl.shortestpaths.YensKShortestPathsConfigImpl;
 import org.neo4j.graphalgo.impl.walking.WalkPath;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 import org.neo4j.graphdb.Path;
-import org.neo4j.logging.Log;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
@@ -192,25 +190,17 @@ public class KShortestPathsProc extends AlgoBaseProc<YensKShortestPaths, YensKSh
     }
 
     @Override
-    protected AlgorithmFactory<YensKShortestPaths, YensKShortestPathsConfig> algorithmFactory(YensKShortestPathsConfig config) {
-        return new AlphaAlgorithmFactory<YensKShortestPaths, YensKShortestPathsConfig>() {
-            @Override
-            public YensKShortestPaths buildAlphaAlgo(
-                Graph graph,
-                YensKShortestPathsConfig configuration,
-                AllocationTracker tracker,
-                Log log
-            ) {
-                validateStartNode(configuration.startNode(), graph);
-                validateEndNode(configuration.endNode(), graph);
-                return new YensKShortestPaths(
-                    graph,
-                    configuration.startNode(),
-                    configuration.endNode(),
-                    configuration.k(),
-                    configuration.maxDepth()
-                );
-            }
+    protected AlgorithmFactory<YensKShortestPaths, YensKShortestPathsConfig> algorithmFactory() {
+        return (AlphaAlgorithmFactory<YensKShortestPaths, YensKShortestPathsConfig>) (graph, configuration, tracker, log) -> {
+            validateStartNode(configuration.startNode(), graph);
+            validateEndNode(configuration.endNode(), graph);
+            return new YensKShortestPaths(
+                graph,
+                configuration.startNode(),
+                configuration.endNode(),
+                configuration.k(),
+                configuration.maxDepth()
+            );
         };
     }
 
@@ -288,6 +278,11 @@ public class KShortestPathsProc extends AlgoBaseProc<YensKShortestPaths, YensKSh
 
         @Override
         public void release() {
+        }
+
+        @Override
+        public Graph concurrentCopy() {
+            return this;
         }
 
         void actuallyRelease() {

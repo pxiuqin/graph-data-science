@@ -25,9 +25,7 @@ import org.neo4j.graphalgo.AlphaAlgorithmFactory;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.impl.shortestpaths.ShortestPathAStar;
-import org.neo4j.logging.Log;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
@@ -78,22 +76,17 @@ public class ShortestPathAStarProc extends AlgoBaseProc<ShortestPathAStar, Short
     }
 
     @Override
-    protected AlgorithmFactory<ShortestPathAStar, ShortestPathAStarConfig> algorithmFactory(ShortestPathAStarConfig config) {
-        return new AlphaAlgorithmFactory<ShortestPathAStar, ShortestPathAStarConfig>() {
-            @Override
-            public ShortestPathAStar buildAlphaAlgo(
-                Graph graph, ShortestPathAStarConfig configuration, AllocationTracker tracker, Log log
-            ) {
-                validateStartNode(configuration.startNodeId(), graph);
-                validateEndNode(configuration.endNodeId(), graph);
-                return new ShortestPathAStar(
-                    graph,
-                    configuration.startNodeId(),
-                    configuration.endNodeId(),
-                    graph.nodeProperties(configuration.propertyKeyLat()),
-                    graph.nodeProperties(configuration.propertyKeyLon())
-                );
-            }
+    protected AlgorithmFactory<ShortestPathAStar, ShortestPathAStarConfig> algorithmFactory() {
+        return (AlphaAlgorithmFactory<ShortestPathAStar, ShortestPathAStarConfig>) (graph, configuration, tracker, log) -> {
+            validateStartNode(configuration.startNodeId(), graph);
+            validateEndNode(configuration.endNodeId(), graph);
+            return new ShortestPathAStar(
+                graph,
+                configuration.startNodeId(),
+                configuration.endNodeId(),
+                graph.nodeProperties(configuration.propertyKeyLat()),
+                graph.nodeProperties(configuration.propertyKeyLon())
+            );
         };
     }
 }

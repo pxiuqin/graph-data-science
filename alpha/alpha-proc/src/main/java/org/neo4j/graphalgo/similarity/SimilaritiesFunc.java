@@ -29,10 +29,13 @@ import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.UserAggregationFunction;
 import org.neo4j.procedure.UserFunction;
+import org.neo4j.values.storable.Values;
 
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import static org.neo4j.graphalgo.impl.similarity.SimilarityVectorAggregator.CATEGORY_KEY;
 import static org.neo4j.graphalgo.impl.similarity.SimilarityVectorAggregator.WEIGHT_KEY;
@@ -40,17 +43,14 @@ import static org.neo4j.graphalgo.impl.utils.NumberUtils.getDoubleValue;
 
 public class SimilaritiesFunc {
 
+    public static final Predicate<Number> IS_NULL = Predicate.isEqual(null);
+    public static final Comparator<Number> NUMBER_COMPARATOR = new NumberComparator();
+
     @UserFunction("gds.alpha.similarity.jaccard")
     @Description("RETURN gds.alpha.similarity.jaccard(vector1, vector2) - Given two collection vectors, calculate Jaccard similarity")
     public double jaccardSimilarity(@Name("vector1") List<Number> vector1, @Name("vector2") List<Number> vector2) {
         if (vector1 == null || vector2 == null) return 0;
-
-        HashSet<Number> intersectionSet = new HashSet<>(vector1);
-        intersectionSet.retainAll(vector2);
-        int intersection = intersectionSet.size();
-
-        long denominator = vector1.size() + vector2.size() - intersection;
-        return denominator == 0 ? 0 : (double) intersection / denominator;
+        return jaccard(vector1, vector2);
     }
 
     @UserFunction("gds.alpha.similarity.cosine")
@@ -173,4 +173,78 @@ public class SimilaritiesFunc {
         return denominator == 0 ? 0 : (double) intersection / denominator;
     }
 
+    /**
+     * A jaccard implementation that supports duplicates.
+     *
+     * We sort the inputs and then loop through them together.
+     * For each pair of indexes:
+     *   if the value is the same, we increment the intersection and the union, and both indexes
+     *   if the value on the left is smaller, we increment the union and the left index
+     *   if the value on the right is smaller, we increment the union and the right index
+     *
+     * We get Lists of Number in and we don't know if these are integers or floats, or at what precision.
+     * For this we have a custom comparator for sorting and comparing.
+     *
+     * Because we increment the side with the smaller number (or both if equal) we may have a remainder on one side.
+     * This remainder cannot contribute to the intersection, so we add the size of it to the union.
+     *
+     * @param vector1 A list of numbers to compare.
+     * @param vector2 A list of numbers to compare.
+     * @return The jaccard score, the intersection divided by the union of the input lists.
+     */
+    private double jaccard(List<Number> vector1, List<Number> vector2) {
+        vector1.removeIf(IS_NULL);
+        vector2.removeIf(IS_NULL);
+        vector1.sort(NUMBER_COMPARATOR);
+        vector2.sort(NUMBER_COMPARATOR);
+
+        int index1 = 0;
+        int index2 = 0;
+
+        int intersection = 0;
+        double union = 0;
+
+        while (index1 < vector1.size() && index2 < vector2.size()) {
+            Number val1 = vector1.get(index1);
+            Number val2 = vector2.get(index2);
+            int compare = NUMBER_COMPARATOR.compare(val1, val2);
+
+            if (compare == 0) {
+                intersection++;
+                union++;
+                index1++;
+                index2++;
+            } else if (compare < 0) {
+                union++;
+                index1++;
+            } else {
+                union++;
+                index2++;
+            }
+        }
+
+        // the remainder, if any, is never shared so add to the union
+        union += (vector1.size() - index1) + (vector2.size() - index2);
+
+        return union == 0 ? 1 : intersection / union;
+    }
+
+    static class NumberComparator implements Comparator<Number> {
+
+        @Override
+        public int compare(Number o1, Number o2) {
+            if (o1 instanceof Long && o2 instanceof Long) {
+                return ((Long) o1).compareTo((Long) o2);
+            }
+
+            if (o1 instanceof Long) {
+                return Values.longValue(o1.longValue()).compareTo(Values.doubleValue(o2.doubleValue()));
+            }
+            if (o2 instanceof Long) {
+                return Values.doubleValue(o1.doubleValue()).compareTo(Values.longValue(o2.longValue()));
+            }
+
+            return Double.compare(o1.doubleValue(), o2.doubleValue());
+        }
+    }
 }

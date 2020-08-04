@@ -26,11 +26,6 @@ import org.neo4j.graphalgo.RelationshipType;
 import org.neo4j.graphalgo.annotation.ValueClass;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.GraphDimensions;
-import org.neo4j.graphalgo.core.huge.AdjacencyList;
-import org.neo4j.graphalgo.core.huge.AdjacencyOffsets;
-import org.neo4j.graphalgo.core.huge.HugeGraph;
-import org.neo4j.graphalgo.core.huge.ImmutablePropertyCSR;
-import org.neo4j.graphalgo.core.huge.ImmutableTopologyCSR;
 import org.neo4j.graphalgo.core.loading.CSRGraphStore;
 import org.neo4j.graphalgo.core.loading.IdsAndProperties;
 import org.neo4j.graphalgo.core.loading.RelationshipsBuilder;
@@ -46,10 +41,10 @@ import java.util.stream.Collectors;
 /**
  * The Abstract Factory defines the construction of the graph
  */
-public abstract class GraphStoreFactory<CONFIG extends GraphCreateConfig> implements Assessable {
+public abstract class GraphStoreFactory<STORE extends GraphStore, CONFIG extends GraphCreateConfig> implements Assessable {
 
     public interface Supplier {
-        GraphStoreFactory<? extends GraphCreateConfig> get(GraphLoaderContext loaderContext);
+        GraphStoreFactory<? extends GraphStore, ? extends GraphCreateConfig> get(GraphLoaderContext loaderContext);
     }
 
     public static final String TASK_LOADING = "LOADING";
@@ -70,7 +65,7 @@ public abstract class GraphStoreFactory<CONFIG extends GraphCreateConfig> implem
         this.progressLogger = initProgressLogger();
     }
 
-    public abstract ImportResult build();
+    public abstract ImportResult<STORE> build();
 
     public abstract MemoryEstimation memoryEstimation();
 
@@ -91,8 +86,8 @@ public abstract class GraphStoreFactory<CONFIG extends GraphCreateConfig> implem
         GraphDimensions dimensions
     ) {
         int relTypeCount = dimensions.relationshipTypeTokens().size();
-        Map<RelationshipType, HugeGraph.TopologyCSR> relationships = new HashMap<>(relTypeCount);
-        Map<RelationshipType, Map<String, HugeGraph.PropertyCSR>> relationshipProperties = new HashMap<>(relTypeCount);
+        Map<RelationshipType, Relationships.Topology> relationships = new HashMap<>(relTypeCount);
+        Map<RelationshipType, Map<String, Relationships.Properties>> relationshipProperties = new HashMap<>(relTypeCount);
 
         relationshipImportResult.builders().forEach((relationshipType, relationshipsBuilder) -> {
             AdjacencyList adjacencyList = relationshipsBuilder.adjacencyList();
@@ -103,25 +98,27 @@ public abstract class GraphStoreFactory<CONFIG extends GraphCreateConfig> implem
 
             relationships.put(
                 relationshipType,
-                ImmutableTopologyCSR.of(
+                ImmutableTopology.of(
                     adjacencyList,
                     adjacencyOffsets,
                     relationshipCount,
-                    projection.orientation()
+                    projection.orientation(),
+                    projection.isMultiGraph()
                 )
             );
 
             PropertyMappings propertyMappings = projection.properties();
             if (!propertyMappings.isEmpty()) {
-                Map<String, HugeGraph.PropertyCSR> propertyMap = propertyMappings
+                Map<String, Relationships.Properties> propertyMap = propertyMappings
                     .enumerate()
                     .collect(Collectors.toMap(
                         propertyIndexAndMapping -> propertyIndexAndMapping.getTwo().propertyKey(),
-                        propertyIndexAndMapping -> ImmutablePropertyCSR.of(
+                        propertyIndexAndMapping -> ImmutableProperties.of(
                             relationshipsBuilder.properties(propertyIndexAndMapping.getOne()),
                             relationshipsBuilder.globalPropertyOffsets(propertyIndexAndMapping.getOne()),
                             relationshipCount,
                             projection.orientation(),
+                            projection.isMultiGraph(),
                             propertyIndexAndMapping.getTwo().defaultValue()
                         )
                     ));
@@ -130,6 +127,7 @@ public abstract class GraphStoreFactory<CONFIG extends GraphCreateConfig> implem
         });
 
         return CSRGraphStore.of(
+            loadingContext.api().databaseId(),
             idsAndProperties.idMap(),
             idsAndProperties.properties(),
             relationships,
@@ -140,13 +138,13 @@ public abstract class GraphStoreFactory<CONFIG extends GraphCreateConfig> implem
     }
 
     @ValueClass
-    public interface ImportResult {
+    public interface ImportResult<STORE extends GraphStore> {
         GraphDimensions dimensions();
 
-        GraphStore graphStore();
+        STORE graphStore();
 
-        static ImportResult of(GraphDimensions dimensions, GraphStore graphStore) {
-            return ImmutableImportResult.builder()
+        static <STORE extends GraphStore> ImportResult<STORE> of(GraphDimensions dimensions, STORE graphStore) {
+            return ImmutableImportResult.<STORE>builder()
                 .dimensions(dimensions)
                 .graphStore(graphStore)
                 .build();

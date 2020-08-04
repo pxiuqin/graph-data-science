@@ -21,9 +21,9 @@ package org.neo4j.graphalgo;
 
 import org.hamcrest.Matcher;
 import org.intellij.lang.annotations.Language;
-import org.neo4j.configuration.GraphDatabaseSettings;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.compat.GraphDatabaseApiProxy;
+import org.neo4j.graphalgo.core.Settings;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.ResourceIterator;
@@ -51,13 +51,13 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.neo4j.graphalgo.ElementProjection.PROJECT_ALL;
 import static org.neo4j.graphalgo.TestSupport.mapEquals;
 import static org.neo4j.graphalgo.compat.GraphDatabaseApiProxy.runInTransaction;
-import static org.neo4j.graphalgo.compat.MapUtil.map;
 import static org.neo4j.graphalgo.config.GraphCreateFromCypherConfig.NODE_QUERY_KEY;
 import static org.neo4j.graphalgo.config.GraphCreateFromCypherConfig.RELATIONSHIP_QUERY_KEY;
 import static org.neo4j.graphalgo.config.GraphCreateFromStoreConfig.NODE_PROJECTION_KEY;
 import static org.neo4j.graphalgo.config.GraphCreateFromStoreConfig.RELATIONSHIP_PROJECTION_KEY;
 import static org.neo4j.graphalgo.core.ExceptionMessageMatcher.containsMessage;
 import static org.neo4j.graphalgo.core.ExceptionMessageMatcher.containsMessageRegex;
+import static org.neo4j.graphalgo.core.utils.ListUtil.sortedListOf;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 public class BaseProcTest extends BaseTest {
@@ -66,11 +66,7 @@ public class BaseProcTest extends BaseTest {
     @ExtensionCallback
     protected void configuration(TestDatabaseManagementServiceBuilder builder) {
         super.configuration(builder);
-        builder.setConfig(GraphDatabaseSettings.procedure_unrestricted, singletonList("gds.*"));
-    }
-
-    protected static Map<String, Object> anonymousGraphConfig(Object... objects) {
-        return anonymousGraphConfig(map(objects));
+        builder.setConfig(Settings.procedureUnrestricted(), singletonList("gds.*"));
     }
 
     protected static Map<String, Object> anonymousGraphConfig(Map<String, Object> baseMap) {
@@ -179,7 +175,7 @@ public class BaseProcTest extends BaseTest {
                 Map<String, Object> expectedRow = expected.get(i);
                 Map<String, Object> actualRow = actual.get(i);
 
-                assertThat(actualRow.keySet(), equalTo(expectedRow.keySet()));
+                assertThat(sortedListOf(expectedRow.keySet()), equalTo(sortedListOf(expectedRow.keySet())));
                 int rowNumber = i;
                 expectedRow.forEach((key, expectedValue) -> {
                     Matcher<Object> matcher;
@@ -264,7 +260,7 @@ public class BaseProcTest extends BaseTest {
 
     protected Graph findLoadedGraph(String graphName) {
         return GraphStoreCatalog
-            .getGraphStores("")
+            .getGraphStores("", db.databaseId())
             .entrySet()
             .stream()
             .filter(e -> e.getKey().graphName().equals(graphName))
@@ -275,7 +271,7 @@ public class BaseProcTest extends BaseTest {
 
     private Set<Graph> getLoadedGraphs(String graphName) {
         return GraphStoreCatalog
-            .getGraphStores("")
+            .getGraphStores("", db.databaseId())
             .entrySet()
             .stream()
             .filter(e -> e.getKey().graphName().equals(graphName))

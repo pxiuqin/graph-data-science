@@ -19,9 +19,9 @@
  */
 package org.neo4j.graphalgo.core;
 
-import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
 
-public class IdentityProperties implements NodeProperties {
+public class IdentityProperties implements LongNodeProperties {
     private final long expectedPropertyCount;
 
     public IdentityProperties(long expectedPropertyCount) {
@@ -29,7 +29,7 @@ public class IdentityProperties implements NodeProperties {
     }
 
     @Override
-    public double nodeProperty(long nodeId) {
+    public long getLong(long nodeId) {
         return nodeId;
     }
 

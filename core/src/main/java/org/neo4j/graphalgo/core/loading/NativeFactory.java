@@ -31,9 +31,9 @@ import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.api.GraphStoreFactory;
 import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
 import org.neo4j.graphalgo.core.GraphDimensionsStoreReader;
-import org.neo4j.graphalgo.core.huge.AdjacencyList;
-import org.neo4j.graphalgo.core.huge.AdjacencyOffsets;
 import org.neo4j.graphalgo.core.huge.HugeGraph;
+import org.neo4j.graphalgo.core.huge.TransientAdjacencyList;
+import org.neo4j.graphalgo.core.huge.TransientAdjacencyOffsets;
 import org.neo4j.graphalgo.core.utils.BatchingProgressLogger;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
 import static org.neo4j.graphalgo.core.GraphDimensionsValidation.validate;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
-public final class NativeFactory extends GraphStoreFactory<GraphCreateFromStoreConfig> {
+public final class NativeFactory extends GraphStoreFactory<CSRGraphStore, GraphCreateFromStoreConfig> {
 
     private final GraphCreateFromStoreConfig storeConfig;
 
@@ -71,7 +71,7 @@ public final class NativeFactory extends GraphStoreFactory<GraphCreateFromStoreC
 
         // nodeProperties
         nodeProjections.allProperties()
-            .forEach(property -> builder.add(property, NodePropertyMap.memoryEstimation()));
+            .forEach(property -> builder.add(property, NodePropertyArray.memoryEstimation()));
 
         // relationships
         relationshipProjections.projections().forEach((relationshipType, relationshipProjection) -> {
@@ -81,21 +81,21 @@ public final class NativeFactory extends GraphStoreFactory<GraphCreateFromStoreC
             // adjacency list
             builder.add(
                 formatWithLocale("adjacency list for '%s'", relationshipType),
-                AdjacencyList.compressedMemoryEstimation(relationshipType, undirected)
+                TransientAdjacencyList.compressedMemoryEstimation(relationshipType, undirected)
             );
             builder.add(
                 formatWithLocale("adjacency offsets for '%s'", relationshipType),
-                AdjacencyOffsets.memoryEstimation()
+                TransientAdjacencyOffsets.memoryEstimation()
             );
             // all properties per projection
             relationshipProjection.properties().mappings().forEach(resolvedPropertyMapping -> {
                 builder.add(
                     formatWithLocale("property '%s.%s", relationshipType, resolvedPropertyMapping.propertyKey()),
-                    AdjacencyList.uncompressedMemoryEstimation(relationshipType, undirected)
+                    TransientAdjacencyList.uncompressedMemoryEstimation(relationshipType, undirected)
                 );
                 builder.add(
                     formatWithLocale("property offset '%s.%s", relationshipType, resolvedPropertyMapping.propertyKey()),
-                    AdjacencyOffsets.memoryEstimation()
+                    TransientAdjacencyOffsets.memoryEstimation()
                 );
             });
         });
@@ -134,7 +134,7 @@ public final class NativeFactory extends GraphStoreFactory<GraphCreateFromStoreC
 
         int concurrency = graphCreateConfig.readConcurrency();
         AllocationTracker tracker = loadingContext.tracker();
-        IdsAndProperties nodes = loadNodes(tracker, concurrency);
+        IdsAndProperties nodes = loadNodes(concurrency);
         RelationshipImportResult relationships = loadRelationships(tracker, nodes, concurrency);
         GraphStore graphStore = createGraphStore(nodes, relationships, tracker, dimensions);
         progressLogger.logMessage(tracker);
@@ -142,7 +142,7 @@ public final class NativeFactory extends GraphStoreFactory<GraphCreateFromStoreC
         return ImportResult.of(dimensions, graphStore);
     }
 
-    private IdsAndProperties loadNodes(AllocationTracker tracker, int concurrency) {
+    private IdsAndProperties loadNodes(int concurrency) {
         Map<NodeLabel, PropertyMappings> propertyMappingsByNodeLabel = graphCreateConfig
             .nodeProjections()
             .projections()
@@ -168,6 +168,7 @@ public final class NativeFactory extends GraphStoreFactory<GraphCreateFromStoreC
         IdsAndProperties idsAndProperties,
         int concurrency
     ) {
+        var pageSize = ImportSizing.of(concurrency, dimensions.nodeCount()).pageSize();
         Map<RelationshipType, RelationshipsBuilder> allBuilders = graphCreateConfig
             .relationshipProjections()
             .projections()
@@ -175,7 +176,11 @@ public final class NativeFactory extends GraphStoreFactory<GraphCreateFromStoreC
             .stream()
             .collect(Collectors.toMap(
                 Map.Entry::getKey,
-                projectionEntry -> new RelationshipsBuilder(projectionEntry.getValue(), tracker)
+                projectionEntry -> new RelationshipsBuilder(
+                    projectionEntry.getValue(),
+                    TransientAdjacencyListBuilder.builderFactory(tracker),
+                    TransientAdjacencyOffsets.forPageSize(pageSize)
+                )
             ));
 
         ObjectLongMap<RelationshipType> relationshipCounts = new ScanningRelationshipsImporter(

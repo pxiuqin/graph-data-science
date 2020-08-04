@@ -20,18 +20,17 @@
 package org.neo4j.graphalgo.core.loading;
 
 import org.neo4j.graphalgo.core.SecureTransaction;
-import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.internal.kernel.api.security.SecurityContext;
 import org.neo4j.io.layout.DatabaseFile;
+import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.RelationshipStore;
 import org.neo4j.kernel.impl.store.format.RecordFormat;
 import org.neo4j.kernel.impl.store.format.RecordFormats;
 import org.neo4j.kernel.impl.store.record.RelationshipRecord;
 
-final class RelationshipRecordBasedScanner extends AbstractRecordBasedScanner<RelationshipReference, RelationshipRecord, RelationshipStore> {
+public final class RelationshipRecordBasedScanner extends AbstractRecordBasedScanner<RelationshipReference, RelationshipRecord, RelationshipStore> {
 
-    static final StoreScanner.Factory<RelationshipReference> FACTORY = RelationshipRecordBasedScanner::new;
+    public static final StoreScanner.Factory<RelationshipReference> FACTORY = RelationshipRecordBasedScanner::new;
 
     private RelationshipRecordBasedScanner(int prefetchSize, SecureTransaction transaction) {
         super(prefetchSize, transaction);
@@ -50,7 +49,8 @@ final class RelationshipRecordBasedScanner extends AbstractRecordBasedScanner<Re
     @Override
     public RelationshipReference recordReference(
         RelationshipRecord record,
-        RelationshipStore store
+        RelationshipStore store,
+        KernelTransaction transaction
     ) {
         return new RelationshipRecordReference(record);
     }

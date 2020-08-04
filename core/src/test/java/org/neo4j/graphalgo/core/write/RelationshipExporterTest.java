@@ -39,8 +39,8 @@ import java.util.Optional;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.isA;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.neo4j.graphalgo.TestGraph.Builder.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 import static org.neo4j.graphalgo.core.utils.TerminationFlag.RUNNING_TRUE;
 
 class RelationshipExporterTest extends BaseTest {

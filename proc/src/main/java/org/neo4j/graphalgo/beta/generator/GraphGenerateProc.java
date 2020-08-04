@@ -42,7 +42,6 @@ import static org.neo4j.graphalgo.config.RandomGraphGeneratorConfig.RELATIONSHIP
 import static org.neo4j.graphalgo.config.RandomGraphGeneratorConfig.RELATIONSHIP_PROPERTY_NAME_KEY;
 import static org.neo4j.graphalgo.config.RandomGraphGeneratorConfig.RELATIONSHIP_PROPERTY_TYPE_KEY;
 import static org.neo4j.graphalgo.config.RandomGraphGeneratorConfig.RELATIONSHIP_PROPERTY_VALUE_KEY;
-import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 import static org.neo4j.procedure.Mode.READ;
 
 public final class GraphGenerateProc extends BaseProc {
@@ -56,12 +55,12 @@ public final class GraphGenerateProc extends BaseProc {
         @Name(value = "averageDegree") long averageDegree,
         @Name(value = "configuration", defaultValue = "{}") Map<String, Object> configuration
     ) {
-        validateGraphName(getUsername(), graphName);
+        validateGraphName(username(), graphName);
 
         // input
         CypherMapWrapper cypherConfig = CypherMapWrapper.create(configuration);
         RandomGraphGeneratorConfig config = RandomGraphGeneratorConfig.of(
-            getUsername(),
+            username(),
             graphName,
             nodeCount,
             averageDegree,
@@ -86,10 +85,6 @@ public final class GraphGenerateProc extends BaseProc {
     ) {
         GraphGenerationStats stats = new GraphGenerationStats(name, averageDegree, config);
 
-        if (GraphStoreCatalog.exists(getUsername(), name)) {
-            throw new IllegalArgumentException(formatWithLocale("A graph with name '%s' is already loaded.", name));
-        }
-
         try (ProgressTimer ignored = ProgressTimer.start(time -> stats.generateMillis = time)) {
             RandomGraphGenerator generator = initializeGraphGenerator(nodeCount, averageDegree, config);
 
@@ -101,6 +96,7 @@ public final class GraphGenerateProc extends BaseProc {
                 .orElse("PROPERTY"));
 
             GraphStore graphStore = CSRGraphStore.of(
+                api.databaseId(),
                 graph,
                 DUMMY_RELATIONSHIP_NAME,
                 relationshipProperty,

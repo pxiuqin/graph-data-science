@@ -19,12 +19,18 @@
  */
 package org.neo4j.graphalgo.core.huge;
 
+import com.carrotsearch.hppc.BitSet;
+import org.neo4j.graphalgo.Orientation;
+import org.neo4j.graphalgo.api.CSRGraph;
 import org.neo4j.graphalgo.api.Graph;
+import org.neo4j.graphalgo.api.ImmutableTopology;
 import org.neo4j.graphalgo.api.NodeMapping;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.api.RelationshipConsumer;
+import org.neo4j.graphalgo.api.RelationshipCursor;
 import org.neo4j.graphalgo.api.RelationshipIntersect;
 import org.neo4j.graphalgo.api.RelationshipWithPropertyConsumer;
+import org.neo4j.graphalgo.api.Relationships;
 import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterable;
 import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterator;
 
@@ -32,13 +38,14 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.function.LongPredicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public final class UnionGraph implements Graph {
+public final class UnionGraph implements CSRGraph {
 
-    private final Graph first;
-    private final Collection<? extends Graph> graphs;
+    private final CSRGraph first;
+    private final Collection<? extends CSRGraph> graphs;
 
-    public static Graph of(Collection<? extends Graph> graphs) {
+    public static CSRGraph of(Collection<? extends CSRGraph> graphs) {
         if (graphs.isEmpty()) {
             throw new IllegalArgumentException("no graphs");
         }
@@ -48,7 +55,7 @@ public final class UnionGraph implements Graph {
         return new UnionGraph(graphs);
     }
 
-    private UnionGraph(Collection<? extends Graph> graphs) {
+    private UnionGraph(Collection<? extends CSRGraph> graphs) {
         first = graphs.iterator().next();
         this.graphs = graphs;
     }
@@ -133,18 +140,35 @@ public final class UnionGraph implements Graph {
     }
 
     @Override
+    public Stream<RelationshipCursor> streamRelationships(long nodeId, double fallbackValue) {
+        return graphs
+            .stream()
+            .flatMap(graph -> graph.streamRelationships(nodeId, fallbackValue));
+    }
+
+    @Override
     public int degree(long nodeId) {
         return Math.toIntExact(graphs.stream().mapToLong(g -> g.degree(nodeId)).sum());
     }
 
     @Override
-    public Graph concurrentCopy() {
-        return of(graphs.stream().map(Graph::concurrentCopy).collect(Collectors.toList()));
+    public int degreeWithoutParallelRelationships(long nodeId) {
+        if (!isMultiGraph()) {
+            return degree(nodeId);
+        }
+        var degreeCounter = new ParallelRelationshipDegreeCounter();
+        graphs.forEach(graph -> graph.forEachRelationship(nodeId, degreeCounter));
+        return degreeCounter.degree();
+    }
+
+    @Override
+    public CSRGraph concurrentCopy() {
+        return of(graphs.stream().map(CSRGraph::concurrentCopy).collect(Collectors.toList()));
     }
 
     @Override
     public RelationshipIntersect intersection(long maxDegree) {
-        throw new UnsupportedOperationException("#intersection is not supported for multiple relationship types");
+        return new UnionGraphIntersect((CompositeAdjacencyList) relationshipTopology().list(), maxDegree);
     }
 
     /**
@@ -195,6 +219,51 @@ public final class UnionGraph implements Graph {
 
     @Override
     public boolean isUndirected() {
-        return first.isUndirected();
+        return graphs.stream().allMatch(Graph::isUndirected);
+    }
+
+    @Override
+    public boolean isMultiGraph() {
+        // we need to run a check across all relationships between the sub-graphs of the union
+        // maybe we'll do that later; for now union never guarantees parallel-free
+        return true;
+    }
+
+    @Override
+    public Relationships.Topology relationshipTopology() {
+        var adjacencyLists = graphs
+            .stream()
+            .map(graph -> graph.relationshipTopology().list())
+            .collect(Collectors.toList());
+        var adjacencyOffsets = graphs
+            .stream()
+            .map(graph -> graph.relationshipTopology().offsets())
+            .collect(Collectors.toList());
+
+        return ImmutableTopology.builder()
+            .offsets(new CompositeAdjacencyOffsets(adjacencyOffsets))
+            .list(new CompositeAdjacencyList(adjacencyLists, adjacencyOffsets))
+            .orientation(Orientation.NATURAL)
+            .elementCount(relationshipCount())
+            .isMultiGraph(true)
+            .build();
+    }
+
+    private static class ParallelRelationshipDegreeCounter implements RelationshipConsumer {
+        private final BitSet visited;
+
+        ParallelRelationshipDegreeCounter() {
+            visited = BitSet.newInstance();
+        }
+
+        @Override
+        public boolean accept(long s, long t) {
+            visited.set(t);
+            return true;
+        }
+
+        int degree() {
+            return Math.toIntExact(visited.cardinality());
+        }
     }
 }

@@ -36,11 +36,12 @@ import org.neo4j.graphalgo.RelationshipType;
 import org.neo4j.graphalgo.StoreLoaderBuilder;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
+import org.neo4j.graphalgo.api.Relationships;
 import org.neo4j.graphalgo.core.Aggregation;
 import org.neo4j.graphalgo.core.GraphLoader;
-import org.neo4j.graphalgo.core.huge.AdjacencyList;
-import org.neo4j.graphalgo.core.huge.AdjacencyOffsets;
-import org.neo4j.graphalgo.core.huge.HugeGraph;
+import org.neo4j.graphalgo.core.huge.TransientAdjacencyList;
+import org.neo4j.graphalgo.core.huge.TransientAdjacencyOffsets;
+import org.neo4j.graphalgo.core.loading.NullPropertyMap.DoubleNullPropertyMap;
 
 import java.time.ZonedDateTime;
 import java.util.Arrays;
@@ -57,11 +58,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.neo4j.graphalgo.NodeLabel.ALL_NODES;
-import static org.neo4j.graphalgo.TestGraph.Builder.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.mapEquals;
 import static org.neo4j.graphalgo.compat.MapUtil.map;
-import static org.neo4j.values.storable.NumberType.FLOATING_POINT;
 
 class GraphStoreTest extends BaseTest {
 
@@ -161,15 +161,16 @@ class GraphStoreTest extends BaseTest {
         // add node properties
         ZonedDateTime initialTime = graphStore.modificationTime();
         Thread.sleep(42);
-        graphStore.addNodeProperty(ALL_NODES, "foo", FLOATING_POINT, new NullPropertyMap(42.0));
+        graphStore.addNodeProperty(ALL_NODES, "foo", new DoubleNullPropertyMap(42.0));
         ZonedDateTime nodePropertyTime = graphStore.modificationTime();
 
         // add relationships
-        HugeGraph.Relationships relationships = HugeGraph.Relationships.of(
+        Relationships relationships = Relationships.of(
             0L,
             Orientation.NATURAL,
-            new AdjacencyList(new byte[0][0]),
-            AdjacencyOffsets.of(new long[0]),
+            false,
+            new TransientAdjacencyList(new byte[0][0]),
+            TransientAdjacencyOffsets.of(new long[0]),
             null,
             null,
             42.0
@@ -220,14 +221,12 @@ class GraphStoreTest extends BaseTest {
             .graphStore();
 
         assertThat(graphStore.relationshipCount(), equalTo(4L));
-        assertThat(graphStore.relationshipPropertyCount(), equalTo(7L));
 
         DeletionResult deletionResult = graphStore.deleteRelationships(RelationshipType.of("LER"));
 
         assertEquals(new HashSet<>(singletonList(RelationshipType.of("REL"))), graphStore.relationshipTypes());
         assertFalse(graphStore.hasRelationshipType(RelationshipType.of("LER")));
         assertEquals(1, graphStore.relationshipCount());
-        assertEquals(1, graphStore.relationshipPropertyCount());
 
         assertEquals(3, deletionResult.deletedRelationships());
         assertThat(deletionResult.deletedProperties(), mapEquals(map("p", 3L, "q", 3L)));

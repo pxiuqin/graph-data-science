@@ -45,7 +45,7 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -72,6 +72,7 @@ import static com.google.auto.common.MoreElements.asType;
 import static com.google.auto.common.MoreElements.getAnnotationMirror;
 import static com.google.auto.common.MoreTypes.asTypeElement;
 import static com.google.auto.common.MoreTypes.isTypeOf;
+import static javax.lang.model.type.TypeKind.DECLARED;
 import static javax.lang.model.util.ElementFilter.methodsIn;
 
 final class GenerateConfiguration {
@@ -164,7 +165,7 @@ final class GenerateConfiguration {
             FieldSpec.builder(
                 member.typeSpecWithAnnotation(Nullable.class),
                 names.newName(member.methodName(), member),
-                Modifier.PRIVATE, Modifier.FINAL
+                Modifier.PRIVATE
             ).build()
         ).forEach(builder::addField);
         return builder.build();
@@ -178,6 +179,11 @@ final class GenerateConfiguration {
         String configParameterName = names.newName(CONFIG_VAR, CONFIG_VAR);
         boolean requiredMapParameter = false;
 
+        String errorsVarName = names.newName("errors");
+        if (!config.members().isEmpty()) {
+            configMapConstructor.addStatement("$1T<$2T> $3N = new $1T<>()", ArrayList.class, IllegalArgumentException.class, errorsVarName);
+        }
+
         for (ConfigParser.Member member : config.members()) {
             Optional<MemberDefinition> memberDefinition = memberDefinition(names, member);
             if (memberDefinition.isPresent()) {
@@ -189,13 +195,15 @@ final class GenerateConfiguration {
                     requiredMapParameter = true;
                     addConfigGetterToConstructor(
                         configMapConstructor,
-                        definition
+                        definition,
+                        errorsVarName
                     );
                 } else {
                     addParameterToConstructor(
                         configMapConstructor,
                         definition,
-                        parameter
+                        parameter,
+                        errorsVarName
                     );
                 }
             }
@@ -203,8 +211,12 @@ final class GenerateConfiguration {
 
         for (ConfigParser.Member member : config.members()) {
             if (member.validates()) {
-                configMapConstructor.addStatement("$N()", member.methodName());
+                catchValidationError(configMapConstructor, errorsVarName, (builder) -> builder.addStatement("$N()", member.methodName()));
             }
+        }
+
+        if (!config.members().isEmpty()) {
+            combineCollectedErrors(names, configMapConstructor, errorsVarName);
         }
 
         if (requiredMapParameter) {
@@ -215,6 +227,74 @@ final class GenerateConfiguration {
         }
 
         return configMapConstructor.build();
+    }
+
+    private void combineCollectedErrors(
+        NameAllocator names,
+        MethodSpec.Builder configMapConstructor,
+        String errorsVarName
+    ) {
+        String combinedErrorMsgVarName = names.newName("combinedErrorMsg");
+        String combinedErrorVarName = names.newName("combinedError");
+        configMapConstructor.beginControlFlow("if(!$N.isEmpty())", errorsVarName)
+            .beginControlFlow("if($N.size() == $L)", errorsVarName, 1)
+            .addStatement("throw $N.get($L)", errorsVarName, 0)
+            .nextControlFlow("else")
+            .addStatement(
+                "$1T $2N = $3N.stream().map($4T::getMessage)" +
+                ".collect($5T.joining(System.lineSeparator() + $6S, $7S + System.lineSeparator() + $6S, $8S))",
+                String.class,
+                combinedErrorMsgVarName,
+                errorsVarName,
+                IllegalArgumentException.class,
+                Collectors.class,
+                "\t\t\t\t",
+                "Multiple errors in configuration arguments:", //prefix
+                "" // suffix
+            )
+            .addStatement(
+                "$1T $2N = new $1T($3N)",
+                IllegalArgumentException.class,
+                combinedErrorVarName,
+                combinedErrorMsgVarName
+            )
+            .addStatement(
+                "$1N.forEach($2N -> $3N.addSuppressed($2N))",
+                errorsVarName,
+                names.newName("error"),
+                combinedErrorVarName
+            )
+            .addStatement("throw $N", combinedErrorVarName)
+            .endControlFlow()
+            .endControlFlow();
+    }
+
+    private void catchAndPropagateIllegalArgumentError(
+        MethodSpec.Builder builder,
+        String errorVarName,
+        UnaryOperator<MethodSpec.Builder> statementFunc
+    ) {
+        builder.beginControlFlow("try");
+        statementFunc.apply(builder);
+        builder
+            .nextControlFlow("catch ($T e)", IllegalArgumentException.class)
+            .addStatement("$N.add(e)", errorVarName)
+            .endControlFlow();
+    }
+
+    private void catchValidationError(
+        MethodSpec.Builder builder,
+        String errorVarName,
+        UnaryOperator<MethodSpec.Builder> statementFunc
+    ) {
+        builder.beginControlFlow("try");
+        statementFunc.apply(builder);
+        builder
+            .nextControlFlow("catch ($T e)", IllegalArgumentException.class)
+            .addStatement("$N.add(e)", errorVarName)
+            // should only throw NPE if previously an error occured on the field it valides on (field is null then)
+            .nextControlFlow("catch ($T e)", NullPointerException.class)
+            .endControlFlow();
     }
 
     private Optional<MethodSpec> defineFactory(
@@ -259,7 +339,8 @@ final class GenerateConfiguration {
 
     private void addConfigGetterToConstructor(
         MethodSpec.Builder constructor,
-        MemberDefinition definition
+        MemberDefinition definition,
+        String errorsVarName
     ) {
         CodeBlock.Builder code = CodeBlock.builder().add(
             "$N.$L$L($S",
@@ -275,7 +356,7 @@ final class GenerateConfiguration {
             codeBlock = converter.apply(codeBlock);
         }
         TypeMirror fieldType = definition.fieldType();
-        if (fieldType.getKind() == TypeKind.DECLARED) {
+        if (fieldType.getKind() == DECLARED) {
             boolean isNullable = !definition.member().annotations(Nullable.class).isEmpty();
 
             if (!isNullable) {
@@ -322,18 +403,24 @@ final class GenerateConfiguration {
             );
         }
 
-        constructor.addStatement("this.$N = $L", definition.fieldName(), codeBlock);
+        CodeBlock finalCodeBlock = codeBlock;
+        catchAndPropagateIllegalArgumentError(
+            constructor,
+            errorsVarName,
+            (builder) -> builder.addStatement("this.$N = $L", definition.fieldName(), finalCodeBlock)
+        );
     }
 
     private void addParameterToConstructor(
         MethodSpec.Builder constructor,
         MemberDefinition definition,
-        Parameter parameter
+        Parameter parameter,
+        String errorsVarName
     ) {
         TypeName paramType = TypeName.get(definition.parameterType());
 
         CodeBlock valueProducer;
-        if (definition.parameterType().getKind() == TypeKind.DECLARED) {
+        if (definition.parameterType().getKind() == DECLARED) {
             if (parameter.acceptNull()) {
                 paramType = paramType.annotated(NULLABLE);
                 valueProducer = CodeBlock.of("$N", definition.fieldName());
@@ -353,9 +440,14 @@ final class GenerateConfiguration {
         for (UnaryOperator<CodeBlock> converter : definition.converters()) {
             valueProducer = converter.apply(valueProducer);
         }
-        constructor
-            .addParameter(paramType, definition.fieldName())
-            .addStatement("this.$N = $L", definition.fieldName(), valueProducer);
+
+        CodeBlock finalValueProducer = valueProducer;
+        constructor.addParameter(paramType, definition.fieldName());
+        catchAndPropagateIllegalArgumentError(
+            constructor,
+            errorsVarName,
+            (builder) -> builder.addStatement("this.$N = $L", definition.fieldName(), finalValueProducer)
+        );
     }
 
     private Optional<MemberDefinition> memberDefinition(NameAllocator names, ConfigParser.Member member) {
@@ -457,18 +549,7 @@ final class GenerateConfiguration {
                 if (!(candidate.getParameters().size() == 1)) {
                     invalidCandidates.add(InvalidCandidate.of(candidate, "May only accept one parameter"));
                 }
-                // There is a difference in behavior between JDKs 8 and 11 for
-                //  javax.lang.model.util.Types#isAssignable
-                // Calling e.g. isAssignable(<A>, int) will return `true` in JDK 8,
-                //  that is, it allows primitive types to be auto-boxed and assigned
-                //  to an unbounded generic type.
-                // JDK 11, on the other hand, does return `false` for that method.
-                // We are aligning this difference to the behavior of JDK 8 by
-                //  only testing for assignability in the absence of generic types.
-                if (
-                    candidate.getTypeParameters().isEmpty() &&
-                    !typeUtils.isAssignable(candidate.getReturnType(), targetType)
-                ) {
+                if (!typeUtils.isAssignable(candidate.getReturnType(), targetType)) {
                     invalidCandidates.add(InvalidCandidate.of(
                         candidate,
                         "Must return a type that is assignable to %s",
@@ -571,6 +652,24 @@ final class GenerateConfiguration {
                     builder.methodName("String");
                 } else if (isTypeOf(Number.class, targetType)) {
                     builder.methodName("Number");
+                } else if (isTypeOf(Optional.class, targetType)) {
+                    if (member.method().isDefault()) {
+                        return error(
+                            "Optional fields can not to be declared default (Optional.empty is the default).",
+                            member.method()
+                        );
+                    }
+                    List<? extends TypeMirror> typeArguments = ((DeclaredType) targetType).getTypeArguments();
+                    if (typeArguments.isEmpty()) {
+                        return error(
+                            "Optional must have a Cypher-supported type as type argument, but found none.",
+                            member.method()
+                        );
+                    }
+                    builder
+                        .methodPrefix("get")
+                        .methodName("Optional")
+                        .expectedType(CodeBlock.of("$T.class", ClassName.get(asTypeElement(typeArguments.get(0)))));
                 } else {
                     builder
                         .methodName("Checked")
@@ -618,11 +717,17 @@ final class GenerateConfiguration {
                 break;
             default:
                 builder.addStatement("$T<$T, Object> map = new $T<>()", Map.class, String.class, LinkedHashMap.class);
-                configMembers.forEach(configMember -> builder.addStatement(
-                    "map.put($S, $L)",
-                    configMember.lookupKey(),
-                    getMapValueCode(configMember)
-                ));
+                configMembers.forEach(configMember -> {
+                    if (isTypeOf(Optional.class, configMember.method().getReturnType())) {
+                        builder.addStatement(getMapPutOptionalCode(configMember));
+                    } else {
+                        builder.addStatement(
+                            "map.put($S, $L)",
+                            configMember.lookupKey(),
+                            getMapValueCode(configMember)
+                        );
+                    }
+                });
                 builder.addStatement("return map");
                 break;
         }
@@ -632,11 +737,29 @@ final class GenerateConfiguration {
     private CodeBlock getMapValueCode(ConfigParser.Member configMember) {
         String getter = configMember.methodName();
         Configuration.ToMapValue toMapValue = configMember.method().getAnnotation(Configuration.ToMapValue.class);
-        return (toMapValue == null) ? CodeBlock.of("$N()", getter) : CodeBlock.of(
-            "$L($N())",
-            toMapValue.value().replaceAll("#", "."),
-            getter
+        return (toMapValue == null)
+            ? CodeBlock.of("$N()", getter)
+            : CodeBlock.of("$L($N())", getReference(toMapValue), getter);
+    }
+
+    @NotNull
+    private CodeBlock getMapPutOptionalCode(ConfigParser.Member configMember) {
+        Configuration.ToMapValue toMapValue = configMember.method().getAnnotation(Configuration.ToMapValue.class);
+
+        CodeBlock mapValue = (toMapValue == null)
+            ? CodeBlock.of("$L", configMember.lookupKey())
+            : CodeBlock.of("$L($L)", getReference(toMapValue), configMember.lookupKey());
+
+        return CodeBlock.of("$L.ifPresent($L -> map.put($S, $L))",
+            CodeBlock.of("$N()", configMember.methodName()),
+            configMember.lookupKey(),
+            configMember.lookupKey(),
+            mapValue
         );
+    }
+
+    private String getReference(Configuration.ToMapValue toMapValue) {
+        return toMapValue.value().replaceAll("#", ".");
     }
 
     private CodeBlock collectKeysCode(ConfigParser.Spec config) {

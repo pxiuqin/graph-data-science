@@ -25,9 +25,11 @@ import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.RelationshipProjection;
 import org.neo4j.graphalgo.api.IdMapping;
+import org.neo4j.graphalgo.api.Relationships;
 import org.neo4j.graphalgo.core.Aggregation;
 import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
 import org.neo4j.graphalgo.core.huge.HugeGraph;
+import org.neo4j.graphalgo.core.huge.TransientAdjacencyOffsets;
 import org.neo4j.graphalgo.core.utils.RawValues;
 import org.neo4j.graphalgo.core.utils.SetBitsIterable;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
@@ -77,7 +79,7 @@ public final class HugeGraphUtil {
         );
     }
 
-    public static HugeGraph create(IdMap idMap, HugeGraph.Relationships relationships, AllocationTracker tracker) {
+    public static HugeGraph create(IdMap idMap, Relationships relationships, AllocationTracker tracker) {
         return HugeGraph.create(
             idMap,
             Collections.emptyMap(),
@@ -168,6 +170,7 @@ public final class HugeGraphUtil {
         private final Orientation orientation;
         private final boolean loadRelationshipProperty;
         private final ExecutorService executorService;
+        private final Aggregation aggregation;
 
         private long importedRelationships = 0;
 
@@ -183,6 +186,7 @@ public final class HugeGraphUtil {
             this.loadRelationshipProperty = loadRelationshipProperty;
             this.executorService = executorService;
             this.idMapping = idMapping;
+            this.aggregation = aggregation;
 
             ImportSizing importSizing = ImportSizing.of(1, idMapping.nodeCount());
             int pageSize = importSizing.pageSize();
@@ -202,7 +206,8 @@ public final class HugeGraphUtil {
 
             this.relationshipsBuilder = new org.neo4j.graphalgo.core.loading.RelationshipsBuilder(
                 projectionBuilder.build(),
-                tracker
+                TransientAdjacencyListBuilder.builderFactory(tracker),
+                TransientAdjacencyOffsets.forPageSize(pageSize)
             );
 
             AdjacencyBuilder adjacencyBuilder = AdjacencyBuilder.compressing(
@@ -261,13 +266,14 @@ public final class HugeGraphUtil {
             addFromInternal(relationship.sourceNodeId(), relationship.targetNodeId(), relationship.property());
         }
 
-        public HugeGraph.Relationships build() {
+        public Relationships build() {
             flushBuffer();
 
             ParallelUtil.run(relationshipImporter.flushTasks(), executorService);
-            return HugeGraph.Relationships.of(
+            return Relationships.of(
                 importedRelationships,
                 orientation,
+                Aggregation.equivalentToNone(aggregation),
                 relationshipsBuilder.adjacencyList(),
                 relationshipsBuilder.globalAdjacencyOffsets(),
                 loadRelationshipProperty ? relationshipsBuilder.properties() : null,

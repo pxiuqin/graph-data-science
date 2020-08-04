@@ -48,14 +48,12 @@ import static org.neo4j.kernel.api.StatementConstants.NO_SUCH_PROPERTY_KEY;
 @Value.Enclosing
 class CypherNodeLoader extends CypherRecordLoader<CypherNodeLoader.LoadResult> {
 
-    static final int CYPHER_RESULT_PROPERTY_KEY = -2;
-
     private final long nodeCount;
     private final GraphDimensions outerDimensions;
     private final IntObjectMap<List<NodeLabel>> labelTokenNodeLabelMapping;
 
     private final HugeLongArrayBuilder builder;
-    private final NodeImporter importer;
+    private final HugeNodeImporter importer;
     private long maxNodeId;
     private CypherNodePropertyImporter nodePropertyImporter;
 
@@ -73,7 +71,7 @@ class CypherNodeLoader extends CypherRecordLoader<CypherNodeLoader.LoadResult> {
         this.maxNodeId = 0L;
         this.labelTokenNodeLabelMapping = new IntObjectHashMap<>();
         this.builder = HugeLongArrayBuilder.of(nodeCount, loadingContext.tracker());
-        this.importer = new NodeImporter(builder, new HashMap<>(), labelTokenNodeLabelMapping);
+        this.importer = new HugeNodeImporter(builder, new HashMap<>(), labelTokenNodeLabelMapping);
     }
 
     @Override
@@ -85,8 +83,7 @@ class CypherNodeLoader extends CypherRecordLoader<CypherNodeLoader.LoadResult> {
         nodePropertyImporter = new CypherNodePropertyImporter(
             propertyColumns,
             labelTokenNodeLabelMapping,
-            nodeCount,
-            cypherConfig.readConcurrency()
+            nodeCount
         );
 
         boolean hasLabelInformation = queryResult.columns().contains(NodeRowVisitor.LABELS_COLUMN);

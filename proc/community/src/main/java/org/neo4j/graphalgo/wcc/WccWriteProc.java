@@ -21,11 +21,11 @@ package org.neo4j.graphalgo.wcc;
 
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.WriteProc;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.dss.DisjointSetStruct;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractCommunityResultBuilder;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
@@ -77,15 +77,15 @@ public class WccWriteProc extends WriteProc<Wcc, DisjointSetStruct, WccWriteProc
     }
 
     @Override
-    protected AlgorithmFactory<Wcc, WccWriteConfig> algorithmFactory(WccWriteConfig config) {
+    protected AlgorithmFactory<Wcc, WccWriteConfig> algorithmFactory() {
         return WccProc.algorithmFactory();
     }
 
     @Override
-    protected PropertyTranslator<DisjointSetStruct> nodePropertyTranslator(
+    protected NodeProperties getNodeProperties(
         ComputationResult<Wcc, DisjointSetStruct, WccWriteConfig> computationResult
     ) {
-        return WccProc.nodePropertyTranslator(computationResult, computationResult.config().writeProperty());
+        return WccProc.nodeProperties(computationResult, computationResult.config().writeProperty());
     }
 
     @Override

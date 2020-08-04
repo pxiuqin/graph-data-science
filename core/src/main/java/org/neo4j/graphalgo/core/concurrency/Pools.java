@@ -19,6 +19,7 @@
  */
 package org.neo4j.graphalgo.core.concurrency;
 
+import org.neo4j.graphalgo.core.GdsEdition;
 import org.neo4j.internal.helpers.NamedThreadFactory;
 
 import java.util.concurrent.ArrayBlockingQueue;
@@ -32,7 +33,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static org.neo4j.graphalgo.config.ConcurrencyValidation.CONCURRENCY_LIMITATION;
+import static org.neo4j.graphalgo.config.ConcurrencyConfig.CONCURRENCY_LIMITATION;
 
 public final class Pools {
 
@@ -47,7 +48,7 @@ public final class Pools {
 
     static ExecutorService createDefaultPool() {
         int corePoolSize, maxPoolSize;
-        if (ConcurrencyMonitor.instance().isUnlimited()) {
+        if (GdsEdition.instance().isOnEnterpriseEdition()) {
             corePoolSize = Runtime.getRuntime().availableProcessors();
             maxPoolSize = corePoolSize * 2;
         } else {

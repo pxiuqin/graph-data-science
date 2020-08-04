@@ -23,9 +23,11 @@ import org.eclipse.collections.api.tuple.Pair;
 import org.eclipse.collections.impl.tuple.Tuples;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.neo4j.graphalgo.BaseProcTest;
 import org.neo4j.graphalgo.compat.MapUtil;
-import org.neo4j.graphalgo.functions.GetNodeFunc;
+import org.neo4j.graphalgo.functions.AsNodeFunc;
+import org.neo4j.graphalgo.impl.similarity.ApproxNearestNeighborsAlgorithm;
+import org.neo4j.graphalgo.impl.similarity.SimilarityConfig;
+import org.neo4j.graphalgo.impl.similarity.SimilarityInput;
 
 import java.util.Map;
 
@@ -34,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.neo4j.graphalgo.compat.MapUtil.map;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
-class ApproxNearestNeighborsProcTest extends BaseProcTest {
+class ApproxNearestNeighborsProcTest extends SimilarityProcTest<ApproxNearestNeighborsAlgorithm<SimilarityInput>, SimilarityInput> {
 
     private static final String DB_CYPHER =
         "CREATE" +
@@ -73,7 +75,7 @@ class ApproxNearestNeighborsProcTest extends BaseProcTest {
     @BeforeEach
     void setUp() throws Exception {
         registerProcedures(ApproxNearestNeighborsProc.class);
-        registerFunctions(GetNodeFunc.class);
+        registerFunctions(AsNodeFunc.class);
         runQuery(DB_CYPHER);
     }
 
@@ -96,8 +98,8 @@ class ApproxNearestNeighborsProcTest extends BaseProcTest {
         );
 
         Map<String, Object> config = map(
-            "config",
-            anonymousGraphConfig("algorithm", "jaccard", "similarityCutoff", 0.1, "randomSeed", 42L)
+            "config", map(
+            "algorithm", "jaccard", "similarityCutoff", 0.1, "randomSeed", 42L)
         );
 
         String query =
@@ -147,7 +149,7 @@ class ApproxNearestNeighborsProcTest extends BaseProcTest {
 
         Map<String, Object> config = map(
             "config",
-            anonymousGraphConfig("algorithm", "jaccard", "similarityCutoff", 0.1, "randomSeed", 42L)
+            map("algorithm", "jaccard", "similarityCutoff", 0.1, "randomSeed", 42L)
         );
 
         String query =
@@ -181,5 +183,17 @@ class ApproxNearestNeighborsProcTest extends BaseProcTest {
                 assertEquals(expectedScore.doubleValue(), row.getNumber("similarity").doubleValue());
             }
         });
+    }
+
+    @Override
+    Map<String, Object> minimalViableConfig() {
+        var config = super.minimalViableConfig();
+        config.put("algorithm", "jaccard");
+        return config;
+    }
+
+    @Override
+    Class<? extends SimilarityProc<ApproxNearestNeighborsAlgorithm<SimilarityInput>, ? extends SimilarityConfig>> getProcedureClazz() {
+        return ApproxNearestNeighborsProc.class;
     }
 }

@@ -21,10 +21,10 @@ package org.neo4j.graphalgo.louvain;
 
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.MutateProc;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.internal.kernel.api.procs.ProcedureCallContext;
@@ -74,13 +74,13 @@ public class LouvainMutateProc extends MutateProc<Louvain, Louvain, LouvainMutat
     }
 
     @Override
-    protected AlgorithmFactory<Louvain, LouvainMutateConfig> algorithmFactory(LouvainMutateConfig config) {
+    protected AlgorithmFactory<Louvain, LouvainMutateConfig> algorithmFactory() {
         return new LouvainFactory<>();
     }
 
     @Override
-    protected PropertyTranslator<Louvain> nodePropertyTranslator(ComputationResult<Louvain, Louvain, LouvainMutateConfig> computationResult) {
-        return LouvainProc.nodePropertyTranslator(computationResult, computationResult.config().mutateProperty());
+    protected NodeProperties getNodeProperties(ComputationResult<Louvain, Louvain, LouvainMutateConfig> computationResult) {
+        return LouvainProc.nodeProperties(computationResult, computationResult.config().mutateProperty());
     }
 
     @Override

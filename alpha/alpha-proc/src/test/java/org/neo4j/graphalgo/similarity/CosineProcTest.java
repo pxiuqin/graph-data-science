@@ -21,9 +21,11 @@ package org.neo4j.graphalgo.similarity;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.neo4j.graphalgo.BaseProcTest;
 import org.neo4j.graphalgo.core.Settings;
 import org.neo4j.graphalgo.functions.IsFiniteFunc;
+import org.neo4j.graphalgo.impl.similarity.CosineAlgorithm;
+import org.neo4j.graphalgo.impl.similarity.SimilarityConfig;
+import org.neo4j.graphalgo.impl.similarity.WeightedInput;
 import org.neo4j.graphdb.Result;
 import org.neo4j.test.TestDatabaseManagementServiceBuilder;
 import org.neo4j.test.extension.ExtensionCallback;
@@ -39,7 +41,7 @@ import static org.neo4j.graphalgo.compat.GraphDatabaseApiProxy.applyInTransactio
 import static org.neo4j.graphalgo.compat.GraphDatabaseApiProxy.runQueryWithoutClosingTheResult;
 import static org.neo4j.graphalgo.compat.MapUtil.map;
 
-class CosineProcTest extends BaseProcTest {
+class CosineProcTest extends SimilarityProcTest<CosineAlgorithm, WeightedInput> {
 
     public static final String DB_CYPHER =
         "CREATE" +
@@ -125,7 +127,7 @@ class CosineProcTest extends BaseProcTest {
     @ExtensionCallback
     protected void configuration(TestDatabaseManagementServiceBuilder builder) {
         super.configuration(builder);
-        builder.setConfig(Settings.unlimitedCores(), true);
+        builder.setConfig(Settings.enterpriseLicensed(), true);
     }
 
     private void buildRandomDB(int size) {
@@ -151,22 +153,22 @@ class CosineProcTest extends BaseProcTest {
                 Result result1 = runQueryWithoutClosingTheResult(
                     tx,
                     STATEMENT_STREAM,
-                    map("config", anonymousGraphConfig("similarityCutoff", -0.1, "concurrency", 1, "topK", 0), "missingValue", 0)
+                    map("config", map("similarityCutoff", -0.1, "concurrency", 1, "topK", 0), "missingValue", 0)
                 );
                 Result result2 = runQueryWithoutClosingTheResult(
                     tx,
                     STATEMENT_STREAM,
-                    map("config", anonymousGraphConfig("similarityCutoff", -0.1, "concurrency", 2, "topK", 0), "missingValue", 0)
+                    map("config", map("similarityCutoff", -0.1, "concurrency", 2, "topK", 0), "missingValue", 0)
                 );
                 Result result4 = runQueryWithoutClosingTheResult(
                     tx,
                     STATEMENT_STREAM,
-                    map("config", anonymousGraphConfig("similarityCutoff", -0.1, "concurrency", 4, "topK", 0), "missingValue", 0)
+                    map("config", map("similarityCutoff", -0.1, "concurrency", 4, "topK", 0), "missingValue", 0)
                 );
                 Result result8 = runQueryWithoutClosingTheResult(
                     tx,
                     STATEMENT_STREAM,
-                    map("config", anonymousGraphConfig("similarityCutoff", -0.1, "concurrency", 8, "topK", 0), "missingValue", 0)
+                    map("config", map("similarityCutoff", -0.1, "concurrency", 8, "topK", 0), "missingValue", 0)
                 )
             ) {
 
@@ -196,22 +198,22 @@ class CosineProcTest extends BaseProcTest {
                 Result result1 = runQueryWithoutClosingTheResult(
                     tx,
                     STATEMENT_STREAM,
-                    map("config", anonymousGraphConfig("similarityCutoff", -0.1, "topK", 1, "concurrency", 1), "missingValue", 0)
+                    map("config", map("similarityCutoff", -0.1, "topK", 1, "concurrency", 1), "missingValue", 0)
                 );
                 Result result2 = runQueryWithoutClosingTheResult(
                     tx,
                     STATEMENT_STREAM,
-                    map("config", anonymousGraphConfig("similarityCutoff", -0.1, "topK", 1, "concurrency", 2), "missingValue", 0)
+                    map("config", map("similarityCutoff", -0.1, "topK", 1, "concurrency", 2), "missingValue", 0)
                 );
                 Result result4 = runQueryWithoutClosingTheResult(
                     tx,
                     STATEMENT_STREAM,
-                    map("config", anonymousGraphConfig("similarityCutoff", -0.1, "topK", 1, "concurrency", 4), "missingValue", 0)
+                    map("config", map("similarityCutoff", -0.1, "topK", 1, "concurrency", 4), "missingValue", 0)
                 );
                 Result result8 = runQueryWithoutClosingTheResult(
                     tx,
                     STATEMENT_STREAM,
-                    map("config", anonymousGraphConfig("similarityCutoff", -0.1, "topK", 1, "concurrency", 8), "missingValue", 0)
+                    map("config", map("similarityCutoff", -0.1, "topK", 1, "concurrency", 8), "missingValue", 0)
                 )
             ) {
                 int cnt = 0;
@@ -234,7 +236,7 @@ class CosineProcTest extends BaseProcTest {
     void topNcosineStreamTest() {
         runQueryWithResultConsumer(
             STATEMENT_STREAM,
-            map("config", anonymousGraphConfig("top", 2, "topK", 0), "missingValue", 0),
+            map("config", map("top", 2, "topK", 0), "missingValue", 0),
             results -> {
                 assert01(results.next());
                 assert02(results.next());
@@ -245,7 +247,7 @@ class CosineProcTest extends BaseProcTest {
 
     @Test
     void cosineStatsTest() {
-        runQueryWithResultConsumer(STATEMENT_STATS, map("config", anonymousGraphConfig("concurrency", 1, "topK", 0, "showComputations", true), "missingValue", 0),
+        runQueryWithResultConsumer(STATEMENT_STATS, map("config", map("concurrency", 1, "topK", 0, "showComputations", true), "missingValue", 0),
             results -> {
                 assertTrue(results.hasNext());
                 Map<String, Object> row = results.next();
@@ -265,7 +267,7 @@ class CosineProcTest extends BaseProcTest {
 
     @Test
     void cosineStreamTest() {
-        runQueryWithResultConsumer(STATEMENT_STREAM, map("config", anonymousGraphConfig("concurrency", 1, "topK", 0), "missingValue", 0),
+        runQueryWithResultConsumer(STATEMENT_STREAM, map("config", map("concurrency", 1, "topK", 0), "missingValue", 0),
             results -> {
                 assertTrue(results.hasNext());
                 assert01(results.next());
@@ -281,7 +283,7 @@ class CosineProcTest extends BaseProcTest {
 
     @Test
     void cosineStreamSourceTargetIdsTest() {
-        Map<String, Object> config = anonymousGraphConfig(
+        Map<String, Object> config = map(
             "concurrency", 1,
             "sourceIds", Collections.singletonList(0L),
             "targetIds", Collections.singletonList(1L)
@@ -300,7 +302,7 @@ class CosineProcTest extends BaseProcTest {
     void cosineSkipStreamTest() {
         runQueryWithResultConsumer(
             STATEMENT_STREAM,
-            map("config", anonymousGraphConfig("concurrency", 1, "skipValue", Double.NaN, "topK", 0), "missingValue", Double.NaN),
+            map("config", map("concurrency", 1, "skipValue", Double.NaN, "topK", 0), "missingValue", Double.NaN),
             results -> {
                 assertTrue(results.hasNext());
                 assert01Skip(results.next());
@@ -316,7 +318,7 @@ class CosineProcTest extends BaseProcTest {
         String query = "MATCH (p:Person)-[r:LIKES]->(i) RETURN id(p) AS item, id(i) AS category, r.stars AS weight";
         runQueryWithResultConsumer(
             STATEMENT_CYPHER_STREAM,
-            map("config", anonymousGraphConfig("concurrency", 1, "graph", "cypher", "skipValue", 0.0, "data", query, "topK", 0)),
+            map("config", map("concurrency", 1, "graph", "cypher", "skipValue", 0.0, "data", query, "topK", 0)),
             results -> {
                 assertTrue(results.hasNext());
                 assert01Skip(results.next());
@@ -329,7 +331,7 @@ class CosineProcTest extends BaseProcTest {
 
     @Test
     void topKCosineStreamTest() {
-        Map<String, Object> params = map("config", anonymousGraphConfig("concurrency", 1, "topK", 1), "missingValue", 0);
+        Map<String, Object> params = map("config", map("concurrency", 1, "topK", 1), "missingValue", 0);
         runQueryWithResultConsumer(STATEMENT_STREAM, params, results -> {
             assertTrue(results.hasNext());
             assert02(results.next());
@@ -342,11 +344,10 @@ class CosineProcTest extends BaseProcTest {
 
     @Test
     void topKCosineSourceTargetIdStreamTest() {
-        Map<String, Object> config = anonymousGraphConfig(
+        Map<String, Object> config = map(
             "concurrency", 1,
             "topK", 1,
             "sourceIds", Collections.singletonList(0L)
-
         );
         Map<String, Object> params = map("config", config, "missingValue", 0);
         runQueryWithResultConsumer(STATEMENT_STREAM, params, results -> {
@@ -359,7 +360,7 @@ class CosineProcTest extends BaseProcTest {
     @Test
     void testCosineHandlesNullValues() {
         runQuery("WITH [{item: 1, weights: [1, null, 3]}] AS data" +
-                 " CALL gds.alpha.similarity.cosine.stream({nodeProjection: '*', relationshipProjection: '*', data: data})" +
+                 " CALL gds.alpha.similarity.cosine.stream({data: data})" +
                  " YIELD item1, item2, count1, count2, similarity\n" +
                  " RETURN item1, item2, similarity");
     }
@@ -389,7 +390,7 @@ class CosineProcTest extends BaseProcTest {
     void topK4cosineStreamTest() {
         Map<String, Object> params = map(
             "config",
-            anonymousGraphConfig("topK", 4, "concurrency", 4, "similarityCutoff", -0.1),
+            map("topK", 4, "concurrency", 4, "similarityCutoff", -0.1),
             "missingValue",
             0
         );
@@ -407,7 +408,7 @@ class CosineProcTest extends BaseProcTest {
 
     @Test
     void topK3cosineStreamTest() {
-        Map<String, Object> params = map("config", anonymousGraphConfig("concurrency", 3, "topK", 3), "missingValue", 0);
+        Map<String, Object> params = map("config", map("concurrency", 3, "topK", 3), "missingValue", 0);
 
         runQueryWithResultConsumer(STATEMENT_STREAM, params,
             results -> {
@@ -422,7 +423,7 @@ class CosineProcTest extends BaseProcTest {
 
     @Test
     void simpleCosineTest() {
-        Map<String, Object> params = map("config", anonymousGraphConfig("topK", 0));
+        Map<String, Object> params = map("config", map("topK", 0));
 
         Map<String, Object> row = runQuery(STATEMENT, params, Result::next);
         assertEquals((double) row.get("p25"), 0.0, 0.01);
@@ -438,7 +439,7 @@ class CosineProcTest extends BaseProcTest {
     void simpleCosineFromEmbeddingTest() {
         runQuery(STORE_EMBEDDING_STATEMENT);
 
-        Map<String, Object> params = map("config", anonymousGraphConfig("topK", 0));
+        Map<String, Object> params = map("config", map("topK", 0));
 
         Map<String, Object> row = runQuery(EMBEDDING_STATEMENT, params, Result::next);
         assertEquals((double) row.get("p25"), 0.0, 0.01);
@@ -452,7 +453,7 @@ class CosineProcTest extends BaseProcTest {
 
     @Test
     void dontComputeComputationsByDefault() {
-        Map<String, Object> params = map("config", anonymousGraphConfig(
+        Map<String, Object> params = map("config", map(
             "similarityCutoff", 0.1
         ));
 
@@ -462,7 +463,7 @@ class CosineProcTest extends BaseProcTest {
 
     @Test
     void numberOfComputations() {
-        Map<String, Object> params = map("config", anonymousGraphConfig(
+        Map<String, Object> params = map("config", map(
             "showComputations", true,
             "similarityCutoff", 0.1
         ));
@@ -473,7 +474,7 @@ class CosineProcTest extends BaseProcTest {
 
     @Test
     void simpleCosineWriteTest() {
-        Map<String, Object> params = map("config", anonymousGraphConfig("similarityCutoff", 0.1, "topK", 0));
+        Map<String, Object> params = map("config", map("similarityCutoff", 0.1, "topK", 0));
 
         runQuery(STATEMENT, params);
 
@@ -618,5 +619,10 @@ class CosineProcTest extends BaseProcTest {
         assertEquals(2L, row.get("count2"));
         // assertEquals(2L, row.get("intersection"));
         assertEquals(0.98, (double) row.get("similarity"), 0.01);
+    }
+
+    @Override
+    Class<? extends SimilarityProc<CosineAlgorithm, ? extends SimilarityConfig>> getProcedureClazz() {
+        return CosineProc.class;
     }
 }

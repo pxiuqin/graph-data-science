@@ -84,9 +84,7 @@ public class TriangleCountStatsProc extends StatsProc<IntersectingTriangleCount,
     }
 
     @Override
-    protected AlgorithmFactory<IntersectingTriangleCount, TriangleCountStatsConfig> algorithmFactory(
-        TriangleCountStatsConfig config
-    ) {
+    protected AlgorithmFactory<IntersectingTriangleCount, TriangleCountStatsConfig> algorithmFactory() {
         return new IntersectingTriangleCountFactory<>();
     }
 
@@ -117,7 +115,7 @@ public class TriangleCountStatsProc extends StatsProc<IntersectingTriangleCount,
         @Override
         public StatsResult build() {
             return new StatsResult(
-                triangleCount,
+                globalTriangleCount,
                 nodeCount,
                 createMillis,
                 computeMillis,

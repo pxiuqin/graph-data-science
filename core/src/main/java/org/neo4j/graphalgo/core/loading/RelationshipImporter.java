@@ -28,8 +28,7 @@ import org.neo4j.internal.kernel.api.CursorFactory;
 import org.neo4j.internal.kernel.api.PropertyCursor;
 import org.neo4j.internal.kernel.api.Read;
 import org.neo4j.io.pagecache.tracing.cursor.PageCursorTracer;
-import org.neo4j.kernel.api.StatementConstants;
-import org.neo4j.memory.EmptyMemoryTracker;
+import org.neo4j.memory.MemoryTracker;
 
 import java.util.Collection;
 
@@ -79,7 +78,7 @@ class RelationshipImporter {
     }
 
     private long importUndirectedWithProperties(RelationshipsBatchBuffer buffer, PropertyReader reader) {
-        int batchLength = buffer.length;
+        int batchLength = buffer.length();
         long[] batch = buffer.sortBySource();
         long[][] outProperties = reader.readProperty(
             batch,
@@ -110,7 +109,7 @@ class RelationshipImporter {
     }
 
     private long importNaturalWithProperties(RelationshipsBatchBuffer buffer, PropertyReader propertyReader) {
-        int batchLength = buffer.length;
+        int batchLength = buffer.length();
         long[] batch = buffer.sortBySource();
         long[][] outProperties = propertyReader.readProperty(
             batch,
@@ -130,7 +129,7 @@ class RelationshipImporter {
     }
 
     private long importReverseWithProperties(RelationshipsBatchBuffer buffer, PropertyReader propertyReader) {
-        int batchLength = buffer.length;
+        int batchLength = buffer.length();
         long[] batch = buffer.sortByTarget();
         long[][] inProperties = propertyReader.readProperty(
             batch,
@@ -154,7 +153,7 @@ class RelationshipImporter {
          * @param propertyKeyIds           property key ids to load
          * @param defaultValues            default weight for each property key
          * @param aggregations             the aggregation for each property
-         * @param atLeastOnePropertyToLoad true iff there is at least one value in {@code propertyKeyIds} that is not {@link StatementConstants#NO_SUCH_PROPERTY_KEY} (-1).
+         * @param atLeastOnePropertyToLoad true iff there is at least one value in {@code propertyKeyIds} that is not {@link org.neo4j.kernel.api.StatementConstants#NO_SUCH_PROPERTY_KEY} (-1).
          * @return list of property values per per relationship property id
          */
         long[][] readProperty(
@@ -171,11 +170,16 @@ class RelationshipImporter {
         return adjacencyBuilder.flushTasks();
     }
 
-    PropertyReader storeBackedPropertiesReader(CursorFactory cursors, Read read) {
+    PropertyReader storeBackedPropertiesReader(
+        CursorFactory cursors,
+        Read read,
+        PageCursorTracer cursorTracer,
+        MemoryTracker memoryTracker
+    ) {
         return (batch, batchLength, relationshipProperties, defaultPropertyValues, aggregations, atLeastOnePropertyToLoad) -> {
             long[][] properties = new long[relationshipProperties.length][batchLength / BATCH_ENTRY_SIZE];
             if (atLeastOnePropertyToLoad) {
-                try (PropertyCursor pc = Neo4jProxy.allocatePropertyCursor(cursors, PageCursorTracer.NULL, EmptyMemoryTracker.INSTANCE)) {
+                try (PropertyCursor pc = Neo4jProxy.allocatePropertyCursor(cursors, cursorTracer, memoryTracker)) {
                     double[] relProps = new double[relationshipProperties.length];
                     for (int i = 0; i < batchLength; i += BATCH_ENTRY_SIZE) {
                         long relationshipReference = batch[RELATIONSHIP_REFERENCE_OFFSET + i];
@@ -202,7 +206,7 @@ class RelationshipImporter {
     }
 
 
-    public static PropertyReader preLoadedPropertyReader() {
+    static PropertyReader preLoadedPropertyReader() {
         return (batch, batchLength, weightProperty, defaultWeight, aggregations, atLeastOnePropertyToLoad) -> {
             long[] properties = new long[batchLength / BATCH_ENTRY_SIZE];
             for (int i = 0; i < batchLength; i += BATCH_ENTRY_SIZE) {
@@ -220,7 +224,7 @@ class RelationshipImporter {
         AdjacencyBuilder adjacency,
         AllocationTracker tracker
     ) {
-        int batchLength = buffer.length;
+        int batchLength = buffer.length();
 
         int[] offsets = buffer.spareInts();
         long[] targets = buffer.spareLongs();

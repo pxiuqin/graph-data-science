@@ -19,11 +19,11 @@
  */
 package org.neo4j.graphalgo.core.utils.paged;
 
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.core.utils.ArrayUtil;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
-import java.util.function.IntFunction;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
 
@@ -87,7 +87,7 @@ public abstract class HugeObjectArray<T> extends HugeArray<T[], T, HugeObjectArr
     /**
      * Set all elements using the provided generator function to compute each element.
      * <p>
-     * The behavior is identical to {@link Arrays#setAll(Object[], IntFunction)}.
+     * The behavior is identical to {@link Arrays#setAll(Object[], java.util.function.IntFunction)}.
      */
     public abstract void setAll(LongFunction<T> gen);
 
@@ -171,6 +171,11 @@ public abstract class HugeObjectArray<T> extends HugeArray<T[], T, HugeObjectArr
      */
     @Override
     public abstract T[] toArray();
+
+    @Override
+    public NodeProperties asNodeProperties() {
+        throw new UnsupportedOperationException("asNodeProperties() on HugeObjectArray");
+    }
 
     /**
      * Creates a new array of the given size, tracking the memory requirements into the given {@link AllocationTracker}.

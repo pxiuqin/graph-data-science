@@ -21,16 +21,10 @@ package org.neo4j.graphalgo.wcc;
 
 import org.neo4j.graphalgo.AlgoBaseProc;
 import org.neo4j.graphalgo.AlgorithmFactory;
-import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
-import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.BatchingProgressLogger;
-import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.CommunityProcCompanion;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.core.utils.paged.dss.DisjointSetStruct;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractCommunityResultBuilder;
-import org.neo4j.logging.Log;
 
 final class WccProc {
 
@@ -40,31 +34,7 @@ final class WccProc {
     private WccProc() {}
 
     static <CONFIG extends WccBaseConfig> AlgorithmFactory<Wcc, CONFIG> algorithmFactory() {
-        return new AlgorithmFactory<Wcc, CONFIG>() {
-            @Override
-            public Wcc build(Graph graph, CONFIG configuration, AllocationTracker tracker, Log log) {
-                var progressLogger = new BatchingProgressLogger(
-                    log,
-                    graph.relationshipCount(),
-                    "WCC",
-                    configuration.concurrency()
-                );
-
-                return new Wcc(
-                    graph,
-                    Pools.DEFAULT,
-                    ParallelUtil.DEFAULT_BATCH_SIZE,
-                    configuration,
-                    progressLogger,
-                    tracker
-                );
-            }
-
-            @Override
-            public MemoryEstimation memoryEstimation(CONFIG config) {
-                return Wcc.memoryEstimation(config.isIncremental());
-            }
-        };
+        return new WccFactory<>();
     }
 
     static <PROC_RESULT, CONFIG extends WccBaseConfig> AbstractCommunityResultBuilder<PROC_RESULT> resultBuilder(
@@ -74,31 +44,10 @@ final class WccProc {
         return procResultBuilder.withCommunityFunction(!computationResult.isGraphEmpty() ? computationResult.result()::setIdOf : null);
     }
 
-    static <CONFIG extends WccBaseConfig> PropertyTranslator<DisjointSetStruct> nodePropertyTranslator(
+    static <CONFIG extends WccBaseConfig> NodeProperties nodeProperties(
         AlgoBaseProc.ComputationResult<Wcc, DisjointSetStruct, CONFIG> computationResult,
         String resultProperty
     ) {
-        var config = computationResult.config();
-        var graphStore = computationResult.graphStore();
-
-        var consecutiveIds = config.consecutiveIds();
-        var isIncremental = config.isIncremental();
-        var seedProperty = config.seedProperty();
-        var resultPropertyEqualsSeedProperty = isIncremental && resultProperty.equals(seedProperty);
-
-        PropertyTranslator.OfLong<DisjointSetStruct> nonSeedingTranslator = DisjointSetStruct::setIdOf;
-
-        if (resultPropertyEqualsSeedProperty && !consecutiveIds) {
-            return PropertyTranslator.OfLongIfChanged.of(graphStore, seedProperty, DisjointSetStruct::setIdOf);
-        } else if (consecutiveIds && !isIncremental) {
-            return new PropertyTranslator.ConsecutivePropertyTranslator<>(
-                computationResult.result(),
-                nonSeedingTranslator,
-                computationResult.graph().nodeCount(),
-                computationResult.tracker()
-            );
-        } else {
-            return nonSeedingTranslator;
-        }
+        return CommunityProcCompanion.nodeProperties(computationResult, resultProperty, computationResult.result().asNodeProperties());
     }
 }

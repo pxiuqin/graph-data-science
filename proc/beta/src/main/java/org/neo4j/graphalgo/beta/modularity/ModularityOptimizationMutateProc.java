@@ -21,10 +21,10 @@ package org.neo4j.graphalgo.beta.modularity;
 
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.MutateProc;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.internal.kernel.api.procs.ProcedureCallContext;
@@ -60,10 +60,10 @@ public class ModularityOptimizationMutateProc extends MutateProc<ModularityOptim
     }
 
     @Override
-    protected PropertyTranslator<ModularityOptimization> nodePropertyTranslator(
+    protected NodeProperties getNodeProperties(
         ComputationResult<ModularityOptimization, ModularityOptimization, ModularityOptimizationMutateConfig> computationResult
     ) {
-        return ModularityOptimizationProc.nodePropertyTranslator(computationResult);
+        return ModularityOptimizationProc.nodeProperties(computationResult);
     }
 
     @Override
@@ -86,9 +86,7 @@ public class ModularityOptimizationMutateProc extends MutateProc<ModularityOptim
     }
 
     @Override
-    protected AlgorithmFactory<ModularityOptimization, ModularityOptimizationMutateConfig> algorithmFactory(
-        ModularityOptimizationMutateConfig config
-    ) {
+    protected AlgorithmFactory<ModularityOptimization, ModularityOptimizationMutateConfig> algorithmFactory() {
         return new ModularityOptimizationFactory<>();
     }
 

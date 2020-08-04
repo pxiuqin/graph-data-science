@@ -36,7 +36,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.asciidoctor.Asciidoctor.Factory.create;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -50,35 +49,18 @@ class AppendixAProcedureListingTest extends BaseProcTest {
     private static final Path ASCIIDOC_PATH = Paths.get("asciidoc");
 
     private final Asciidoctor asciidoctor = create();
+    private static final List<String> PACKAGES_TO_SCAN = List.of(
+        "org.neo4j.graphalgo",
+        "org.neo4j.gds.embeddings"
+    );
 
     @BeforeEach
     void setUp() {
-        Reflections reflections = new Reflections("org.neo4j.graphalgo",
-            new MethodAnnotationsScanner());
-        reflections
-            .getMethodsAnnotatedWith(Procedure.class)
-            .stream()
-            .map(Method::getDeclaringClass)
-            .collect(Collectors.toSet())
-            .forEach(procedureClass -> {
-                try {
-                    registerProcedures(procedureClass);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            });
-
-        reflections
-            .getMethodsAnnotatedWith(UserFunction.class)
-            .stream()
-            .map(Method::getDeclaringClass)
-            .collect(Collectors.toSet())
-            .forEach(functionClass -> {
-                try {
-                    registerFunctions(functionClass);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+        PACKAGES_TO_SCAN.stream()
+            .map(this::createReflections)
+            .forEach(reflections -> {
+                registerProcedures(reflections);
+                registerFunctions(reflections);
             });
     }
 
@@ -112,6 +94,44 @@ class AppendixAProcedureListingTest extends BaseProcTest {
         assertEquals(registeredProcedures, documentedProcedures);
 
         assertEquals(registeredProcedures.size(), documentedProcedures.size());
+    }
+
+
+    private Reflections createReflections(String pkg) {
+        return new Reflections(
+            pkg,
+            new MethodAnnotationsScanner()
+        );
+    }
+
+    private void registerProcedures(Reflections reflections) {
+        reflections
+            .getMethodsAnnotatedWith(Procedure.class)
+            .stream()
+            .map(Method::getDeclaringClass)
+            .distinct()
+            .forEach(procedureClass -> {
+                try {
+                    registerProcedures(procedureClass);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+    }
+
+    private void registerFunctions(Reflections reflections) {
+        reflections
+            .getMethodsAnnotatedWith(UserFunction.class)
+            .stream()
+            .map(Method::getDeclaringClass)
+            .distinct()
+            .forEach(functionClass -> {
+                try {
+                    registerFunctions(functionClass);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
     }
 
 }

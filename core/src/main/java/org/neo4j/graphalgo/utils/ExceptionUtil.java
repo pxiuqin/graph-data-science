@@ -19,7 +19,11 @@
  */
 package org.neo4j.graphalgo.utils;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
@@ -91,9 +95,39 @@ public final class ExceptionUtil {
         if (exception instanceof RuntimeException) {
             throw (RuntimeException) exception;
         }
+        if (exception instanceof IOException) {
+            throw new UncheckedIOException((IOException) exception);
+        }
         if (exception instanceof Error) {
             throw (Error) exception;
         }
+    }
+
+    @SuppressWarnings("TypeMayBeWeakened")
+    public static <E extends Exception> Runnable unchecked(CheckedRunnable<E> runnable) {
+        return runnable;
+    }
+
+    @SuppressWarnings("TypeMayBeWeakened")
+    public static <E extends Exception> void run(CheckedRunnable<E> runnable) {
+        runnable.run();
+    }
+
+    public static <T, R, E extends Exception> Function<? super T, ? extends R> function(
+        CheckedFunction<? super T, ? extends R, E> function
+    ) throws E {
+        return function;
+    }
+
+    public static <T, E extends Exception> Supplier<? extends T> supplier(CheckedSupplier<? extends T, E> supplier) {
+        return supplier;
+    }
+
+    public static <T, R, E extends Exception> R apply(
+        CheckedFunction<? super T, ? extends R, E> function,
+        T input
+    ) {
+        return function.apply(input);
     }
 
     public static void validateTargetNodeIsLoaded(long mappedId, long neoId) {

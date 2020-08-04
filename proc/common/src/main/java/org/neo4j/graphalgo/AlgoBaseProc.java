@@ -27,6 +27,7 @@ import org.neo4j.graphalgo.annotation.ValueClass;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.api.GraphStoreFactory;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.AlgoBaseConfig;
 import org.neo4j.graphalgo.config.BaseConfig;
 import org.neo4j.graphalgo.config.ConfigurableSeedConfig;
@@ -52,7 +53,6 @@ import org.neo4j.graphalgo.core.utils.mem.MemoryEstimations;
 import org.neo4j.graphalgo.core.utils.mem.MemoryTree;
 import org.neo4j.graphalgo.core.utils.mem.MemoryTreeWithDimensions;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.graphalgo.utils.StringJoining;
 
@@ -63,8 +63,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import static java.util.stream.Collectors.toList;
 import static org.neo4j.graphalgo.ElementProjection.PROJECT_ALL;
 import static org.neo4j.graphalgo.config.BaseConfig.SUDO_KEY;
+import static org.neo4j.graphalgo.config.ConcurrencyConfig.CONCURRENCY_KEY;
+import static org.neo4j.graphalgo.config.ConcurrencyConfig.DEFAULT_CONCURRENCY;
+import static org.neo4j.graphalgo.config.GraphCreateConfig.READ_CONCURRENCY_KEY;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 public abstract class AlgoBaseProc<
@@ -88,9 +92,11 @@ public abstract class AlgoBaseProc<
     public final CONFIG newConfig(Optional<String> graphName, CypherMapWrapper config) {
         Optional<GraphCreateConfig> maybeImplicitCreate = Optional.empty();
         Collection<String> allowedKeys = new HashSet<>();
-        if (!graphName.isPresent()) {
-            // we should do implicit loading
-            GraphCreateConfig createConfig = GraphCreateConfig.createImplicit(getUsername(), config);
+        // implicit loading
+        if (graphName.isEmpty()) {
+            // inherit concurrency from AlgoBaseConfig
+            config = config.withNumber(READ_CONCURRENCY_KEY, config.getInt(CONCURRENCY_KEY, DEFAULT_CONCURRENCY));
+            GraphCreateConfig createConfig = GraphCreateConfig.createImplicit(username(), config);
             maybeImplicitCreate = Optional.of(createConfig);
             allowedKeys.addAll(createConfig.configKeys());
             CypherMapWrapper configWithoutCreateKeys = config.withoutAny(allowedKeys);
@@ -102,7 +108,7 @@ public abstract class AlgoBaseProc<
             }
             config = configWithoutCreateKeys;
         }
-        CONFIG algoConfig = newConfig(getUsername(), graphName, maybeImplicitCreate, config);
+        CONFIG algoConfig = newConfig(username(), graphName, maybeImplicitCreate, config);
         allowedKeys.addAll(algoConfig.configKeys());
         validateConfig(config, allowedKeys);
         return algoConfig;
@@ -115,12 +121,12 @@ public abstract class AlgoBaseProc<
         final AllocationTracker tracker
     ) {
         TerminationFlag terminationFlag = TerminationFlag.wrap(transaction);
-        return algorithmFactory(config)
+        return algorithmFactory()
             .build(graph, config, tracker, log)
             .withTerminationFlag(terminationFlag);
     }
 
-    protected abstract AlgorithmFactory<ALGO, CONFIG> algorithmFactory(CONFIG config);
+    protected abstract AlgorithmFactory<ALGO, CONFIG> algorithmFactory();
 
     protected MemoryTreeWithDimensions memoryEstimation(CONFIG config) {
         MemoryEstimations.Builder estimationBuilder = MemoryEstimations.builder("Memory Estimation");
@@ -129,7 +135,7 @@ public abstract class AlgoBaseProc<
         if (config.implicitCreateConfig().isPresent()) {
             GraphCreateConfig createConfig = config.implicitCreateConfig().get();
             GraphLoader loader = newLoader(createConfig, AllocationTracker.EMPTY);
-            GraphStoreFactory<?> graphStoreFactory = loader.graphStoreFactory();
+            GraphStoreFactory<?, ?> graphStoreFactory = loader.graphStoreFactory();
             estimateDimensions = graphStoreFactory.estimationDimensions();
 
             if (createConfig.nodeCount() >= 0 || createConfig.relationshipCount() >= 0) {
@@ -145,7 +151,11 @@ public abstract class AlgoBaseProc<
         } else {
             String graphName = config.graphName().orElseThrow(IllegalStateException::new);
 
-            GraphStoreWithConfig graphStoreWithConfig = GraphStoreCatalog.get(getUsername(), graphName);
+            GraphStoreWithConfig graphStoreWithConfig = GraphStoreCatalog.get(
+                username(),
+                databaseId(),
+                graphName
+            );
             GraphCreateConfig graphCreateConfig = graphStoreWithConfig.config();
             GraphStore graphStore = graphStoreWithConfig.graphStore();
 
@@ -171,7 +181,7 @@ public abstract class AlgoBaseProc<
             }
         }
 
-        estimationBuilder.add("algorithm", algorithmFactory(config).memoryEstimation(config));
+        estimationBuilder.add("algorithm", algorithmFactory().memoryEstimation(config));
 
         MemoryTree memoryTree = estimationBuilder.build().estimate(estimateDimensions, config.concurrency());
         return new MemoryTreeWithDimensions(memoryTree, estimateDimensions);
@@ -230,7 +240,7 @@ public abstract class AlgoBaseProc<
         GraphStoreWithConfig graphCandidate;
 
         if (maybeGraphName.isPresent()) {
-            graphCandidate = GraphStoreCatalog.get(getUsername(), maybeGraphName.get());
+            graphCandidate = GraphStoreCatalog.get(username(), databaseId(), maybeGraphName.get());
         } else if (config.implicitCreateConfig().isPresent()) {
             GraphCreateConfig createConfig = config.implicitCreateConfig().get();
             GraphLoader loader = newLoader(createConfig, AllocationTracker.EMPTY);
@@ -329,20 +339,62 @@ public abstract class AlgoBaseProc<
     protected void validateConfigs(GraphCreateConfig graphCreateConfig, CONFIG config) { }
 
     protected void validateIsUndirectedGraph(GraphCreateConfig graphCreateConfig, CONFIG config) {
-        if (graphCreateConfig instanceof GraphCreateFromStoreConfig) {
-            GraphCreateFromStoreConfig storeConfig = (GraphCreateFromStoreConfig) graphCreateConfig;
-            storeConfig.relationshipProjections().projections().entrySet().stream()
-                .filter(entry -> config.relationshipTypes().equals(Collections.singletonList(PROJECT_ALL)) ||
-                                 config.relationshipTypes().contains(entry.getKey().name()))
-                .filter(entry -> entry.getValue().orientation() != Orientation.UNDIRECTED)
-                .forEach(entry -> {
+        graphCreateConfig.accept(new GraphCreateConfig.Visitor() {
+            @Override
+            public void visit(GraphCreateFromStoreConfig storeConfig) {
+                storeConfig.relationshipProjections().projections().entrySet().stream()
+                    .filter(entry -> config.relationshipTypes().equals(Collections.singletonList(PROJECT_ALL)) ||
+                                     config.relationshipTypes().contains(entry.getKey().name()))
+                    .filter(entry -> entry.getValue().orientation() != Orientation.UNDIRECTED)
+                    .forEach(entry -> {
+                        throw new IllegalArgumentException(formatWithLocale(
+                            "Procedure requires relationship projections to be UNDIRECTED. Projection for `%s` uses orientation `%s`",
+                            entry.getKey().name,
+                            entry.getValue().orientation()
+                        ));
+                    });
+
+            }
+        });
+    }
+
+    /**
+     * Validates that {@link Orientation#UNDIRECTED} is not mixed with {@link Orientation#NATURAL}
+     * and {@link Orientation#REVERSE}. If a relationship type filter is present in the algorithm
+     * config, only those relationship projections are considered in the validation.
+     */
+    protected void validateOrientationCombinations(GraphCreateConfig graphCreateConfig, CONFIG algorithmConfig) {
+        graphCreateConfig.accept(new GraphCreateConfig.Visitor() {
+            @Override
+            public void visit(GraphCreateFromStoreConfig storeConfig) {
+                var filteredProjections = storeConfig
+                    .relationshipProjections()
+                    .projections()
+                    .entrySet()
+                    .stream()
+                    .filter(entry -> algorithmConfig.relationshipTypes().equals(Collections.singletonList(PROJECT_ALL)) ||
+                                     algorithmConfig.relationshipTypes().contains(entry.getKey().name()))
+                    .collect(toList());
+
+                boolean allUndirected = filteredProjections
+                    .stream()
+                    .allMatch(entry -> entry.getValue().orientation() == Orientation.UNDIRECTED);
+
+                boolean anyUndirected = filteredProjections
+                    .stream()
+                    .anyMatch(entry -> entry.getValue().orientation() == Orientation.UNDIRECTED);
+
+                if (anyUndirected && !allUndirected) {
                     throw new IllegalArgumentException(formatWithLocale(
-                        "Procedure requires relationship projections to be UNDIRECTED. Projection for `%s` uses orientation `%s`",
-                        entry.getKey().name,
-                        entry.getValue().orientation()
+                        "Combining UNDIRECTED orientation with NATURAL or REVERSE is not supported. Found projections: %s.",
+                        StringJoining.join(filteredProjections
+                            .stream()
+                            .map(entry -> formatWithLocale("%s (%s)", entry.getKey().name, entry.getValue().orientation()))
+                            .sorted())
                     ));
-                });
-        }
+                }
+            }
+        });
     }
 
     protected ComputationResult<ALGO, ALGO_RESULT, CONFIG> compute(
@@ -417,7 +469,7 @@ public abstract class AlgoBaseProc<
             .build();
     }
 
-    protected PropertyTranslator<ALGO_RESULT> nodePropertyTranslator(
+    protected NodeProperties getNodeProperties(
         ComputationResult<ALGO, ALGO_RESULT, CONFIG> computationResult
     ) {
         throw new UnsupportedOperationException(

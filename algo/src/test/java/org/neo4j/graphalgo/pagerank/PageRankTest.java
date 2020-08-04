@@ -20,35 +20,36 @@
 package org.neo4j.graphalgo.pagerank;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.TestLog;
 import org.neo4j.graphalgo.TestProgressLogger;
 import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.core.GraphDimensions;
-import org.neo4j.graphalgo.core.ImmutableGraphDimensions;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
-import org.neo4j.graphalgo.core.utils.mem.MemoryRange;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.extension.GdlExtension;
 import org.neo4j.graphalgo.extension.GdlGraph;
-import org.neo4j.graphalgo.extension.IdFunction;
 import org.neo4j.graphalgo.extension.Inject;
+import org.neo4j.graphalgo.extension.TestGraph;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.LongStream;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.neo4j.graphalgo.compat.MapUtil.genericMap;
+import static org.neo4j.graphalgo.TestSupport.assertMemoryEstimation;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 @GdlExtension
 final class PageRankTest {
 
-    @GdlGraph
-    @GdlGraph(graphName = "reverseGraph", orientation = Orientation.REVERSE)
+    @GdlGraph(graphNamePrefix = "natural", orientation = Orientation.NATURAL)
+    @GdlGraph(graphNamePrefix = "reverse", orientation = Orientation.REVERSE)
     private static final String GRAPH =
         "CREATE" +
         "  (a:Label)" +
@@ -72,13 +73,10 @@ final class PageRankTest {
         ", (f)-[:TYPE]->(e)";
 
     @Inject
-    private Graph graph;
+    private TestGraph naturalGraph;
 
     @Inject
-    private IdFunction nodeId;
-
-    @Inject(graphName = "reverseGraph")
-    private Graph reverseGraph;
+    private TestGraph reverseGraph;
 
     private static final PageRankBaseConfig DEFAULT_CONFIG = defaultConfigBuilder().build();
 
@@ -90,34 +88,34 @@ final class PageRankTest {
     @Test
     void testOnOutgoingRelationships() {
         var expected = Map.of(
-            nodeId.of("a"), 0.243007,
-            nodeId.of("b"), 1.9183995,
-            nodeId.of("c"), 1.7806315,
-            nodeId.of("d"), 0.21885,
-            nodeId.of("e"), 0.243007,
-            nodeId.of("f"), 0.21885,
-            nodeId.of("g"), 0.15,
-            nodeId.of("h"), 0.15,
-            nodeId.of("i"), 0.15,
-            nodeId.of("j"), 0.15
+            naturalGraph.toMappedNodeId("a"), 0.243007,
+            naturalGraph.toMappedNodeId("b"), 1.9183995,
+            naturalGraph.toMappedNodeId("c"), 1.7806315,
+            naturalGraph.toMappedNodeId("d"), 0.21885,
+            naturalGraph.toMappedNodeId("e"), 0.243007,
+            naturalGraph.toMappedNodeId("f"), 0.21885,
+            naturalGraph.toMappedNodeId("g"), 0.15,
+            naturalGraph.toMappedNodeId("h"), 0.15,
+            naturalGraph.toMappedNodeId("i"), 0.15,
+            naturalGraph.toMappedNodeId("j"), 0.15
         );
 
-        assertResult(this.graph, PageRankAlgorithmType.NON_WEIGHTED, expected);
+        assertResult(this.naturalGraph, PageRankAlgorithmType.NON_WEIGHTED, expected);
     }
 
     @Test
     void testOnIncomingRelationships() {
         var expected = Map.of(
-            nodeId.of("a"), 0.15,
-            nodeId.of("b"), 0.3386727,
-            nodeId.of("c"), 0.2219679,
-            nodeId.of("d"), 0.3494679,
-            nodeId.of("e"), 2.5463981,
-            nodeId.of("f"), 2.3858317,
-            nodeId.of("g"), 0.15,
-            nodeId.of("h"), 0.15,
-            nodeId.of("i"), 0.15,
-            nodeId.of("j"), 0.15
+            reverseGraph.toMappedNodeId("a"), 0.15,
+            reverseGraph.toMappedNodeId("b"), 0.3386727,
+            reverseGraph.toMappedNodeId("c"), 0.2219679,
+            reverseGraph.toMappedNodeId("d"), 0.3494679,
+            reverseGraph.toMappedNodeId("e"), 2.5463981,
+            reverseGraph.toMappedNodeId("f"), 2.3858317,
+            reverseGraph.toMappedNodeId("g"), 0.15,
+            reverseGraph.toMappedNodeId("h"), 0.15,
+            reverseGraph.toMappedNodeId("i"), 0.15,
+            reverseGraph.toMappedNodeId("j"), 0.15
         );
 
         assertResult(reverseGraph, PageRankAlgorithmType.NON_WEIGHTED, expected);
@@ -128,10 +126,9 @@ final class PageRankTest {
         // explicitly list all source nodes to prevent the 'we got everything' optimization
         PageRankAlgorithmType.NON_WEIGHTED
             .create(
-                graph,
-                LongStream.range(0L, graph.nodeCount()),
-                DEFAULT_CONFIG,
-                1,
+                naturalGraph,
+                LongStream.range(0L, naturalGraph.nodeCount()),
+                defaultConfigBuilder().concurrency(1).build(),
                 null,
                 1,
                 ProgressLogger.NULL_LOGGER,
@@ -141,25 +138,26 @@ final class PageRankTest {
         // should not throw
     }
 
-    @Test
-    void shouldComputeMemoryEstimation1Thread() {
-        long nodeCount = 100_000L;
-        int concurrency = 1;
-        assertMemoryEstimation(nodeCount, concurrency);
+    static Stream<Arguments> expectedMemoryEstimation() {
+        return Stream.of(
+            Arguments.of(1, 2000416L, 2000416L),
+            Arguments.of(4, 3201304L, 3201304L),
+            Arguments.of(42, 18451288L, 18451288L)
+        );
     }
 
-    @Test
-    void shouldComputeMemoryEstimation4Threads() {
-        long nodeCount = 100_000L;
-        int concurrency = 4;
-        assertMemoryEstimation(nodeCount, concurrency);
-    }
-
-    @Test
-    void shouldComputeMemoryEstimation42Threads() {
-        long nodeCount = 100_000L;
-        int concurrency = 42;
-        assertMemoryEstimation(nodeCount, concurrency);
+    @ParameterizedTest
+    @MethodSource("org.neo4j.graphalgo.pagerank.PageRankTest#expectedMemoryEstimation")
+    void shouldComputeMemoryEstimation(int concurrency, long expectedMinBytes, long expectedMaxBytes) {
+        var config = defaultConfigBuilder().build();
+        var nodeCount = 100_000;
+        assertMemoryEstimation(
+            () -> new PageRankFactory<>().memoryEstimation(config),
+            nodeCount,
+            concurrency,
+            expectedMinBytes,
+            expectedMaxBytes
+        );
     }
 
     @Test
@@ -167,13 +165,13 @@ final class PageRankTest {
         var config = ImmutablePageRankStreamConfig.builder().build();
 
         var testLogger = new TestProgressLogger(
-            graph.relationshipCount(),
+            naturalGraph.relationshipCount(),
             "PageRank",
             config.concurrency()
         );
 
         var pageRank = PageRankAlgorithmType.NON_WEIGHTED.create(
-            graph,
+            naturalGraph,
             config,
             LongStream.empty(),
             testLogger
@@ -184,7 +182,7 @@ final class PageRankTest {
         List<AtomicLong> progresses = testLogger.getProgresses();
 
         assertEquals(progresses.size(), pageRank.iterations());
-        progresses.forEach(progress -> assertEquals(graph.relationshipCount(), progress.get()));
+        progresses.forEach(progress -> assertEquals(naturalGraph.relationshipCount(), progress.get()));
 
         assertTrue(testLogger.containsMessage(TestLog.INFO, ":: Start"));
         LongStream.range(1, pageRank.iterations() + 1).forEach(iteration -> {
@@ -208,31 +206,5 @@ final class PageRankTest {
                 "Node#" + originalNodeId
             );
         });
-    }
-
-    private void assertMemoryEstimation(final long nodeCount, final int concurrency) {
-        GraphDimensions dimensions = ImmutableGraphDimensions.builder().nodeCount(nodeCount).build();
-
-        final PageRankFactory<PageRankStreamConfig> pageRank = new PageRankFactory<>(PageRankAlgorithmType.NON_WEIGHTED);
-
-        final MemoryRange actual = pageRank
-            .memoryEstimation(defaultConfigBuilder().build())
-            .estimate(dimensions, concurrency)
-            .memoryUsage();
-
-        Map<Integer, Long> minByConcurrency = genericMap(
-            1, 2000416L,
-            4, 3201304L,
-            42, 18451288L
-        );
-
-        Map<Integer, Long> maxByConcurrency = genericMap(
-            1, 2000416L,
-            4, 3201304L,
-            42, 18451288L
-        );
-
-        assertEquals(minByConcurrency.get(concurrency), actual.min);
-        assertEquals(maxByConcurrency.get(concurrency), actual.max);
     }
 }

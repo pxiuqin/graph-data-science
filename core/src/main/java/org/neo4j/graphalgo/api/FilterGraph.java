@@ -26,6 +26,7 @@ import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterator
 import java.util.Collection;
 import java.util.Set;
 import java.util.function.LongPredicate;
+import java.util.stream.Stream;
 
 public abstract class FilterGraph implements Graph {
 
@@ -33,6 +34,11 @@ public abstract class FilterGraph implements Graph {
 
     public FilterGraph(Graph graph) {
         this.graph = graph;
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return graph.isEmpty();
     }
 
     @Override
@@ -68,6 +74,11 @@ public abstract class FilterGraph implements Graph {
     @Override
     public int degree(long nodeId) {
         return graph.degree(nodeId);
+    }
+
+    @Override
+    public int degreeWithoutParallelRelationships(long nodeId) {
+        return graph.degreeWithoutParallelRelationships(nodeId);
     }
 
     @Override
@@ -116,6 +127,16 @@ public abstract class FilterGraph implements Graph {
     }
 
     @Override
+    public boolean hasLabel(long nodeId, NodeLabel label) {
+        return graph.hasLabel(nodeId, label);
+    }
+
+    @Override
+    public boolean containsOnlyAllNodesLabel() {
+        return graph.containsOnlyAllNodesLabel();
+    }
+
+    @Override
     public NodeProperties nodeProperties(String propertyKey) {
         return graph.nodeProperties(propertyKey);
     }
@@ -141,6 +162,11 @@ public abstract class FilterGraph implements Graph {
     }
 
     @Override
+    public Stream<RelationshipCursor> streamRelationships(long nodeId, double fallbackValue) {
+        return graph.streamRelationships(nodeId, fallbackValue);
+    }
+
+    @Override
     public boolean exists(long sourceNodeId, long targetNodeId) {
         return graph.exists(sourceNodeId, targetNodeId);
     }
@@ -153,5 +179,32 @@ public abstract class FilterGraph implements Graph {
     @Override
     public double relationshipProperty(long sourceNodeId, long targetNodeId) {
         return graph.relationshipProperty(sourceNodeId, targetNodeId);
+    }
+
+    @Override
+    public RelationshipIntersect intersection() {
+        return graph.intersection();
+    }
+
+    @Override
+    public void release() {
+        graph.release();
+    }
+
+    @Override
+    public void releaseTopology() {
+        graph.releaseTopology();
+    }
+
+    @Override
+    public void releaseProperties() {
+        graph.releaseProperties();
+    }
+
+    @Override
+    public boolean isMultiGraph() {
+        // by filtering out elements the guarantee could become fulfilled, but we don't know
+        // it would never go from fulfilled to not fulfilled however, so this is safe
+        return graph.isMultiGraph();
     }
 }

@@ -36,7 +36,11 @@ public class GraphExistsProc extends CatalogProc {
     @Description(DESCRIPTION)
     public Stream<GraphExistsResult> exists(@Name(value = "graphName") String graphName) {
         validateGraphName(graphName);
-        return Stream.of(new GraphExistsResult(graphName, GraphStoreCatalog.exists(getUsername(), graphName)));
+        return Stream.of(new GraphExistsResult(graphName, GraphStoreCatalog.exists(
+            username(),
+            databaseId(),
+            graphName
+        )));
     }
 
     public static class GraphExistsResult {

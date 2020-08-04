@@ -25,11 +25,11 @@ import org.neo4j.graphalgo.GdsCypher;
 import org.neo4j.graphalgo.MutateNodePropertyTest;
 import org.neo4j.graphalgo.StoreLoaderBuilder;
 import org.neo4j.graphalgo.api.Graph;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.compat.MapUtil;
 import org.neo4j.graphalgo.core.Aggregation;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
-import org.neo4j.values.storable.NumberType;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,8 +40,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.lessThan;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.neo4j.graphalgo.TestGraph.Builder.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 
 public class LabelPropagationMutateProcTest extends LabelPropagationProcTest<LabelPropagationMutateConfig> implements MutateNodePropertyTest<LabelPropagation, LabelPropagationMutateConfig, LabelPropagation> {
 
@@ -51,8 +51,8 @@ public class LabelPropagationMutateProcTest extends LabelPropagationProcTest<Lab
     }
 
     @Override
-    public NumberType mutatePropertyType() {
-        return NumberType.INTEGRAL;
+    public ValueType mutatePropertyType() {
+        return ValueType.LONG;
     }
 
     @Override
@@ -185,15 +185,15 @@ public class LabelPropagationMutateProcTest extends LabelPropagationProcTest<Lab
 
         runQuery(query);
 
-        List<Double> expectedValueList = new ArrayList<>(RESULT.size() + 1);
-        expectedValueList.add(Double.NaN);
-        RESULT.forEach(component -> expectedValueList.add((double) component + deletedNodes + 1));
+        List<Long> expectedValueList = new ArrayList<>(RESULT.size() + 1);
+        expectedValueList.add(Long.MIN_VALUE);
+        RESULT.forEach(component -> expectedValueList.add(component + deletedNodes + 1));
 
-        Graph mutatedGraph = GraphStoreCatalog.get(TEST_USERNAME, graphName).graphStore().getUnion();
+        Graph mutatedGraph = GraphStoreCatalog.get(TEST_USERNAME, namedDatabaseId(), graphName).graphStore().getUnion();
         mutatedGraph.forEachNode(nodeId -> {
             assertEquals(
                     expectedValueList.get(Math.toIntExact(nodeId)),
-                    mutatedGraph.nodeProperties("communityId").nodeProperty(nodeId)
+                    mutatedGraph.nodeProperties("communityId").getLong(nodeId)
                 );
                 return true;
             }

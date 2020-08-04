@@ -20,23 +20,46 @@
 package org.neo4j.graphalgo.triangle;
 
 import org.neo4j.graphalgo.AlgoBaseProc;
+import org.neo4j.graphalgo.RelationshipType;
+import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.config.GraphCreateConfig;
+import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractCommunityResultBuilder;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 import org.neo4j.internal.kernel.api.procs.ProcedureCallContext;
+import org.neo4j.logging.Log;
 
+import java.util.Collections;
 import java.util.Optional;
+
+import static org.neo4j.graphalgo.ElementProjection.PROJECT_ALL;
 
 final class LocalClusteringCoefficientCompanion {
 
     private LocalClusteringCoefficientCompanion() {}
 
-    static PropertyTranslator<LocalClusteringCoefficient.Result> nodePropertyTranslator() {
-        return (PropertyTranslator.OfDouble<LocalClusteringCoefficient.Result>) (data, nodeId) -> data
-            .localClusteringCoefficients()
-            .get(nodeId);
+    static <CONFIG extends LocalClusteringCoefficientBaseConfig> NodeProperties nodeProperties(
+        AlgoBaseProc.ComputationResult<LocalClusteringCoefficient, LocalClusteringCoefficient.Result, CONFIG> computeResult
+    ) {
+        return computeResult.result().localClusteringCoefficients().asNodeProperties();
+    }
+
+    static void warnOnGraphWithParallelRelationships(GraphCreateConfig graphCreateConfig, LocalClusteringCoefficientBaseConfig config, Log log) {
+        if (graphCreateConfig instanceof GraphCreateFromStoreConfig) {
+            GraphCreateFromStoreConfig storeConfig = (GraphCreateFromStoreConfig) graphCreateConfig;
+            storeConfig.relationshipProjections().projections().entrySet().stream()
+                .filter(entry -> config.relationshipTypes().equals(Collections.singletonList(PROJECT_ALL)) ||
+                                 config.relationshipTypes().contains(entry.getKey().name()))
+                .filter(entry -> entry.getValue().isMultiGraph())
+                .forEach(entry -> log.warn(
+                    "Procedure runs optimal with relationship aggregation." +
+                    " Projection for `%s` does not aggregate relationships." +
+                    " You might experience a slowdown in the procedure execution.",
+                    entry.getKey().equals(RelationshipType.ALL_RELATIONSHIPS) ? "*" : entry.getKey().name
+                ));
+        }
     }
 
     static <PROC_RESULT, CONFIG extends LocalClusteringCoefficientBaseConfig> AbstractResultBuilder<PROC_RESULT> resultBuilder(

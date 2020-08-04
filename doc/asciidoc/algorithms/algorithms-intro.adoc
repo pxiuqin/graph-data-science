@@ -30,7 +30,9 @@ This chapter is divided into the following sections:
 * <<algorithms-similarity>>
 * <<algorithms-path-finding>>
 * <<algorithms-linkprediction>>
+* <<node-embeddings>>
 * <<algorithms-auxiliary>>
+* <<algorithms-pregel-api>>
 
 include::algorithms-syntax.adoc[leveloffset=+1]
 
@@ -47,3 +49,5 @@ include::algorithms-link-prediction.adoc[leveloffset=+1]
 include::node-embeddings.adoc[leveloffset=+1]
 
 include::algorithms-auxiliary.adoc[leveloffset=+1]
+
+include::algorithms-pregel-api.adoc[leveloffset=+1]

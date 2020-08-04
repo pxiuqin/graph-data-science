@@ -47,6 +47,7 @@ import org.neo4j.io.pagecache.PageCursor;
 import org.neo4j.io.pagecache.PagedFile;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
 import org.neo4j.io.pagecache.tracing.cursor.PageCursorTracer;
+import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.query.ExecutingQuery;
 import org.neo4j.kernel.impl.store.NodeStore;
 import org.neo4j.kernel.impl.store.RecordStore;
@@ -55,14 +56,22 @@ import org.neo4j.kernel.impl.store.format.RecordFormats;
 import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.store.record.RecordLoad;
-import org.neo4j.logging.FormattedLog;
+import org.neo4j.kernel.lifecycle.LifeSupport;
+import org.neo4j.logging.Level;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.internal.LogService;
 import org.neo4j.memory.MemoryTracker;
 import org.neo4j.scheduler.JobScheduler;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.nio.file.OpenOption;
+import java.nio.file.Path;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 public interface Neo4jProxyApi {
 
@@ -97,6 +106,15 @@ public interface Neo4jProxyApi {
         PageCursorTracer pageCursorTracer
     ) throws IOException;
 
+    PagedFile pageCacheMap(
+        PageCache pageCache,
+        File file,
+        int pageSize,
+        OpenOption... openOptions
+    ) throws IOException;
+
+    Path pagedFile(PagedFile pagedFile);
+
     PropertyCursor allocatePropertyCursor(
         CursorFactory cursorFactory,
         PageCursorTracer cursorTracer,
@@ -113,9 +131,23 @@ public interface Neo4jProxyApi {
 
     void nodeLabelScan(Read dataRead, int label, NodeLabelIndexCursor cursor);
 
+    CompositeNodeCursor compositeNodeCursor(List<NodeLabelIndexCursor> cursors, int[] labelIds);
+
     OffHeapLongArray newOffHeapLongArray(long length, long defaultValue, long base);
 
     LongArray newChunkedLongArray(NumberArrayFactory numberArrayFactory, int size, long defaultValue);
+
+    MemoryTracker memoryTracker(KernelTransaction kernelTransaction);
+
+    LogService logProviderForStoreAndRegister(
+        Path storeLogPath,
+        FileSystemAbstraction fs,
+        LifeSupport lifeSupport
+    ) throws IOException;
+
+    Path metadataStore(DatabaseLayout databaseLayout);
+
+    Path homeDirectory(DatabaseLayout databaseLayout);
 
     BatchImporter instantiateBatchImporter(
         BatchImporterFactory factory,
@@ -138,7 +170,21 @@ public interface Neo4jProxyApi {
 
     String queryText(ExecutingQuery query);
 
-    Log toPrintWriter(FormattedLog.Builder builder, PrintWriter writer);
+    Log logger(
+        Level level,
+        ZoneId zoneId,
+        DateTimeFormatter dateTimeFormatter,
+        String category,
+        PrintWriter writer
+    );
+
+    Log logger(
+        Level level,
+        ZoneId zoneId,
+        DateTimeFormatter dateTimeFormatter,
+        String category,
+        OutputStream outputStream
+    );
 
     Setting<Boolean> onlineBackupEnabled();
 

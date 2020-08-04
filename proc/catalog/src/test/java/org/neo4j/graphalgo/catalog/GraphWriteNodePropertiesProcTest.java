@@ -36,7 +36,6 @@ import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.core.IdentityProperties;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
 import org.neo4j.graphdb.QueryExecutionException;
-import org.neo4j.values.storable.NumberType;
 
 import java.util.Arrays;
 
@@ -220,10 +219,10 @@ class GraphWriteNodePropertiesProcTest extends BaseProcTest {
     void writeMutatedNodeProperties() {
         long expectedPropertyCount = 6;
 
-        GraphStore graphStore = GraphStoreCatalog.get(getUsername(), TEST_GRAPH_SAME_PROPERTIES).graphStore();
+        GraphStore graphStore = GraphStoreCatalog.get(getUsername(), db.databaseId(), TEST_GRAPH_SAME_PROPERTIES).graphStore();
         NodeProperties identityProperties = new IdentityProperties(expectedPropertyCount);
-        graphStore.addNodeProperty(NodeLabel.of("A"), "newNodeProp3", NumberType.INTEGRAL, identityProperties);
-        graphStore.addNodeProperty(NodeLabel.of("B"), "newNodeProp3", NumberType.INTEGRAL, identityProperties);
+        graphStore.addNodeProperty(NodeLabel.of("A"), "newNodeProp3", identityProperties);
+        graphStore.addNodeProperty(NodeLabel.of("B"), "newNodeProp3", identityProperties);
 
         String graphWriteQuery = formatWithLocale(
             "CALL gds.graph.writeNodeProperties(" +

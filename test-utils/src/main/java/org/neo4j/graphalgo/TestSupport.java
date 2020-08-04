@@ -30,8 +30,15 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.canonization.CanonicalAdjacencyMatrix;
 import org.neo4j.graphalgo.core.Aggregation;
+import org.neo4j.graphalgo.core.GraphDimensions;
 import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
 import org.neo4j.graphalgo.core.concurrency.Pools;
+import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
+import org.neo4j.graphalgo.extension.GdlSupportExtension;
+import org.neo4j.graphalgo.extension.IdFunction;
+import org.neo4j.graphalgo.extension.TestGraph;
+import org.neo4j.graphalgo.gdl.GdlFactory;
+import org.neo4j.graphalgo.gdl.ImmutableGraphCreateFromGdlConfig;
 import org.neo4j.graphdb.TransactionTerminatedException;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.exceptions.Status;
@@ -45,8 +52,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -100,6 +109,72 @@ public final class TestSupport {
                 }));
     }
 
+    public static TestGraph fromGdl(String gdl) {
+        return fromGdl(gdl, NATURAL, "graph");
+    }
+
+    public static TestGraph fromGdl(String gdl, String name) {
+        return fromGdl(gdl, NATURAL, name);
+    }
+
+    public static TestGraph fromGdl(String gdl, Orientation orientation) {
+        return fromGdl(gdl, orientation, "graph");
+    }
+
+    public static TestGraph fromGdl(String gdl, Orientation orientation, String name) {
+        Objects.requireNonNull(gdl);
+
+        var config = ImmutableGraphCreateFromGdlConfig.builder()
+            .gdlGraph(gdl)
+            .graphName("graph")
+            .orientation(orientation)
+            .build();
+
+        var gdlFactory = GdlFactory.of(config, GdlSupportExtension.DATABASE_ID);
+
+        return new TestGraph(gdlFactory.build().graphStore().getUnion(), gdlFactory::nodeId, name);
+    }
+
+    public static long[][] ids(IdFunction idFunction, String[][] variables) {
+        return Arrays.stream(variables).map(vs -> ids(idFunction, vs)).toArray(long[][]::new);
+    }
+
+    public static long[] ids(IdFunction idFunction, String... variables) {
+        return Arrays.stream(variables).mapToLong(idFunction::of).toArray();
+    }
+
+    public static void assertLongValues(TestGraph graph, Function<Long, Long> actualValues, Map<String, Long> expectedValues) {
+        expectedValues.forEach((variable, expectedValue) -> {
+            Long actualValue = actualValues.apply(graph.toMappedNodeId(variable));
+            assertEquals(
+                expectedValue,
+                actualValue,
+                formatWithLocale(
+                    "Values do not match for variable %s. Expected %s, got %s.",
+                    variable,
+                    expectedValue.toString(),
+                    actualValue.toString()
+                ));
+        });
+    }
+
+    public static void assertDoubleValues(TestGraph graph, Function<Long, Double> actualValues, Map<String, Double> expectedValues, double delta) {
+        expectedValues.forEach((variable, expectedValue) -> {
+            Double actualValue = actualValues.apply(graph.toMappedNodeId(variable));
+            assertEquals(
+                expectedValue,
+                actualValue,
+                delta,
+                formatWithLocale(
+                    "Values do not match for variable %s. Expected %s, got %s.",
+                    variable,
+                    expectedValue.toString(),
+                    actualValue.toString()
+                ));
+        });
+    }
+
+
     public static void assertGraphEquals(Graph expected, Graph actual) {
         Assertions.assertEquals(expected.nodeCount(), actual.nodeCount(), "Node counts do not match.");
         // TODO: we cannot check this right now, because the relationshhip counts depends on how the graph has been loaded for HugeGraph
@@ -129,8 +204,37 @@ public final class TestSupport {
         assertTrue(equals, message);
     }
 
+    public static void assertMemoryEstimation(
+        Supplier<MemoryEstimation> actualMemoryEstimation,
+        long nodeCount,
+        int concurrency,
+        long expectedMinBytes,
+        long expectedMaxBytes
+    ) {
+        assertMemoryEstimation(
+            actualMemoryEstimation,
+            GraphDimensions.of(nodeCount),
+            concurrency,
+            expectedMinBytes,
+            expectedMaxBytes
+        );
+    }
+
+    public static void assertMemoryEstimation(
+        Supplier<MemoryEstimation> actualMemoryEstimation,
+        GraphDimensions dimensions,
+        int concurrency,
+        long expectedMinBytes,
+        long expectedMaxBytes
+    ) {
+        var actual = actualMemoryEstimation.get().estimate(dimensions, concurrency).memoryUsage();
+
+        assertEquals(expectedMinBytes, actual.min);
+        assertEquals(expectedMaxBytes, actual.max);
+    }
+
     public static <K, V> Matcher<Map<K, ? extends V>> mapEquals(Map<K, V> expected) {
-        return new BaseMatcher<Map<K, ? extends V>>() {
+        return new BaseMatcher<>() {
             @Override
             public boolean matches(Object actual) {
                 if (!(actual instanceof Map)) {

@@ -23,6 +23,7 @@ import com.carrotsearch.hppc.IntObjectMap;
 import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.PropertyMapping;
 import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 
 import java.util.Collection;
@@ -34,7 +35,6 @@ import java.util.stream.Collectors;
 import static org.neo4j.graphalgo.NodeLabel.ALL_NODES;
 import static org.neo4j.graphalgo.core.GraphDimensions.ANY_LABEL;
 import static org.neo4j.graphalgo.core.GraphDimensions.IGNORE;
-import static org.neo4j.graphalgo.core.loading.CypherNodeLoader.CYPHER_RESULT_PROPERTY_KEY;
 
 public class CypherNodePropertyImporter {
 
@@ -42,7 +42,6 @@ public class CypherNodePropertyImporter {
 
     private final Collection<String> propertyColumns;
     private final long nodeCount;
-    private final int concurrency;
     private final IntObjectMap<List<NodeLabel>> labelTokenNodeLabelMapping;
     private final Map<NodeLabel, Map<String, NodePropertiesBuilder>> buildersByNodeLabel;
 
@@ -50,13 +49,11 @@ public class CypherNodePropertyImporter {
     public CypherNodePropertyImporter(
         Collection<String> propertyColumns,
         IntObjectMap<List<NodeLabel>> labelTokenNodeLabelMapping,
-        long nodeCount,
-        int concurrency
+        long nodeCount
     ) {
         this.propertyColumns = propertyColumns;
         this.labelTokenNodeLabelMapping = labelTokenNodeLabelMapping;
         this.nodeCount = nodeCount;
-        this.concurrency = concurrency;
 
         this.buildersByNodeLabel = new HashMap<>();
     }
@@ -76,12 +73,7 @@ public class CypherNodePropertyImporter {
                 propertyBuilders.computeIfAbsent(
                     property,
                     (ignore) -> NodePropertiesBuilder.of(
-                        nodeCount,
-                        AllocationTracker.EMPTY,
-                        NO_PROPERTY_VALUE,
-                        CYPHER_RESULT_PROPERTY_KEY,
-                        property,
-                        concurrency
+                        nodeCount, ValueType.DOUBLE, AllocationTracker.EMPTY, NO_PROPERTY_VALUE
                     )
                 );
             }

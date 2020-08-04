@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 "Neo4j,"
+ * Copyright (c) 2017-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -24,9 +24,6 @@ import org.neo4j.graphalgo.beta.k1coloring.K1ColoringStatsProc;
 import org.neo4j.graphalgo.beta.k1coloring.K1ColoringStreamProc;
 import org.neo4j.graphalgo.beta.k1coloring.K1ColoringWriteProc;
 import org.neo4j.graphalgo.catalog.GraphCreateProc;
-import org.neo4j.graphalgo.louvain.LouvainStatsProc;
-import org.neo4j.graphalgo.louvain.LouvainStreamProc;
-import org.neo4j.graphalgo.louvain.LouvainWriteProc;
 
 import java.util.Arrays;
 import java.util.List;

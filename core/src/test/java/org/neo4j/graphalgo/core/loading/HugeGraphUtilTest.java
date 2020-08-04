@@ -31,8 +31,8 @@ import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.neo4j.graphalgo.TestGraph.Builder.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 
 class HugeGraphUtilTest {
 

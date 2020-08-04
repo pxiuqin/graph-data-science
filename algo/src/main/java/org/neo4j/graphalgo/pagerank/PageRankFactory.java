@@ -23,27 +23,13 @@ import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.utils.BatchingProgressLogger;
-import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimations;
 import org.neo4j.graphalgo.core.utils.mem.MemoryUsage;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
-import org.neo4j.graphalgo.core.utils.partition.Partition;
 import org.neo4j.logging.Log;
 
-import static org.neo4j.graphalgo.core.utils.BitUtil.ceilDiv;
-
-public class PageRankFactory<CONFIG extends PageRankBaseConfig> extends AlgorithmFactory<PageRank, CONFIG> {
-
-    private final PageRankAlgorithmType algorithmType;
-
-    public PageRankFactory() {
-        this(PageRankAlgorithmType.NON_WEIGHTED);  //默认给定无权图
-    }
-
-    public PageRankFactory(PageRankAlgorithmType algorithmType) {
-        this.algorithmType = algorithmType;
-    }
+public class PageRankFactory<CONFIG extends PageRankBaseConfig> implements AlgorithmFactory<PageRank, CONFIG> {
 
     @Override
     public PageRank build(
@@ -59,12 +45,10 @@ public class PageRankFactory<CONFIG extends PageRankBaseConfig> extends Algorith
             configuration.concurrency()
         );
 
-        //构建一个新图
-        return algorithmType.create(
+        return algorithmType(configuration).create(
             graph,
             configuration.sourceNodeIds(),
             configuration,
-            configuration.concurrency(),
             Pools.DEFAULT,
             progressLogger,
             tracker
@@ -74,28 +58,20 @@ public class PageRankFactory<CONFIG extends PageRankBaseConfig> extends Algorith
     @Override
     public MemoryEstimation memoryEstimation(CONFIG config) {
         return MemoryEstimations.builder(PageRank.class)
-            .add(MemoryEstimations.setup("computeSteps", (dimensions, concurrency) -> {
-                // adjust concurrency, if necessary
-                long nodeCount = dimensions.nodeCount();
-                long nodesPerThread = ceilDiv(nodeCount, concurrency);  //除法
-                if (nodesPerThread > Partition.MAX_NODE_COUNT) {
-                    concurrency = (int) ceilDiv(nodeCount, Partition.MAX_NODE_COUNT);
-                    nodesPerThread = ceilDiv(nodeCount, concurrency);
-                    while (nodesPerThread > Partition.MAX_NODE_COUNT) {
-                        concurrency++;
-                        nodesPerThread = ceilDiv(nodeCount, concurrency);
-                    }
-                }
-
-                return MemoryEstimations
-                    .builder(PageRank.ComputeSteps.class)
-                    .perThread("scores[] wrapper", MemoryUsage::sizeOfObjectArray)
-                    .perThread("starts[]", MemoryUsage::sizeOfLongArray)
-                    .perThread("lengths[]", MemoryUsage::sizeOfLongArray)
-                    .perThread("list of computeSteps", MemoryUsage::sizeOfObjectArray)
-                    .perThread("ComputeStep", algorithmType.memoryEstimation())
-                    .build();
-            }))
+            .add(MemoryEstimations.setup("computeSteps", (dimensions, concurrency) -> MemoryEstimations
+                .builder(PageRank.ComputeSteps.class)
+                .perThread("scores[] wrapper", MemoryUsage::sizeOfObjectArray)
+                .perThread("starts[]", MemoryUsage::sizeOfLongArray)
+                .perThread("lengths[]", MemoryUsage::sizeOfLongArray)
+                .perThread("list of computeSteps", MemoryUsage::sizeOfObjectArray)
+                .perThread("ComputeStep", algorithmType(config).memoryEstimation())
+                .build()))
             .build();
+    }
+
+    private PageRankAlgorithmType algorithmType(PageRankBaseConfig configuration) {
+        return configuration.relationshipWeightProperty() == null
+            ? PageRankAlgorithmType.NON_WEIGHTED
+            : PageRankAlgorithmType.WEIGHTED;
     }
 }

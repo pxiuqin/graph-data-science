@@ -21,9 +21,9 @@ package org.neo4j.graphalgo.triangle;
 
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.WriteProc;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.procedure.Description;
@@ -81,15 +81,13 @@ public class TriangleCountWriteProc extends WriteProc<IntersectingTriangleCount,
     }
 
     @Override
-    protected AlgorithmFactory<IntersectingTriangleCount, TriangleCountWriteConfig> algorithmFactory(
-        TriangleCountWriteConfig config
-    ) {
+    protected AlgorithmFactory<IntersectingTriangleCount, TriangleCountWriteConfig> algorithmFactory() {
         return new IntersectingTriangleCountFactory<>();
     }
 
     @Override
-    protected PropertyTranslator<IntersectingTriangleCount.TriangleCountResult> nodePropertyTranslator(ComputationResult<IntersectingTriangleCount, IntersectingTriangleCount.TriangleCountResult, TriangleCountWriteConfig> computationResult) {
-        return TriangleCountCompanion.nodePropertyTranslator();
+    protected NodeProperties getNodeProperties(ComputationResult<IntersectingTriangleCount, IntersectingTriangleCount.TriangleCountResult, TriangleCountWriteConfig> computationResult) {
+        return TriangleCountCompanion.nodePropertyTranslator(computationResult);
     }
 
     @Override
@@ -103,7 +101,7 @@ public class TriangleCountWriteProc extends WriteProc<IntersectingTriangleCount,
         public long writeMillis;
 
         public WriteResult(
-            long triangleCount,
+            long globalTriangleCount,
             long nodeCount,
             long nodePropertiesWritten,
             long createMillis,
@@ -112,7 +110,7 @@ public class TriangleCountWriteProc extends WriteProc<IntersectingTriangleCount,
             Map<String, Object> configuration
         ) {
             super(
-                triangleCount,
+                globalTriangleCount,
                 nodeCount,
                 createMillis,
                 computeMillis,
@@ -129,7 +127,7 @@ public class TriangleCountWriteProc extends WriteProc<IntersectingTriangleCount,
         @Override
         public WriteResult build() {
             return new WriteResult(
-                triangleCount,
+                globalTriangleCount,
                 nodeCount,
                 nodePropertiesWritten,
                 createMillis,

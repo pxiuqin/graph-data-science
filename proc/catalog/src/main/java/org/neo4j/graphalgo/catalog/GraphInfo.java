@@ -19,28 +19,20 @@
  */
 package org.neo4j.graphalgo.catalog;
 
-import org.HdrHistogram.AtomicHistogram;
-import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
-import org.neo4j.graphalgo.compat.MapUtil;
-import org.neo4j.graphalgo.config.AlgoBaseConfig;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.config.GraphCreateFromCypherConfig;
 import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
-import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
-import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.graphalgo.config.RandomGraphGeneratorConfig;
 import org.neo4j.graphalgo.core.utils.mem.MemoryUsage;
 
 import java.time.ZonedDateTime;
 import java.util.Map;
 
-import static java.util.Collections.emptyMap;
-
 public class GraphInfo {
-    private static final int PRECISION = 5;
 
     public final String graphName;
+    public final String database;
     public final String memoryUsage;
     public final long sizeInBytes;
     public final Map<String, Object> nodeProjection;
@@ -49,72 +41,88 @@ public class GraphInfo {
     public final String relationshipQuery;
     public final long nodeCount;
     public final long relationshipCount;
-    public final Map<String, Object> degreeDistribution;
     public final ZonedDateTime creationTime;
     public final ZonedDateTime modificationTime;
     public final Map<String, Object> schema;
 
-    GraphInfo(GraphCreateConfig config, GraphStore graphStore, boolean computeHistogram) {
-        this.graphName = config.graphName();
-        this.creationTime = config.creationTime();
-
-        if (config instanceof GraphCreateFromCypherConfig) {
-            GraphCreateFromCypherConfig cypherConfig = (GraphCreateFromCypherConfig) config;
-            this.nodeQuery = cypherConfig.nodeQuery();
-            this.relationshipQuery = cypherConfig.relationshipQuery();
-            this.nodeProjection = null;
-            this.relationshipProjection = null;
-        } else {
-            GraphCreateFromStoreConfig fromStoreConfig = (GraphCreateFromStoreConfig) config;
-            this.nodeProjection = fromStoreConfig.nodeProjections().toObject();
-            this.relationshipProjection = fromStoreConfig.relationshipProjections().toObject();
-            this.nodeQuery = null;
-            this.relationshipQuery = null;
-        }
-
-        this.modificationTime = graphStore.modificationTime();
-        this.nodeCount = graphStore.nodeCount();
-        this.relationshipCount = graphStore.relationshipCount();
-        this.degreeDistribution = computeHistogram ? computeHistogram(graphStore.getUnion()) : emptyMap();
-        this.schema = graphStore.schema().toMap();
-        this.sizeInBytes = MemoryUsage.sizeOf(graphStore);
-        this.memoryUsage = MemoryUsage.humanReadable(this.sizeInBytes);
+    GraphInfo(
+        String graphName,
+        String database,
+        String memoryUsage,
+        long sizeInBytes,
+        Map<String, Object> nodeProjection,
+        Map<String, Object> relationshipProjection,
+        String nodeQuery,
+        String relationshipQuery,
+        long nodeCount,
+        long relationshipCount,
+        ZonedDateTime creationTime,
+        ZonedDateTime modificationTime,
+        Map<String, Object> schema
+    ) {
+        this.graphName = graphName;
+        this.database = database;
+        this.memoryUsage = memoryUsage;
+        this.sizeInBytes = sizeInBytes;
+        this.nodeProjection = nodeProjection;
+        this.relationshipProjection = relationshipProjection;
+        this.nodeQuery = nodeQuery;
+        this.relationshipQuery = relationshipQuery;
+        this.nodeCount = nodeCount;
+        this.relationshipCount = relationshipCount;
+        this.creationTime = creationTime;
+        this.modificationTime = modificationTime;
+        this.schema = schema;
     }
 
-    private Map<String, Object> computeHistogram(Graph graph) {
-        int batchSize = Math.toIntExact(ParallelUtil.adjustedBatchSize(
-            graph.nodeCount(),
-            AlgoBaseConfig.DEFAULT_CONCURRENCY,
-            ParallelUtil.DEFAULT_BATCH_SIZE
-        ));
-        // needs to be at least 2 due to some requirement from the AtomicHistogram, see their JavaDoc
-        long maximumDegree = Math.max(2, graph.relationshipCount());
-        AtomicHistogram histogram = new AtomicHistogram(maximumDegree, PRECISION);
+    static GraphInfo of(GraphCreateConfig graphCreateConfig, GraphStore graphStore) {
+        var graphName = graphCreateConfig.graphName();
+        var creationTime = graphCreateConfig.creationTime();
 
-        ParallelUtil.readParallel(
-            AlgoBaseConfig.DEFAULT_CONCURRENCY,
-            batchSize,
-            graph,
-            Pools.DEFAULT,
-            (nodeOffset, nodeIds) -> () -> {
-                PrimitiveLongIterator iterator = nodeIds.iterator();
-                while (iterator.hasNext()) {
-                    long nodeId = iterator.next();
-                    int degree = graph.degree(nodeId);
-                    histogram.recordValue(degree);
-                }
-            }
+        var sizeInBytes = MemoryUsage.sizeOf(graphStore);
+        var memoryUsage = MemoryUsage.humanReadable(sizeInBytes);
+
+        var configVisitor = new Visitor();
+        graphCreateConfig.accept(configVisitor);
+
+        return new GraphInfo(
+            graphName,
+            graphStore.databaseId().name(),
+            memoryUsage,
+            sizeInBytes,
+            configVisitor.nodeProjection,
+            configVisitor.relationshipProjection,
+            configVisitor.nodeQuery,
+            configVisitor.relationshipQuery,
+            graphStore.nodeCount(),
+            graphStore.relationshipCount(),
+            creationTime,
+            graphStore.modificationTime(),
+            graphStore.schema().toMap()
         );
-        return MapUtil.map(
-            "min", histogram.getMinValue(),
-            "mean", histogram.getMean(),
-            "max", histogram.getMaxValue(),
-            "p50", histogram.getValueAtPercentile(50),
-            "p75", histogram.getValueAtPercentile(75),
-            "p90", histogram.getValueAtPercentile(90),
-            "p95", histogram.getValueAtPercentile(95),
-            "p99", histogram.getValueAtPercentile(99),
-            "p999", histogram.getValueAtPercentile(99.9)
-        );
+    }
+
+    static final class Visitor implements GraphCreateConfig.Visitor {
+
+        String nodeQuery, relationshipQuery = null;
+        Map<String, Object> nodeProjection, relationshipProjection = null;
+
+        @Override
+        public void visit(GraphCreateFromStoreConfig storeConfig) {
+            nodeProjection = storeConfig.nodeProjections().toObject();
+            relationshipProjection = storeConfig.relationshipProjections().toObject();
+        }
+
+        @Override
+        public void visit(GraphCreateFromCypherConfig cypherConfig) {
+            nodeQuery = cypherConfig.nodeQuery();
+            relationshipQuery = cypherConfig.relationshipQuery();
+        }
+
+        @Override
+        public void visit(RandomGraphGeneratorConfig randomGraphConfig) {
+            nodeProjection = randomGraphConfig.nodeProjections().toObject();
+            relationshipProjection = randomGraphConfig.relationshipProjections().toObject();
+        }
     }
 }

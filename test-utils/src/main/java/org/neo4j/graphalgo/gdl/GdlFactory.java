@@ -28,10 +28,11 @@ import org.neo4j.graphalgo.api.GraphLoaderContext;
 import org.neo4j.graphalgo.api.GraphStoreFactory;
 import org.neo4j.graphalgo.api.IdMapping;
 import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.api.Relationships;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.core.Aggregation;
 import org.neo4j.graphalgo.core.GraphDimensions;
 import org.neo4j.graphalgo.core.ImmutableGraphDimensions;
-import org.neo4j.graphalgo.core.huge.HugeGraph;
 import org.neo4j.graphalgo.core.loading.CSRGraphStore;
 import org.neo4j.graphalgo.core.loading.HugeGraphUtil;
 import org.neo4j.graphalgo.core.loading.IdMap;
@@ -40,7 +41,9 @@ import org.neo4j.graphalgo.core.loading.NodePropertiesBuilder;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimations;
+import org.neo4j.graphalgo.extension.GdlSupportExtension;
 import org.neo4j.internal.kernel.api.security.AuthSubject;
+import org.neo4j.kernel.database.NamedDatabaseId;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.NullLog;
@@ -55,24 +58,31 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public final class GdlFactory extends GraphStoreFactory<GraphCreateFromGdlConfig> {
+public final class GdlFactory extends GraphStoreFactory<CSRGraphStore, GraphCreateFromGdlConfig> {
 
-    private static final int NO_SUCH_PROPERTY = -2;
     private final GDLHandler gdlHandler;
+    private final NamedDatabaseId databaseId;
 
     public static GdlFactory of(String gdlGraph) {
-        return of(AuthSubject.ANONYMOUS.username(), "graph", gdlGraph);
+        return of(gdlGraph, GdlSupportExtension.DATABASE_ID);
     }
 
-    public static GdlFactory of(String username, String graphName, String gdlGraph) {
-        return of(ImmutableGraphCreateFromGdlConfig.builder()
-            .username(username)
-            .graphName(graphName)
-            .gdlGraph(gdlGraph)
-            .build());
+    public static GdlFactory of(String gdlGraph, NamedDatabaseId namedDatabaseId) {
+        return of(AuthSubject.ANONYMOUS.username(), namedDatabaseId, "graph", gdlGraph);
     }
 
-    public static GdlFactory of(GraphCreateFromGdlConfig config) {
+    public static GdlFactory of(String username, NamedDatabaseId namedDatabaseId, String graphName, String gdlGraph) {
+        return of(
+            ImmutableGraphCreateFromGdlConfig.builder()
+                .username(username)
+                .graphName(graphName)
+                .gdlGraph(gdlGraph)
+                .build(),
+            namedDatabaseId
+        );
+    }
+
+    public static GdlFactory of(GraphCreateFromGdlConfig config, NamedDatabaseId databaseId) {
         var gdlHandler = new GDLHandler.Builder()
             .setDefaultVertexLabel(NodeLabel.ALL_NODES.name)
             .setDefaultEdgeLabel(RelationshipType.ALL_RELATIONSHIPS.name)
@@ -80,16 +90,18 @@ public final class GdlFactory extends GraphStoreFactory<GraphCreateFromGdlConfig
 
         var graphDimensions = GraphDimensionsGdlReader.of(gdlHandler);
 
-        return new GdlFactory(gdlHandler, config, graphDimensions);
+        return new GdlFactory(gdlHandler, config, graphDimensions, databaseId);
     }
 
     private GdlFactory(
         GDLHandler gdlHandler,
         GraphCreateFromGdlConfig graphCreateConfig,
-        GraphDimensions graphDimensions
+        GraphDimensions graphDimensions,
+        NamedDatabaseId databaseId
     ) {
         super(graphCreateConfig, NO_API_CONTEXT, graphDimensions);
         this.gdlHandler = gdlHandler;
+        this.databaseId = databaseId;
     }
 
     public long nodeId(String variable) {
@@ -107,7 +119,7 @@ public final class GdlFactory extends GraphStoreFactory<GraphCreateFromGdlConfig
     }
 
     @Override
-    public ImportResult build() {
+    public ImportResult<CSRGraphStore> build() {
         var nodes = loadNodes();
         var relationships = loadRelationships(nodes.idMap());
         var topologies = relationships.entrySet().stream()
@@ -121,7 +133,8 @@ public final class GdlFactory extends GraphStoreFactory<GraphCreateFromGdlConfig
                 Map.Entry::getKey,
                 entry -> Map.of(entry.getValue().getOne().get(), entry.getValue().getTwo().properties().get())
             ));
-        var graphStore = CSRGraphStore.of(
+        CSRGraphStore graphStore = CSRGraphStore.of(
+            databaseId,
             nodes.idMap(),
             nodes.properties(),
             topologies,
@@ -141,7 +154,10 @@ public final class GdlFactory extends GraphStoreFactory<GraphCreateFromGdlConfig
 
         gdlHandler.getVertices().forEach(vertex -> idMapBuilder.addNode(
             vertex.getId(),
-            vertex.getLabels().stream().map(NodeLabel::of).toArray(NodeLabel[]::new)
+            vertex.getLabels().stream()
+                .map(NodeLabel::of)
+                .filter(nodeLabel -> !nodeLabel.equals(NodeLabel.ALL_NODES))
+                .toArray(NodeLabel[]::new)
         ));
 
         var idMap = idMapBuilder.build();
@@ -153,25 +169,23 @@ public final class GdlFactory extends GraphStoreFactory<GraphCreateFromGdlConfig
         var propertyKeysByLabel = new HashMap<NodeLabel, Set<PropertyMapping>>();
         var propertyBuilders = new HashMap<PropertyMapping, NodePropertiesBuilder>();
 
-        gdlHandler.getVertices().forEach(vertex -> {
-            vertex.getProperties().forEach((propertyKey, propertyValue) ->
-                propertyBuilders.computeIfAbsent(PropertyMapping.of(propertyKey), (key) -> {
-                    vertex.getLabels().stream()
-                        .map(NodeLabel::of)
-                        .forEach(nodeLabel -> propertyKeysByLabel
-                            .computeIfAbsent(nodeLabel, (ignore) -> new HashSet<>())
-                            .add(key)
-                        );
-                    return NodePropertiesBuilder.of(
-                        dimensions.nodeCount(),
-                        loadingContext.tracker(),
-                        PropertyMapping.DEFAULT_FALLBACK_VALUE,
-                        NO_SUCH_PROPERTY,
-                        key.propertyKey(),
-                        1
+        gdlHandler.getVertices().forEach(vertex -> vertex
+            .getProperties()
+            .forEach((propertyKey, propertyValue) -> {
+                vertex.getLabels().stream()
+                    .map(NodeLabel::of)
+                    .forEach(nodeLabel -> propertyKeysByLabel
+                        .computeIfAbsent(nodeLabel, (ignore) -> new HashSet<>())
+                        .add(PropertyMapping.of(propertyKey))
                     );
-                }).set(idMap.toMappedNodeId(vertex.getId()), gdsValue(vertex, propertyKey, propertyValue)));
-        });
+                propertyBuilders.computeIfAbsent(PropertyMapping.of(propertyKey), (key) ->
+                    NodePropertiesBuilder.of(
+                        dimensions.nodeCount(),
+                        ValueType.DOUBLE,
+                        loadingContext.tracker(),
+                        PropertyMapping.DEFAULT_FALLBACK_VALUE
+                    )).set(idMap.toMappedNodeId(vertex.getId()), gdsValue(vertex, propertyKey, propertyValue));
+            }));
 
         var nodeProperties = propertyBuilders
             .entrySet()
@@ -188,7 +202,7 @@ public final class GdlFactory extends GraphStoreFactory<GraphCreateFromGdlConfig
             ));
     }
 
-    private Map<RelationshipType, Pair<Optional<String>, HugeGraph.Relationships>> loadRelationships(IdMap nodes) {
+    private Map<RelationshipType, Pair<Optional<String>, Relationships>> loadRelationships(IdMap nodes) {
         var propertyKeysByRelType = new HashMap<String, Optional<String>>();
 
         gdlHandler.getEdges()
@@ -223,6 +237,20 @@ public final class GdlFactory extends GraphStoreFactory<GraphCreateFromGdlConfig
                 }
             });
 
+        // Add fake relationship type since we do not
+        // support GraphStores with zero relationships.
+        if (relTypeImporters.isEmpty()) {
+            relTypeImporters.put(RelationshipType.ALL_RELATIONSHIPS.name, HugeGraphUtil.createRelImporter(
+                nodes,
+                graphCreateConfig.orientation(),
+                false,
+                Aggregation.NONE,
+                loadingContext.executor(),
+                loadingContext.tracker()
+            ));
+            propertyKeysByRelType.put(RelationshipType.ALL_RELATIONSHIPS.name, Optional.empty());
+        }
+
         return relTypeImporters.entrySet().stream().collect(Collectors.toMap(
             entry -> RelationshipType.of(entry.getKey()),
             entry -> Tuples.pair(propertyKeysByRelType.get(entry.getKey()), entry.getValue().build())
@@ -232,6 +260,8 @@ public final class GdlFactory extends GraphStoreFactory<GraphCreateFromGdlConfig
     private double gdsValue(Element element, String propertyKey, Object gdlValue) {
         if (gdlValue instanceof Number) {
             return ((Number) gdlValue).doubleValue();
+        } else if (gdlValue instanceof String && gdlValue.equals("NaN")) {
+            return Double.NaN;
         } else {
             throw new IllegalArgumentException(String.format(
                 Locale.ENGLISH,

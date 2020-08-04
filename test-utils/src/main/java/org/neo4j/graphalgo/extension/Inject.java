@@ -28,6 +28,4 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Target({FIELD, TYPE})
 @Retention(RUNTIME)
-public @interface Inject {
-    String graphName() default "graph";
-}
+public @interface Inject { }
