@@ -137,7 +137,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
     PageRank(
         Graph graph,
         PageRankVariant pageRankVariant,
-        LongStream sourceNodeIds,
+        LongStream sourceNodeIds,   //给定源节点情况
         PageRankBaseConfig algoConfig,
         int concurrency,
         ExecutorService executor,
@@ -201,7 +201,24 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
             return;
         }
 
-        //确定分片
+        /**
+         * 分区说明：
+         * 1.File L0 (1<src_id<100)
+         * src_id|out_degress|dest_id
+         * 1     |4          |9 102 256 324
+         * 2     |5          |3 178 203 278 345
+         * 3     |5          |5 10 196 313 335
+         * 
+         * 2.File L1 (101<srci_d<200)
+         * src_id|out_degress|dest_id
+         * 101   |4          |1 65 102 109
+         * 102   |3          |15 109 256
+         * 103   |1          |5
+         * 
+         * 3.other
+         * 
+         * 说明：基于这个分片来分析每次迭代过程，是如何使用scores的三维数组实现从出链分值到入链分值的累加
+         */
         List<Partition> partitions = PartitionUtils.degreePartition(graph, adjustBatchSize(batchSize));
 
         ExecutorService executor = ParallelUtil.canRunInParallel(this.executor)
@@ -211,7 +228,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
                 concurrency,
                 idMapping.nodeCount(),
                 dampingFactor,
-                sourceNodeIds.map(graph::toMappedNodeId).filter(mappedId -> mappedId != -1L).toArray(),
+                sourceNodeIds.map(graph::toMappedNodeId).filter(mappedId -> mappedId != -1L).toArray(),  //过滤处理下
                 partitions,
                 executor);
     }
@@ -224,8 +241,8 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
 
         // multiply batchsize by average degree, so that the resulting
         // partitions are sized closer to the provided batchSize
-        long averageDegree = Math.max(1, ceilDiv(graph.relationshipCount(), graph.nodeCount()));
-        long degreeBatchSize = averageDegree * batchSize;
+        long averageDegree = Math.max(1, ceilDiv(graph.relationshipCount(), graph.nodeCount()));  //平均度大小
+        long degreeBatchSize = averageDegree * batchSize;  //？
 
         return (int) Math.min(degreeBatchSize, Partition.MAX_NODE_COUNT);
     }
@@ -249,7 +266,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         int partitionsPerThread = ParallelUtil.threadCount(
                 concurrency + 1,
                 partitions.size());
-        Iterator<Partition> parts = partitions.iterator();
+        Iterator<Partition> parts = partitions.iterator();  //分片迭代器
 
         DegreeComputer degreeComputer = pageRankVariant.degreeComputer(graph);
         DegreeCache degreeCache = degreeComputer.degree(pool, concurrency, tracker);
@@ -268,8 +285,8 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
                 ++i;
             }
 
-            starts.add(start);  //开始节点保存
-            lengths.add(partitionSize);
+            starts.add(start);  //开始节点保存，开始节点的数量和computeStemp的个数是相同的
+            lengths.add(partitionSize);  //每个开始节点对应的分片中的相关节点个数
 
             //添加一个可计算单元，使用PageRankVariant来创建计算单元
             computeSteps.add(pageRankVariant.createComputeStep(
@@ -300,7 +317,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
             int concurrency,
             Log log) {
         if (concurrency <= 0) {
-            concurrency = partitions.size();
+            concurrency = partitions.size();  //并发度使用分区数量来标识
         }
 
         if (log != null && log.isDebugEnabled()) {
@@ -414,7 +431,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         perThreadUsage += sizeOfInstance(BaseComputeStep.class);
         perThreadUsage += sizeOfObjectArray(stepSize);
 
-        sharedUsage += sizeOfInstance(ComputeSteps.class);
+        sharedUsage += sizeOfInstance(ComputeSteps.class);  //共享内存使用
         sharedUsage += sizeOfLongArray(stepSize) << 1;
 
         return sharedUsage + perThreadUsage;
@@ -447,7 +464,7 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
             this.steps = steps;
             this.pool = pool;
             int stepSize = steps.size();
-            scores = new float[stepSize][stepSize][];  //？
+            scores = new float[stepSize][stepSize][];  //？多个处理单元使用一份公共的全局pr分值记录
             if (AllocationTracker.isTracking(tracker)) {
                 tracker.add((stepSize + 1) * sizeOfObjectArray(stepSize));
             }
@@ -513,20 +530,21 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
 
         private void synchronizeScores() {
             int stepSize = steps.size();
-            float[][][] scores = this.scores;
+            float[][][] scores = this.scores;  //临时变量
             int i;
 
             //每个并行步分别同步下相关得分
             for (i = 0; i < stepSize; i++) {
-                synchronizeScores(steps.get(i), i, scores);
+                synchronizeScores(steps.get(i), i, scores);  //把每个计算单元中的计算得分同步下
             }
         }
 
         //同步得分
         private void synchronizeScores(ComputeStep step, int idx, float[][][] scores) {
-            step.prepareNextIteration(scores[idx]);
-            float[][] nextScores = step.nextScores();
+            step.prepareNextIteration(scores[idx]);  //实现得分计算，把入链分求和处理分发到出链分上
+            float[][] nextScores = step.nextScores();  //获取出链分
             for (int j = 0, len = nextScores.length; j < len; j++) {
+                //注意这里的下标情况
                 scores[j][idx] = nextScores[j];  //给出一个计算单元中的得分值【同步的目的就是把入链值转换到出链值】
             }
         }

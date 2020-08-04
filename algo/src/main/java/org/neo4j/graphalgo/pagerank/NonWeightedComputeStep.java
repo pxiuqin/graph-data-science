@@ -76,7 +76,7 @@ public class NonWeightedComputeStep extends BaseComputeStep implements Relations
     public boolean accept(long sourceNodeId, long targetNodeId) {
         if (srcRankDelta != 0F) {
             int idx = binaryLookup(targetNodeId, starts);
-            nextScores[idx][(int) (targetNodeId - starts[idx])] += srcRankDelta;   //保存到出链携带的pr
+            nextScores[idx][(int) (targetNodeId - starts[idx])] += srcRankDelta;   //保存到携带的pr值，同weightedComputeSetp
         }
         return true;
     }

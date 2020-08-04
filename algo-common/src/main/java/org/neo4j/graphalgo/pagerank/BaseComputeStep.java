@@ -75,7 +75,7 @@ public abstract class BaseComputeStep implements ComputeStep {
 
     BaseComputeStep(
         double dampingFactor,  //阻尼因子
-        long[] sourceNodeIds,
+        long[] sourceNodeIds,  //起始点
         Graph graph,
         AllocationTracker tracker,
         int partitionSize,
@@ -159,9 +159,9 @@ public abstract class BaseComputeStep implements ComputeStep {
 
     //初始化处理，给定初始的pr值
     private void initialize() {
-        this.nextScores = new float[starts.length][];  //多少个开始节点来定义下一步得分？
+        this.nextScores = new float[starts.length][];  //多少个开始节点来定义下一步得分？因为开始节点数和computeStep个数相同
         Arrays.setAll(nextScores, i -> {
-            int size = lengths[i];  //不同起始点对应的长度是不同，这里要针对每个具体的起点来确定
+            int size = lengths[i];  //不同起始点对应的长度是不同，这里要针对每个具体的起点来确定【分片中节点的个数】
             tracker.add(sizeOfFloatArray(size));
             return new float[size];
         });
@@ -169,25 +169,26 @@ public abstract class BaseComputeStep implements ComputeStep {
         tracker.add(sizeOfDoubleArray(partitionSize) << 1);
 
         double[] partitionRank = new double[partitionSize];
-        double initialValue = initialValue();
-        if (sourceNodeIds.length == 0) {
+        double initialValue = initialValue();  //初始值给定为1-阻尼因子
+        if (sourceNodeIds.length == 0) {  //没有给定源节点的话，使用初始化值
             Arrays.fill(partitionRank, initialValue);
         } else {
-            Arrays.fill(partitionRank, 0.0);
+            Arrays.fill(partitionRank, 0.0);  //先初始化为0
 
             long[] partitionSourceNodeIds = LongStream.of(sourceNodeIds)
                 .filter(sourceNodeId -> sourceNodeId >= startNode && sourceNodeId < endNode)
-                .toArray();
+                .toArray();  //确定分片内节点
 
             for (long sourceNodeId : partitionSourceNodeIds) {
-                partitionRank[Math.toIntExact(sourceNodeId - this.startNode)] = initialValue;
+                partitionRank[Math.toIntExact(sourceNodeId - this.startNode)] = initialValue;  //通过分片中节点的偏移来设置初始值
             }
         }
 
-        this.pageRank = partitionRank;
+        this.pageRank = partitionRank;  //分片中节点的多少，记录分片中节点的pr值
         this.deltas = Arrays.copyOf(partitionRank, partitionSize);  //给定大小
     }
 
+    //给定初始值
     double initialValue() {
         return alpha;
     }
@@ -204,7 +205,7 @@ public abstract class BaseComputeStep implements ComputeStep {
         this.prevScores = prevScores;  //行表示PR计算中初始的ComputeStemp个数，列表示入链
     }
 
-    //同步
+    //合并分值
     boolean combineScores() {
         assert prevScores != null;
         assert prevScores.length >= 1;
@@ -215,18 +216,18 @@ public abstract class BaseComputeStep implements ComputeStep {
         boolean shouldBreak = true;
 
         int length = prevScores[0].length;  //分区中的节点数
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++) {  //每个分区中的节点都需要计算下
             double sum = 0.0;
             for (int j = 0; j < scoreDim; j++) {
                 float[] scores = prevScores[j];
-                sum += scores[i];  //对入链分配的值做求和
-                scores[i] = 0F;
+                sum += scores[i];  //对入链分配的值做求和【这里入链分配是不准确的，应该理解为计算单元个数或并发线程数】
+                scores[i] = 0F;  //？累加后为什么要置0
             }
             double delta = dampingFactor * sum;  //乘以阻尼因子，为了避免Rank Leak【可以理解是等级泄露】和Rank Sink【可以理解是等级沉没】
             if (delta > tolerance) {
                 shouldBreak = false;
             }
-            pageRank[i] += delta;
+            pageRank[i] += delta;  //这里为什么要累加？
             deltas[i] = delta;  //同时把计算的值赋给delta
         }
 

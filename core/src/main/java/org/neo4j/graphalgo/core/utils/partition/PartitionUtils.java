@@ -73,7 +73,7 @@ public final class PartitionUtils {
                 partitionSize += degrees.degree(nodeId); //节点的度大小累加到分片大小
             }
 
-            long end = nodeId + 1;
+            long end = nodeId + 1;  //通过度大小和batchSize找到end节点
             partitions.add(new Partition(start, end - start));  //完成一个分片
             start = end;
         }

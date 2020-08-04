@@ -29,7 +29,7 @@ import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
 import static org.neo4j.graphalgo.core.utils.ArrayUtil.binaryLookup;
 import static org.neo4j.graphalgo.pagerank.PageRank.DEFAULT_WEIGHT;
 
-//构建含权重的PageRank的计算单元
+//构建含权重的PageRank的计算单元【这里还实现了边操作的回调操作】
 public class WeightedComputeStep extends BaseComputeStep implements RelationshipWithPropertyConsumer {
 
     private final HugeDoubleArray aggregatedDegrees;
@@ -62,27 +62,34 @@ public class WeightedComputeStep extends BaseComputeStep implements Relationship
         long startNode = this.startNode;
         long endNode = this.endNode;
         RelationshipIterator rels = this.relationshipIterator;
+
+        //从分片中的开始节点到结束节点
         for (long nodeId = startNode; nodeId < endNode; ++nodeId) {
             delta = deltas[(int) (nodeId - startNode)];  //取出delta
             if (delta > 0.0) {
                 int degree = degrees.degree(nodeId);  //出度
                 if (degree > 0) {
+                    //这里的值每次不去保留？因为下面accept中会用到此变量【实现了边操作回调函数】
                     sumOfWeights = aggregatedDegrees.get(nodeId); //权重和代替delta/degree
-                    rels.forEachRelationship(nodeId, DEFAULT_WEIGHT, this);
+                    rels.forEachRelationship(nodeId, DEFAULT_WEIGHT, this);  //这里把当前节点的传播权重值保存
                 }
             }
             progressLogger.logProgress(graph.degree(nodeId));
         }
     }
 
+    //处理边操作时回回调这里的函数实现具体的操作【上面的rels.forEachRelationship(nodeId, DEFAULT_WEIGHT, this)中标示用this的回调】
     @Override
     public boolean accept(long sourceNodeId, long targetNodeId, double property) {
         if (property > 0) {
             double proportion = property / sumOfWeights;
-            float srcRankDelta = (float) (delta * proportion);  //乘以权重带过来的传播因子
+            float srcRankDelta = (float) (delta * proportion);  //乘以权重带过来的传播因子，这里delta是 delta = deltas[(int) (nodeId - startNode)];处计算的结果
             if (srcRankDelta != 0F) {
-                int idx = binaryLookup(targetNodeId, starts);  //找到索引位置【在开始节点数组中找位置】
-                nextScores[idx][(int) (targetNodeId - starts[idx])] += srcRankDelta;  //赋值出链携带pr值
+                //注意这里会有多个线程下完成从多个入链汇集pr值
+                int idx = binaryLookup(targetNodeId, starts);  //找到索引位置【在开始节点数组中找位置，也可以理解为分片的起始位置】
+
+                //targetNodeId - starts[idx]表示targetNodeId的位置
+                nextScores[idx][(int) (targetNodeId - starts[idx])] += srcRankDelta;  //赋值携带pr值【这里会有多线程从多个入链来的pr值，所以用了累加】
             }
         }
 

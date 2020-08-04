@@ -19,6 +19,7 @@
  */
 package org.neo4j.graphalgo.api;
 
+//这里给定了边处理的回调函数
 public interface RelationshipWithPropertyConsumer {
     /**
      * Called for every relationship that matches a given relation-constraint
