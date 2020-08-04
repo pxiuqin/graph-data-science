@@ -23,6 +23,7 @@ import org.neo4j.graphalgo.annotation.Configuration;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Configuration("FieldTypesConfig")
 public interface FieldTypes {
@@ -48,4 +49,6 @@ public interface FieldTypes {
     Map<String, Object> aMap();
 
     List<Object> aList();
+
+    Optional<String> anOptional();
 }

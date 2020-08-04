@@ -33,11 +33,16 @@ import static java.lang.annotation.ElementType.FIELD;
 @Repeatable(GdlGraphs.class)
 public @interface GdlGraph {
 
-    Orientation orientation() default Orientation.NATURAL;
+    String graphNamePrefix() default "";
 
-    String graphName() default "graph";
+    Orientation orientation() default Orientation.NATURAL;
 
     String username() default "";
 
+    /**
+     * If set, the graph store is added to the GraphStore catalog.
+     * The name is the {@code graphNamePrefix() + 'Graph'} or just
+     * {@code 'graph'} if no prefix is set.
+     */
     boolean addToCatalog() default false;
 }

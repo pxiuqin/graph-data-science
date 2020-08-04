@@ -20,9 +20,11 @@
 package org.neo4j.graphalgo.core.loading;
 
 import org.jetbrains.annotations.Nullable;
+import org.neo4j.graphalgo.annotation.ValueClass;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
+import org.neo4j.kernel.database.NamedDatabaseId;
 
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -40,8 +42,8 @@ public final class GraphStoreCatalog {
 
     private GraphStoreCatalog() { }
 
-    public static GraphStoreWithConfig get(String username, String graphName) {
-        return getUserCatalog(username).get(graphName);
+    public static GraphStoreWithConfig get(String username, NamedDatabaseId databaseId, String graphName) {
+        return getUserCatalog(username).get(UserCatalog.UserCatalogKey.of(databaseId, graphName));
     }
 
     public static void set(GraphCreateConfig config, GraphStore graphStore) {
@@ -50,41 +52,64 @@ public final class GraphStoreCatalog {
             if (userCatalog == null) {
                 userCatalog = new UserCatalog();
             }
-            userCatalog.set(config, graphStore);
+            userCatalog.set(
+                UserCatalog.UserCatalogKey.of(graphStore.databaseId(), config.graphName()),
+                config,
+                graphStore
+            );
             return userCatalog;
         });
     }
 
-    public static Optional<Graph> getUnion(String username, String graphName) {
-        return getUserCatalog(username).getUnion(graphName);
+    public static Optional<Graph> getUnion(String username, NamedDatabaseId databaseId, String graphName) {
+        return getUserCatalog(username).getUnion(UserCatalog.UserCatalogKey.of(databaseId, graphName));
     }
 
-    public static boolean exists(String username, String graphName) {
-        return getUserCatalog(username).exists(graphName);
+    public static boolean exists(String username, NamedDatabaseId databaseId, String graphName) {
+        return getUserCatalog(username).exists(UserCatalog.UserCatalogKey.of(databaseId, graphName));
     }
 
-    public static void remove(String username, String graphName, Consumer<GraphStoreWithConfig> removedGraphConsumer) {
+    public static void remove(
+        String username,
+        NamedDatabaseId databaseId,
+        String graphName,
+        Consumer<GraphStoreWithConfig> removedGraphConsumer
+    ) {
+        UserCatalog.UserCatalogKey userCatalogKey = UserCatalog.UserCatalogKey.of(databaseId, graphName);
+
         GraphStoreWithConfig graphStoreWithConfig = Optional
-            .ofNullable(getUserCatalog(username).remove(graphName))
-            .orElseThrow(failOnNonExistentGraph(graphName));
+            .ofNullable(getUserCatalog(username).remove(userCatalogKey))
+            .orElseThrow(failOnNonExistentGraph(userCatalogKey.graphName()));
 
         removedGraphConsumer.accept(graphStoreWithConfig);
-
         GraphStore graphStore = graphStoreWithConfig.graphStore();
         graphStore.canRelease(true);
         graphStore.release();
+
+        getUserCatalog(username).removeDegreeDistribution(userCatalogKey);
     }
 
     public static int graphStoresCount() {
-        return (int) userCatalogs
+        return userCatalogs
             .values()
             .stream()
-            .mapToLong(userCatalog -> userCatalog.getGraphStores().values().size())
+            .mapToInt(userCatalog -> userCatalog.getGraphStores().values().size())
             .sum();
     }
 
-    private static UserCatalog getUserCatalog(String username) {
-        return userCatalogs.getOrDefault(username, UserCatalog.EMPTY);
+    public static int graphStoresCount(NamedDatabaseId databaseId) {
+        return userCatalogs
+            .values()
+            .stream()
+            .mapToInt(userCatalog -> userCatalog.getGraphStores(databaseId).values().size())
+            .sum();
+    }
+    public static Optional<Map<String, Object>> getDegreeDistribution(String username, NamedDatabaseId databaseId, String graphName) {
+        return getUserCatalog(username).getDegreeDistribution(UserCatalog.UserCatalogKey.of(databaseId, graphName));
+    }
+
+    public static void setDegreeDistribution(String username, NamedDatabaseId databaseId, String graphName, Map<String, Object> degreeDistribution) {
+        getUserCatalog(username).setDegreeDistribution(UserCatalog.UserCatalogKey.of(databaseId, graphName), degreeDistribution);
     }
 
     public static void removeAllLoadedGraphs() {
@@ -95,6 +120,14 @@ public final class GraphStoreCatalog {
         return getUserCatalog(username).getGraphStores();
     }
 
+    public static Map<GraphCreateConfig, GraphStore> getGraphStores(String username, NamedDatabaseId databaseId) {
+        return getUserCatalog(username).getGraphStores(databaseId);
+    }
+
+    private static UserCatalog getUserCatalog(String username) {
+        return userCatalogs.getOrDefault(username, UserCatalog.EMPTY);
+    }
+
     private static Supplier<RuntimeException> failOnNonExistentGraph(String graphName) {
         return () -> new IllegalArgumentException(formatWithLocale(
             "Graph with name `%s` does not exist and can't be removed.",
@@ -102,18 +135,37 @@ public final class GraphStoreCatalog {
         ));
     }
 
-    private static class UserCatalog {
+    static class UserCatalog {
+
+        @ValueClass
+        public interface UserCatalogKey {
+
+            String graphName();
+
+            NamedDatabaseId namedDatabaseId();
+
+            static UserCatalogKey of(GraphCreateConfig createConfig, NamedDatabaseId databaseId) {
+                return of(databaseId, createConfig.graphName());
+            }
+
+            static UserCatalogKey of(NamedDatabaseId databaseId, String graphName) {
+                return ImmutableUserCatalogKey.of(graphName, databaseId);
+            }
+        }
 
         private static final UserCatalog EMPTY = new UserCatalog();
 
-        private final Map<String, GraphStoreWithConfig> graphsByName = new ConcurrentHashMap<>();
+        private final Map<UserCatalogKey, GraphStoreWithConfig> graphsByName = new ConcurrentHashMap<>();
 
-        void set(GraphCreateConfig config, GraphStore graphStore) {
+        private final Map<UserCatalogKey, Map<String, Object>> degreeDistributionByName = new ConcurrentHashMap<>();
+
+        private void set(UserCatalogKey userCatalogKey, GraphCreateConfig config, GraphStore graphStore) {
             if (config.graphName() == null || graphStore == null) {
                 throw new IllegalArgumentException("Both name and graph store must be not null");
             }
             GraphStoreWithConfig graphStoreWithConfig = ImmutableGraphStoreWithConfig.of(graphStore, config);
-            if (graphsByName.putIfAbsent(config.graphName(), graphStoreWithConfig) != null) {
+
+            if (graphsByName.putIfAbsent(userCatalogKey, graphStoreWithConfig) != null) {
                 throw new IllegalStateException(formatWithLocale(
                     "Graph name %s already loaded",
                     config.graphName()
@@ -122,12 +174,37 @@ public final class GraphStoreCatalog {
             graphStore.canRelease(false);
         }
 
-        GraphStoreWithConfig get(String graphName) {
-            if (graphsByName.containsKey(graphName)) {
-                return graphsByName.get(graphName);
-            } else {
-                throw new NoSuchElementException(formatWithLocale("Cannot find graph with name '%s'.", graphName));
+        private void setDegreeDistribution(UserCatalogKey userCatalogKey, Map<String, Object> degreeDistribution) {
+
+            if (userCatalogKey == null || degreeDistribution == null) {
+                throw new IllegalArgumentException("Both name and degreeDistribution must be not null");
             }
+            if (!graphsByName.containsKey(userCatalogKey)) {
+                throw new IllegalArgumentException(formatWithLocale(
+                    "Cannot set degreeDistribution because graph %s does not exist",
+                    userCatalogKey.graphName()
+                ));
+            }
+            degreeDistributionByName.put(userCatalogKey, degreeDistribution);
+        }
+
+        private void removeDegreeDistribution(UserCatalogKey userCatalogKey) {
+            degreeDistributionByName.remove(userCatalogKey);
+        }
+
+        private GraphStoreWithConfig get(UserCatalogKey userCatalogKey) {
+            if (graphsByName.containsKey(userCatalogKey)) {
+                return graphsByName.get(userCatalogKey);
+            } else {
+                throw new NoSuchElementException(formatWithLocale("Cannot find graph with name '%s'.", userCatalogKey.graphName()));
+            }
+        }
+
+        private Optional<Map<String, Object>> getDegreeDistribution(UserCatalogKey userCatalogKey) {
+            if (!graphsByName.containsKey(userCatalogKey)) {
+                return Optional.empty();
+            }
+            return Optional.ofNullable(degreeDistributionByName.get(userCatalogKey));
         }
 
         /**
@@ -135,29 +212,42 @@ public final class GraphStoreCatalog {
          * Each sub-graph has the same node set and represents a unique relationship type / property combination.
          * This method returns the union of all subgraphs refered to by the given name.
          */
-        Optional<Graph> getUnion(String graphName) {
-            return !exists(graphName) ? Optional.empty() : Optional.of(graphsByName.get(graphName).graphStore().getUnion());
+        private Optional<Graph> getUnion(UserCatalogKey userCatalogKey) {
+            return !exists(userCatalogKey) ? Optional.empty() : Optional.of(graphsByName.get(userCatalogKey).graphStore().getUnion());
         }
 
-        boolean exists(String graphName) {
-            return graphName != null && graphsByName.containsKey(graphName);
+        private boolean exists(UserCatalogKey userCatalogKey) {
+            return userCatalogKey != null && graphsByName.containsKey(userCatalogKey);
         }
 
         @Nullable
-        GraphStoreWithConfig remove(String graphName) {
-            if (!exists(graphName)) {
+        private GraphStoreWithConfig remove(UserCatalogKey userCatalogKey) {
+            if (!exists(userCatalogKey)) {
                 // remove is allowed to return null if the graph does not exist
                 // as it's being used by algo.graph.info or algo.graph.remove,
                 // that can deal with missing graphs
                 return null;
             }
-            return graphsByName.remove(graphName);
+            return graphsByName.remove(userCatalogKey);
         }
 
-        Map<GraphCreateConfig, GraphStore> getGraphStores() {
-            return graphsByName.values().stream().collect(Collectors.toMap(
-                GraphStoreWithConfig::config, GraphStoreWithConfig::graphStore
-            ));
+        private Map<GraphCreateConfig, GraphStore> getGraphStores() {
+            return graphsByName.values().stream()
+                .collect(Collectors.toMap(
+                    GraphStoreWithConfig::config,
+                    GraphStoreWithConfig::graphStore
+                    )
+                );
+        }
+
+        private Map<GraphCreateConfig, GraphStore> getGraphStores(NamedDatabaseId databaseId) {
+            return graphsByName.entrySet().stream()
+                .filter(entry -> entry.getKey().namedDatabaseId().equals(databaseId))
+                .collect(Collectors.toMap(
+                    entry -> entry.getValue().config(),
+                    entry -> entry.getValue().graphStore()
+                    )
+                );
         }
     }
 

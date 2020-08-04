@@ -27,9 +27,10 @@ import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.StoreLoaderBuilder;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.RelationshipConsumer;
+import org.neo4j.graphalgo.api.RelationshipCursor;
 import org.neo4j.graphalgo.api.RelationshipIterator;
 import org.neo4j.graphalgo.api.RelationshipWithPropertyConsumer;
-import org.neo4j.graphalgo.config.AlgoBaseConfig;
+import org.neo4j.graphalgo.config.ConcurrencyConfig;
 import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.huge.DirectIdMapping;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
@@ -44,6 +45,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.LongUnaryOperator;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,32 +78,42 @@ final class MultiSourceBFSTest extends AlgoTestBase {
         withGraph(
             DB_CYPHER,
             graph -> {
-                BfsWithPredecessorConsumer mock = mock(BfsWithPredecessorConsumer.class);
+                BfsConsumer bfsConsumerMock = mock(BfsConsumer.class);
+                BfsWithPredecessorConsumer bfsWithPredecessorConsumerMock = mock(BfsWithPredecessorConsumer.class);
                 MultiSourceBFS msbfs = MultiSourceBFS.predecessorProcessing(
                     graph,
-                    graph,
-                    (i, p, d, s) -> mock.accept(i + 1, p + 1, d, toList(s, x -> x + 1)),
+                    (i, d, s) -> bfsConsumerMock.accept(i + 1, d, toList(s, x -> x + 1)),
+                    (i, p, d, s) -> bfsWithPredecessorConsumerMock.accept(i + 1, p + 1, d, toList(s, x -> x + 1)),
                     AllocationTracker.EMPTY,
                     0, 1
                 );
 
-                msbfs.run(AlgoBaseConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
+                msbfs.run(ConcurrencyConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
 
-                verify(mock).accept(3, 1, 1, toList(1));
-                verify(mock).accept(3, 2, 1, toList(2));
-                verify(mock).accept(4, 1, 1, toList(1));
-                verify(mock).accept(4, 2, 1, toList(2));
+                verify(bfsConsumerMock).accept(1, 0, toList(1));
+                verify(bfsConsumerMock).accept(2, 0, toList(2));
+                verify(bfsConsumerMock).accept(3, 1, toList(1, 2));
+                verify(bfsConsumerMock).accept(4, 1, toList(1, 2));
+                verify(bfsConsumerMock).accept(1, 2, toList(2));
+                verify(bfsConsumerMock).accept(2, 2, toList(1));
+                verify(bfsConsumerMock).accept(5, 2, toList(1, 2));
+                verify(bfsConsumerMock).accept(6, 2, toList(1, 2));
 
-                verify(mock).accept(5, 3, 2, toList(1, 2));
-                verify(mock).accept(6, 4, 2, toList(1, 2));
+                verify(bfsWithPredecessorConsumerMock).accept(3, 1, 1, toList(1));
+                verify(bfsWithPredecessorConsumerMock).accept(3, 2, 1, toList(2));
+                verify(bfsWithPredecessorConsumerMock).accept(4, 1, 1, toList(1));
+                verify(bfsWithPredecessorConsumerMock).accept(4, 2, 1, toList(2));
 
-                verify(mock).accept(2, 3, 2, toList(1));
-                verify(mock).accept(2, 4, 2, toList(1));
+                verify(bfsWithPredecessorConsumerMock).accept(5, 3, 2, toList(1, 2));
+                verify(bfsWithPredecessorConsumerMock).accept(6, 4, 2, toList(1, 2));
 
-                verify(mock).accept(1, 3, 2, toList(2));
-                verify(mock).accept(1, 4, 2, toList(2));
+                verify(bfsWithPredecessorConsumerMock).accept(2, 3, 2, toList(1));
+                verify(bfsWithPredecessorConsumerMock).accept(2, 4, 2, toList(1));
 
-                verifyNoMoreInteractions(mock);
+                verify(bfsWithPredecessorConsumerMock).accept(1, 3, 2, toList(2));
+                verify(bfsWithPredecessorConsumerMock).accept(1, 4, 2, toList(2));
+
+                verifyNoMoreInteractions(bfsWithPredecessorConsumerMock);
             }
         );
     }
@@ -118,7 +130,7 @@ final class MultiSourceBFSTest extends AlgoTestBase {
                     0, 1
             );
 
-            msbfs.run(AlgoBaseConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
+            msbfs.run(ConcurrencyConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
 
             verify(mock).accept(3, 1, toList(1, 2));
             verify(mock).accept(4, 1, toList(1, 2));
@@ -136,12 +148,12 @@ final class MultiSourceBFSTest extends AlgoTestBase {
             BfsWithPredecessorConsumer mock = mock(BfsWithPredecessorConsumer.class);
             MultiSourceBFS msbfs = MultiSourceBFS.predecessorProcessing(
                 graph,
-                graph,
+                (i, d, s) -> {},
                 (i, p, d, s) -> mock.accept(i + 1, p + 1, d, toList(s, x -> x + 1)),
                 AllocationTracker.EMPTY
             );
 
-            msbfs.run(AlgoBaseConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
+            msbfs.run(ConcurrencyConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
 
             verify(mock).accept(1, 3, 1, toList(3));
             verify(mock).accept(1, 4, 1, toList(4));
@@ -193,7 +205,7 @@ final class MultiSourceBFSTest extends AlgoTestBase {
                     AllocationTracker.EMPTY
             );
 
-            msbfs.run(AlgoBaseConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
+            msbfs.run(ConcurrencyConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
 
             verify(mock).accept(1, 1, toList(3, 4));
             verify(mock).accept(2, 1, toList(3, 4));
@@ -265,7 +277,7 @@ final class MultiSourceBFSTest extends AlgoTestBase {
                                 }
                             },
                             AllocationTracker.EMPTY);
-                    msbfs.run(AlgoBaseConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
+                    msbfs.run(ConcurrencyConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
                 });
 
         for (int i = 0; i < maxNodes; i++) {
@@ -340,6 +352,11 @@ final class MultiSourceBFSTest extends AlgoTestBase {
             public boolean exists(final long sourceNodeId, final long targetNodeId) {
                 return false;
             }
+
+            @Override
+            public Stream<RelationshipCursor> streamRelationships(long nodeId, double fallbackValue) {
+                throw new UnsupportedOperationException(".streamRelationships is not implemented.");
+            }
         };
 
         final long[] sources = new long[sourceCount];
@@ -359,7 +376,7 @@ final class MultiSourceBFSTest extends AlgoTestBase {
                 },
                 AllocationTracker.EMPTY,
                 sources);
-        msbfs.run(AlgoBaseConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
+        msbfs.run(ConcurrencyConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT);
 
         for (int i = 0; i < seen.length; i++) {
             final int[] nodeSeen = seen[i];

@@ -21,6 +21,7 @@ package org.neo4j.graphalgo.core.loading;
 
 import com.carrotsearch.hppc.LongSet;
 import org.jetbrains.annotations.Nullable;
+import org.neo4j.graphalgo.compat.Neo4jProxy;
 import org.neo4j.graphalgo.core.SecureTransaction;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.RawValues;
@@ -33,16 +34,17 @@ import org.neo4j.kernel.api.KernelTransaction;
 import java.util.Collection;
 import java.util.Collections;
 
-final class NodesScanner extends StatementAction implements RecordScanner {
+public final class NodesScanner extends StatementAction implements RecordScanner {
 
-    static InternalImporter.CreateScanner of(
+    public static InternalImporter.CreateScanner of(
         SecureTransaction tx,
         StoreScanner<NodeReference> scanner,
         LongSet labels,
         ProgressLogger progressLogger,
         NodeImporter importer,
         @Nullable NativeNodePropertyImporter nodePropertyImporter,
-        TerminationFlag terminationFlag) {
+        TerminationFlag terminationFlag
+    ) {
         return new NodesScanner.Creator(
                 tx,
                 scanner,
@@ -140,6 +142,8 @@ final class NodesScanner extends StatementAction implements RecordScanner {
     public void accept(KernelTransaction transaction) {
         Read read = transaction.dataRead();
         CursorFactory cursors = transaction.cursors();
+        var cursorTracer = transaction.pageCursorTracer();
+        var memoryTracker = Neo4jProxy.memoryTracker(transaction);
         try (StoreScanner.ScanCursor<NodeReference> cursor = scanner.getCursor(transaction)) {
             NodesBatchBuffer batches = new NodesBatchBufferBuilder()
                 .nodeLabelIds(labels)
@@ -149,7 +153,14 @@ final class NodesScanner extends StatementAction implements RecordScanner {
                 .build();
             while (batches.scan(cursor)) {
                 terminationFlag.assertRunning();
-                long imported = importer.importNodes(batches, read, cursors, nodePropertyImporter);
+                long imported = importer.importNodes(
+                    batches,
+                    read,
+                    cursors,
+                    cursorTracer,
+                    memoryTracker,
+                    nodePropertyImporter
+                );
                 int batchImportedNodes = RawValues.getHead(imported);
                 int batchImportedProperties = RawValues.getTail(imported);
                 progressLogger.logProgress(batchImportedNodes);

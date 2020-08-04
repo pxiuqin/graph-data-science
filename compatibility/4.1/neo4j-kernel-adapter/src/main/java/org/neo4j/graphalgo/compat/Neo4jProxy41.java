@@ -19,6 +19,7 @@
  */
 package org.neo4j.graphalgo.compat;
 
+import org.eclipse.collections.api.factory.Sets;
 import org.neo4j.configuration.Config;
 import org.neo4j.configuration.ExternalSettings;
 import org.neo4j.dbms.api.DatabaseManagementService;
@@ -53,6 +54,7 @@ import org.neo4j.io.pagecache.PageCursor;
 import org.neo4j.io.pagecache.PagedFile;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
 import org.neo4j.io.pagecache.tracing.cursor.PageCursorTracer;
+import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.query.ExecutingQuery;
 import org.neo4j.kernel.impl.store.NodeLabelsField;
 import org.neo4j.kernel.impl.store.NodeStore;
@@ -63,16 +65,26 @@ import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.store.record.RecordLoad;
 import org.neo4j.kernel.impl.transaction.log.files.TransactionLogInitializer;
+import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.logging.FormattedLog;
+import org.neo4j.logging.Level;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.internal.LogService;
+import org.neo4j.logging.internal.StoreLogService;
 import org.neo4j.memory.EmptyMemoryTracker;
 import org.neo4j.memory.MemoryTracker;
 import org.neo4j.scheduler.JobScheduler;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.lang.invoke.MethodHandles;
+import java.nio.file.OpenOption;
+import java.nio.file.Path;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 public final class Neo4jProxy41 implements Neo4jProxyApi {
 
@@ -126,6 +138,21 @@ public final class Neo4jProxy41 implements Neo4jProxyApi {
     }
 
     @Override
+    public PagedFile pageCacheMap(
+        PageCache pageCache,
+        File file,
+        int pageSize,
+        OpenOption... openOptions
+    ) throws IOException {
+        return pageCache.map(file, pageSize, Sets.immutable.of(openOptions));
+    }
+
+    @Override
+    public Path pagedFile(PagedFile pagedFile) {
+        return pagedFile.file().toPath();
+    }
+
+    @Override
     public PropertyCursor allocatePropertyCursor(CursorFactory cursorFactory, PageCursorTracer cursorTracer, MemoryTracker memoryTracker) {
         return cursorFactory.allocatePropertyCursor(cursorTracer, memoryTracker);
     }
@@ -156,6 +183,11 @@ public final class Neo4jProxy41 implements Neo4jProxyApi {
     }
 
     @Override
+    public CompositeNodeCursor compositeNodeCursor(List<NodeLabelIndexCursor> cursors, int[] labelIds) {
+        return new CompositeNodeCursor41(cursors, labelIds);
+    }
+
+    @Override
     public OffHeapLongArray newOffHeapLongArray(long length, long defaultValue, long base) {
         return new OffHeapLongArray(length, defaultValue, base, EmptyMemoryTracker.INSTANCE);
     }
@@ -163,6 +195,30 @@ public final class Neo4jProxy41 implements Neo4jProxyApi {
     @Override
     public LongArray newChunkedLongArray(NumberArrayFactory numberArrayFactory, int size, long defaultValue) {
         return numberArrayFactory.newLongArray(size, defaultValue, EmptyMemoryTracker.INSTANCE);
+    }
+
+    @Override
+    public MemoryTracker memoryTracker(KernelTransaction kernelTransaction) {
+        return kernelTransaction.memoryTracker();
+    }
+
+    @Override
+    public LogService logProviderForStoreAndRegister(
+        Path storeLogPath,
+        FileSystemAbstraction fs,
+        LifeSupport lifeSupport
+    ) throws IOException {
+        return lifeSupport.add(StoreLogService.withInternalLog(storeLogPath.toFile()).build(fs));
+    }
+
+    @Override
+    public Path metadataStore(DatabaseLayout databaseLayout) {
+        return databaseLayout.metadataStore().toPath();
+    }
+
+    @Override
+    public Path homeDirectory(DatabaseLayout databaseLayout) {
+        return databaseLayout.getNeo4jLayout().homeDirectory().toPath();
     }
 
     @Override
@@ -212,10 +268,36 @@ public final class Neo4jProxy41 implements Neo4jProxyApi {
     }
 
     @Override
-    public Log toPrintWriter(FormattedLog.Builder builder, PrintWriter writer) {
-        return builder.toPrintWriter(() -> writer);
+    public Log logger(
+        Level level,
+        ZoneId zoneId,
+        DateTimeFormatter dateTimeFormatter,
+        String category,
+        PrintWriter writer
+    ) {
+        return FormattedLog
+            .withLogLevel(level)
+            .withZoneId(zoneId)
+            .withDateTimeFormatter(dateTimeFormatter)
+            .withCategory(category)
+            .toPrintWriter(() -> writer);
     }
 
+    @Override
+    public Log logger(
+        Level level,
+        ZoneId zoneId,
+        DateTimeFormatter dateTimeFormatter,
+        String category,
+        OutputStream outputStream
+    ) {
+        return FormattedLog
+            .withLogLevel(level)
+            .withZoneId(zoneId)
+            .withDateTimeFormatter(dateTimeFormatter)
+            .withCategory(category)
+            .toOutputStream(() -> outputStream);
+    }
 
     @Override
     public Setting<Boolean> onlineBackupEnabled() {

@@ -37,14 +37,16 @@ public interface GraphCreateConfig extends BaseConfig {
     String IMPLICIT_GRAPH_NAME = "";
     String NODECOUNT_KEY = "nodeCount";
     String RELCOUNT_KEY = "relationshipCount";
+    String READ_CONCURRENCY_KEY = "readConcurrency";
 
     @Configuration.Parameter
     String graphName();
 
     @Value.Default
     @Value.Parameter(false)
+    @Configuration.Key(READ_CONCURRENCY_KEY)
     default int readConcurrency() {
-        return AlgoBaseConfig.DEFAULT_CONCURRENCY;
+        return ConcurrencyConfig.DEFAULT_CONCURRENCY;
     }
 
     @Value.Default
@@ -76,6 +78,14 @@ public interface GraphCreateConfig extends BaseConfig {
     @Configuration.Ignore
     GraphStoreFactory.Supplier graphStoreFactory();
 
+    @Value.Check
+    default void validateReadConcurrency() {
+        ConcurrencyConfig.validateConcurrency(readConcurrency(), READ_CONCURRENCY_KEY);
+    }
+
+    @Configuration.Ignore
+    <R> R accept(Cases<R> visitor);
+
     static GraphCreateConfig createImplicit(String username, CypherMapWrapper config) {
         CypherMapWrapper.PairResult result = config.verifyMutuallyExclusivePairs(
             NODE_PROJECTION_KEY,
@@ -88,6 +98,63 @@ public interface GraphCreateConfig extends BaseConfig {
             return GraphCreateFromStoreConfig.fromProcedureConfig(username, config);
         } else {
             return GraphCreateFromCypherConfig.fromProcedureConfig(username, config);
+        }
+    }
+
+    interface Cases<R> {
+        R store(GraphCreateFromStoreConfig storeConfig);
+
+        R cypher(GraphCreateFromCypherConfig cypherConfig);
+
+        R random(RandomGraphGeneratorConfig randomGraphConfig);
+    }
+
+    interface Visitor extends Cases<Void> {
+
+        @Override
+        default Void store(GraphCreateFromStoreConfig storeConfig) {
+            visit(storeConfig);
+            return null;
+        };
+
+        @Override
+        default Void cypher(GraphCreateFromCypherConfig cypherConfig) {
+            visit(cypherConfig);
+            return null;
+        };
+
+        @Override
+        default Void random(RandomGraphGeneratorConfig randomGraphConfig) {
+            visit(randomGraphConfig);
+            return null;
+        };
+
+        default void visit(GraphCreateFromStoreConfig storeConfig) {}
+
+        default void visit(GraphCreateFromCypherConfig cypherConfig) {}
+
+        default void visit(RandomGraphGeneratorConfig randomGraphConfig) {}
+    }
+
+    interface Rewriter extends Cases<GraphCreateConfig> {
+
+        @Override
+        default GraphCreateConfig store(GraphCreateFromStoreConfig storeConfig) {
+            return storeConfig;
+        }
+
+        @Override
+        default GraphCreateConfig cypher(GraphCreateFromCypherConfig cypherConfig) {
+            return cypherConfig;
+        }
+
+        @Override
+        default GraphCreateConfig random(RandomGraphGeneratorConfig randomGraphConfig) {
+            return randomGraphConfig;
+        }
+
+        default GraphCreateConfig apply(GraphCreateConfig config) {
+            return config.accept(this);
         }
     }
 }

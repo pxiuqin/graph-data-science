@@ -40,8 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.neo4j.graphalgo.Orientation.REVERSE;
-import static org.neo4j.graphalgo.TestGraph.Builder.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 public class NodeSimilarityWriteProcTest extends NodeSimilarityProcTest<NodeSimilarityWriteConfig> {
@@ -119,7 +119,7 @@ public class NodeSimilarityWriteProcTest extends NodeSimilarityProcTest<NodeSimi
 
         runQuery(loadQuery);
 
-        Graph simGraph = GraphStoreCatalog.getUnion(getUsername(), resultGraphName).orElse(null);
+        Graph simGraph = GraphStoreCatalog.getUnion(getUsername(), namedDatabaseId(), resultGraphName).orElse(null);
         assertNotNull(simGraph);
         assertGraphEquals(
             orientation == REVERSE

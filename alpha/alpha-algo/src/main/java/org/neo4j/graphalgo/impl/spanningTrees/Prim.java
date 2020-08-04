@@ -19,14 +19,13 @@
  */
 package org.neo4j.graphalgo.impl.spanningTrees;
 
+import com.carrotsearch.hppc.BitSet;
 import com.carrotsearch.hppc.IntDoubleMap;
 import com.carrotsearch.hppc.IntDoubleScatterMap;
 import org.neo4j.graphalgo.Algorithm;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.IdMapping;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
-import org.neo4j.graphalgo.core.utils.container.SimpleBitSet;
-import org.neo4j.graphalgo.core.utils.container.UndirectedTree;
 import org.neo4j.graphalgo.core.utils.queue.SharedIntPriorityQueue;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 
@@ -41,7 +40,8 @@ import static org.neo4j.graphalgo.core.heavyweight.Converters.longToIntConsumer;
  * The algorithm computes the MST by traversing all nodes from a given
  * startNodeId. It aggregates all transitions into a MinPriorityQueue
  * and visits each (unvisited) connected node by following only the
- * cheapest transition and adding it to a specialized form of {@link UndirectedTree}.
+ * cheapest transition and adding it to a specialized form of
+ * {@link org.neo4j.graphalgo.core.utils.container.UndirectedTree}.
  * <p>
  * The algorithm also computes the minimum, maximum and sum of all
  * weights in the MST.
@@ -73,20 +73,20 @@ public class Prim extends Algorithm<Prim, SpanningTree> {
                 cost,
                 Double.MAX_VALUE);
         ProgressLogger logger = getProgressLogger();
-        SimpleBitSet visited = new SimpleBitSet(nodeCount);
+        BitSet visited = new BitSet(nodeCount);
         Arrays.fill(parent, -1);
         cost.put(startNodeId, 0.0);
         queue.add(startNodeId, -1.0);
         int effectiveNodeCount = 0;
         while (!queue.isEmpty() && running()) {
             int node = queue.pop();
-            if (visited.contains(node)) {
+            if (visited.get(node)) {
                 continue;
             }
             effectiveNodeCount++;
-            visited.put(node);
+            visited.set(node);
             graph.forEachRelationship(node, 0.0D, longToIntConsumer((s, t, w) -> {
-                if (visited.contains(t)) {
+                if (visited.get(t)) {
                     return true;
                 }
                 // invert weight to calculate maximum

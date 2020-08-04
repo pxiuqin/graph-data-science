@@ -31,7 +31,7 @@ import static org.neo4j.graphalgo.core.loading.ZigZagLongDecoding.zigZagUncompre
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfByteArray;
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfDoubleArray;
 
-final class CompressedLongArray {
+public final class CompressedLongArray {
 
     private static final byte[] EMPTY_BYTES = new byte[0];
 
@@ -42,23 +42,24 @@ final class CompressedLongArray {
     private long lastValue;
     private int length;
 
-    CompressedLongArray(AllocationTracker tracker) {
+    public CompressedLongArray(AllocationTracker tracker) {
         this(tracker, 0);
     }
 
-    CompressedLongArray(AllocationTracker tracker, int numberOfProperties) {
+    public CompressedLongArray(AllocationTracker tracker, int numberOfProperties) {
         this.tracker = tracker;
         storage = EMPTY_BYTES;
         weights = new long[numberOfProperties][0];
     }
 
     /**
+     * For memory efficiency, we reuse the {@code values}. They cannot be reused after calling this method.
+     *
      * @param values values to write
      * @param start  start index in values
      * @param end    end index in values
-     * @implNote For memory efficiency, we reuse the {@code values}. They cannot be reused after calling this method.
      */
-    void add(long[] values, int start, int end) {
+    public void add(long[] values, int start, int end) {
         // not inlined to avoid field access
         long currentLastValue = this.lastValue;
         long delta;
@@ -79,13 +80,14 @@ final class CompressedLongArray {
     }
 
     /**
+     * For memory efficiency, we reuse the {@code values}. They cannot be reused after calling this method.
+     *
      * @param values        values to write
      * @param allWeights    weights to write
      * @param start         start index in values and weights
      * @param end           end index in values and weights
-     * @implNote For memory efficiency, we reuse the {@code values}. They cannot be reused after calling this method.
      */
-    void add(long[] values, long[][] allWeights, int start, int end) {
+    public void add(long[] values, long[][] allWeights, int start, int end) {
         // write weights
         for (int i = 0; i < allWeights.length; i++) {
             long[] weights = allWeights[i];
@@ -120,16 +122,16 @@ final class CompressedLongArray {
         }
     }
 
-    int length() {
+    public int length() {
         return length;
     }
 
-    int uncompress(long[] into) {
+    public int uncompress(long[] into) {
         assert into.length >= length;
         return zigZagUncompress(storage, pos, into);
     }
 
-    byte[] storage() {
+    public byte[] storage() {
         return storage;
     }
 
@@ -137,11 +139,11 @@ final class CompressedLongArray {
         return weights;
     }
 
-    boolean hasWeights() {
+    public boolean hasWeights() {
         return weights != null && !(weights.length == 0);
     }
 
-    void release() {
+    public void release() {
         if (storage.length > 0) {
             tracker.remove(sizeOfByteArray(storage.length));
             tracker.remove(sizeOfDoubleArray(weights.length));

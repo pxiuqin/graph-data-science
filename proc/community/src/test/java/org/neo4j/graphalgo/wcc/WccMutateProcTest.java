@@ -24,20 +24,20 @@ import org.neo4j.graphalgo.AlgoBaseProc;
 import org.neo4j.graphalgo.GdsCypher;
 import org.neo4j.graphalgo.MutateNodePropertyTest;
 import org.neo4j.graphalgo.StoreLoaderBuilder;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.compat.MapUtil;
 import org.neo4j.graphalgo.core.Aggregation;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
 import org.neo4j.graphalgo.core.utils.paged.dss.DisjointSetStruct;
-import org.neo4j.values.storable.NumberType;
 
 import java.util.Optional;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.lessThan;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.neo4j.graphalgo.TestGraph.Builder.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 
 class WccMutateProcTest extends WccProcTest<WccMutateConfig> implements MutateNodePropertyTest<Wcc, WccMutateConfig, DisjointSetStruct> {
 
@@ -47,8 +47,8 @@ class WccMutateProcTest extends WccProcTest<WccMutateConfig> implements MutateNo
     }
 
     @Override
-    public NumberType mutatePropertyType() {
-        return NumberType.INTEGRAL;
+    public ValueType mutatePropertyType() {
+        return ValueType.LONG;
     }
 
     @Override

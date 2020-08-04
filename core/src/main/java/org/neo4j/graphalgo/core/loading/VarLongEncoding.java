@@ -21,7 +21,7 @@ package org.neo4j.graphalgo.core.loading;
 
 public final class VarLongEncoding {
 
-    static int encodeVLongs(long[] values, int limit, byte[] out, int into) {
+    public static int encodeVLongs(long[] values, int limit, byte[] out, int into) {
         return encodeVLongs(values, 0, limit, out, into);
     }
 
@@ -127,7 +127,7 @@ public final class VarLongEncoding {
         }
     }
 
-    static long zigZag(final long value) {
+    public static long zigZag(final long value) {
         return (value >> 63) ^ (value << 1);
     }
 

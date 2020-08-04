@@ -19,34 +19,56 @@
  */
 package org.neo4j.graphalgo.api;
 
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
-import org.neo4j.values.storable.NumberType;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
+import org.neo4j.values.storable.Value;
 
 import java.util.OptionalLong;
 
 //节点属性信息描述
-@FunctionalInterface
 public interface NodeProperties {
 
-    /**
-     * Returns the property value for a node or the loaded default value if no property has been defined.
-     */
-    double nodeProperty(long nodeId);
-
-    /**
-     * Returns the property value for a node or the given default value if no property had been defined.
-     * The default value has precedence over the default value defined by the loader.
-     */
-    default double nodeProperty(long nodeId, double defaultValue) {
-        return nodeProperty(nodeId);
+    default double getDouble(long nodeId) {
+        throw new UnsupportedOperationException("double is not supported");
     }
 
-    /**
-     * @return the maximum value contained in the mapping or an empty {@link OptionalLong} if the mapping is
-     *         empty or the feature is not supported.
-     */
-    default OptionalLong getMaxPropertyValue() {
-        return OptionalLong.empty();
+    default long getLong(long nodeId) {
+        throw new UnsupportedOperationException("long is not supported");
+    };
+
+    default double[] getDoubleArray(long nodeId) {
+        throw new UnsupportedOperationException("double[] is not supported");
+    }
+
+    default long[] getLongArray(long nodeId) {
+        throw new UnsupportedOperationException("long[] is not supported");
+    }
+
+    default Object getObject(long nodeId) {
+        return getDouble(nodeId);
+    }
+
+    ValueType getType();
+
+    Value getValue(long nodeId);
+
+    default double getDouble(long nodeId, double defaultValue) {
+        return getDouble(nodeId);
+    }
+
+    default long getLong(long nodeId, long defaultValue) {
+        return getLong(nodeId);
+    }
+
+    default double[] getDoubleArray(long nodeId, double[] defaultValue) {
+        return getDoubleArray(nodeId);
+    }
+
+    default long[] getLongArray(long nodeId, long[] defaultValue) {
+        return getLongArray(nodeId);
+    }
+
+    default Object getObject(long nodeId, Object defaultValue) {
+        return getObject(nodeId);
     }
 
     /**
@@ -65,13 +87,32 @@ public interface NodeProperties {
         return 0;
     }
 
-    static PropertyTranslator<NodeProperties> translatorFor(NumberType numberType) {
-        if (numberType == NumberType.FLOATING_POINT) {
-            return (PropertyTranslator.OfDouble<NodeProperties>) NodeProperties::nodeProperty;
-        } else if (numberType == NumberType.INTEGRAL) {
-            return (PropertyTranslator.OfLong<NodeProperties>) (data, nodeId) -> (long) data.nodeProperty(nodeId);
-        } else {
-            throw new UnsupportedOperationException("Can not provide a property translator for non-numeric types.");
-        }
+    //------------- Old Interface
+
+    /**
+     * Returns the property value for a node or the loaded default value if no property has been defined.
+     */
+    @Deprecated
+    default double nodeProperty(long nodeId) {
+        return getDouble(nodeId);
+    };
+
+    /**
+     * Returns the property value for a node or the given default value if no property had been defined.
+     * The default value has precedence over the default value defined by the loader.
+     */
+    @Deprecated
+    default double nodeProperty(long nodeId, double defaultValue) {
+        return getDouble(nodeId, defaultValue);
     }
+
+    /**
+     * @return the maximum value contained in the mapping or an empty {@link OptionalLong} if the mapping is
+     *         empty or the feature is not supported.
+     */
+    @Deprecated
+    default OptionalLong getMaxPropertyValue() {
+        return OptionalLong.empty();
+    }
+
 }

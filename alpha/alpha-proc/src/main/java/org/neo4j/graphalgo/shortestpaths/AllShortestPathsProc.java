@@ -22,16 +22,13 @@ package org.neo4j.graphalgo.shortestpaths;
 import org.neo4j.graphalgo.AlgoBaseProc;
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.AlphaAlgorithmFactory;
-import org.neo4j.graphalgo.api.Graph;
+import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.utils.TerminationFlag;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.impl.msbfs.MSBFSASPAlgorithm;
 import org.neo4j.graphalgo.impl.msbfs.MSBFSAllShortestPaths;
 import org.neo4j.graphalgo.impl.msbfs.WeightedAllShortestPaths;
-import org.neo4j.graphalgo.config.GraphCreateConfig;
-import org.neo4j.logging.Log;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
@@ -74,31 +71,23 @@ public class AllShortestPathsProc extends AlgoBaseProc<MSBFSASPAlgorithm, Stream
     }
 
     @Override
-    protected AlgorithmFactory<MSBFSASPAlgorithm, AllShortestPathsConfig> algorithmFactory(AllShortestPathsConfig config) {
-        return new AlphaAlgorithmFactory<MSBFSASPAlgorithm, AllShortestPathsConfig>() {
-            @Override
-            public MSBFSASPAlgorithm buildAlphaAlgo(
-                Graph graph,
-                AllShortestPathsConfig configuration,
-                AllocationTracker tracker,
-                Log log
-            ) {
-                if (config.relationshipWeightProperty() != null) {
-                    return new WeightedAllShortestPaths(
-                        graph,
-                        Pools.DEFAULT,
-                        configuration.concurrency()
-                    )
-                        .withTerminationFlag(TerminationFlag.wrap(transaction));
-                } else {
-                    return new MSBFSAllShortestPaths(
-                        graph,
-                        tracker,
-                        configuration.concurrency(),
-                        Pools.DEFAULT
-                    )
-                        .withTerminationFlag(TerminationFlag.wrap(transaction));
-                }
+    protected AlgorithmFactory<MSBFSASPAlgorithm, AllShortestPathsConfig> algorithmFactory() {
+        return (AlphaAlgorithmFactory<MSBFSASPAlgorithm, AllShortestPathsConfig>) (graph, configuration, tracker, log) -> {
+            if (configuration.relationshipWeightProperty() != null) {
+                return new WeightedAllShortestPaths(
+                    graph,
+                    Pools.DEFAULT,
+                    configuration.concurrency()
+                )
+                    .withTerminationFlag(TerminationFlag.wrap(transaction));
+            } else {
+                return new MSBFSAllShortestPaths(
+                    graph,
+                    tracker,
+                    configuration.concurrency(),
+                    Pools.DEFAULT
+                )
+                    .withTerminationFlag(TerminationFlag.wrap(transaction));
             }
         };
     }

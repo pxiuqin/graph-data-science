@@ -36,6 +36,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.hamcrest.core.Is.isA;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.neo4j.graphalgo.compat.MapUtil.map;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
@@ -94,24 +95,14 @@ class GraphDropProcTest extends BaseProcTest {
                     "relationshipQuery", null,
                     "nodeCount", 2L,
                     "relationshipCount", 1L,
-                    "degreeDistribution", map(
-                        "min", 0L,
-                        "mean", 0.5D,
-                        "max", 1L,
-                        "p50", 0L,
-                        "p75", 1L,
-                        "p90", 1L,
-                        "p95", 1L,
-                        "p99", 1L,
-                        "p999", 1L
-                    ),
                     "creationTime", isA(ZonedDateTime.class),
                     "modificationTime", isA(ZonedDateTime.class),
                     "memoryUsage", isA(String.class),
                     "sizeInBytes", isA(Long.class),
                     "schema", map(
                         "nodes", map("A", emptyMap()),
-                        "relationships", map("REL", emptyMap()))
+                        "relationships", map("REL", emptyMap())
+                    )
                 )
             )
         );
@@ -125,50 +116,16 @@ class GraphDropProcTest extends BaseProcTest {
         );
     }
 
-
     @Test
-    void dropWithDegreeDistributionComputationOptOut() {
+    void shouldNotReturnDegreeDistribution() {
         runQuery("CALL gds.graph.create($name, 'A', 'REL')", map("name", GRAPH_NAME));
 
-        assertCypherResult(
-            "CALL gds.graph.exists($graphName)",
+        runQueryWithResultConsumer(
+            "CALL gds.graph.drop($graphName)",
             map("graphName", GRAPH_NAME),
-            singletonList(
-                map("graphName", GRAPH_NAME, "exists", true)
-            )
-        );
-
-        assertCypherResult(
-            "CALL gds.graph.drop($graphName) " +
-            "YIELD graphName, nodeProjection, relationshipProjection, nodeCount, relationshipCount",
-            map("graphName", GRAPH_NAME),
-            singletonList(
-                map(
-                    "graphName", GRAPH_NAME,
-                    "nodeProjection", map(
-                        "A", map(
-                            "label", "A",
-                            "properties", emptyMap()
-                        )
-                    ),
-                    "relationshipProjection", map(
-                        "REL", map(
-                            "type", "REL",
-                            "orientation", "NATURAL",
-                            "aggregation", "DEFAULT",
-                            "properties", emptyMap()
-                        )),
-                    "nodeCount", 2L,
-                    "relationshipCount", 1L
-                )
-            )
-        );
-
-        assertCypherResult(
-            "CALL gds.graph.exists($graphName)",
-            map("graphName", GRAPH_NAME),
-            singletonList(
-                map("graphName", GRAPH_NAME, "exists", false)
+            result -> assertFalse(
+                result.columns().contains("degreeDistribution"),
+                "The result should not contain `degreeDistribution` field"
             )
         );
     }
@@ -200,7 +157,8 @@ class GraphDropProcTest extends BaseProcTest {
             map("nodeCount", 4L, "relationshipCount", 2L, "graphName", GRAPH_NAME)
         );
 
-        assertCypherResult("CALL gds.graph.list($name) YIELD nodeCount, relationshipCount, graphName",
+        assertCypherResult(
+            "CALL gds.graph.list($name) YIELD nodeCount, relationshipCount, graphName",
             singletonMap("name", GRAPH_NAME),
             expectedGraphInfo
         );

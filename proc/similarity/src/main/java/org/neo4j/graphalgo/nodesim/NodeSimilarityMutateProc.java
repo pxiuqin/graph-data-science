@@ -24,6 +24,8 @@ import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.MutateProc;
 import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.RelationshipType;
+import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.api.Relationships;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.Aggregation;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
@@ -31,7 +33,6 @@ import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.huge.HugeGraph;
 import org.neo4j.graphalgo.core.loading.HugeGraphUtil;
 import org.neo4j.graphalgo.core.utils.ProgressTimer;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.procedure.Description;
@@ -81,14 +82,12 @@ public class NodeSimilarityMutateProc extends MutateProc<NodeSimilarity, NodeSim
     }
 
     @Override
-    protected AlgorithmFactory<NodeSimilarity, NodeSimilarityMutateConfig> algorithmFactory(
-        NodeSimilarityMutateConfig config
-    ) {
+    protected AlgorithmFactory<NodeSimilarity, NodeSimilarityMutateConfig> algorithmFactory() {
         return new NodeSimilarityFactory<>();
     }
 
     @Override
-    protected PropertyTranslator<NodeSimilarityResult> nodePropertyTranslator(
+    protected NodeProperties getNodeProperties(
         ComputationResult<NodeSimilarity, NodeSimilarityResult, NodeSimilarityMutateConfig> computationResult
     ) {
         throw new UnsupportedOperationException("NodeSimilarity does not mutate node properties.");
@@ -105,51 +104,53 @@ public class NodeSimilarityMutateProc extends MutateProc<NodeSimilarity, NodeSim
     public Stream<MutateResult> mutate(
         ComputationResult<NodeSimilarity, NodeSimilarityResult, NodeSimilarityMutateConfig> computationResult
     ) {
-        NodeSimilarityMutateConfig config = computationResult.config();
+        return runWithExceptionLogging("Graph mutation failed", () -> {
+            NodeSimilarityMutateConfig config = computationResult.config();
 
-        if (computationResult.isGraphEmpty()) {
-            return Stream.of(
-                new MutateResult(
-                    computationResult.createMillis(),
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    Collections.emptyMap(),
-                    config.toMap()
-                )
-            );
-        }
-
-        NodeSimilarityProc.NodeSimilarityResultBuilder<MutateResult> resultBuilder =
-            NodeSimilarityProc.resultBuilder(new MutateResult.Builder(), computationResult);
-
-        try (ProgressTimer ignored = ProgressTimer.start(resultBuilder::withMutateMillis)) {
-            HugeGraph.Relationships resultRelationships = getRelationships(
-                computationResult,
-                computationResult.result().graphResult(),
-                resultBuilder
-            );
-
-            computationResult
-                .graphStore()
-                .addRelationshipType(
-                    RelationshipType.of(config.mutateRelationshipType()),
-                    Optional.of(config.mutateProperty()),
-                    Optional.of(NumberType.FLOATING_POINT),
-                    resultRelationships
+            if (computationResult.isGraphEmpty()) {
+                return Stream.of(
+                    new MutateResult(
+                        computationResult.createMillis(),
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        Collections.emptyMap(),
+                        config.toMap()
+                    )
                 );
-        }
-        return Stream.of(resultBuilder.build());
+            }
+
+            NodeSimilarityProc.NodeSimilarityResultBuilder<MutateResult> resultBuilder =
+                NodeSimilarityProc.resultBuilder(new MutateResult.Builder(), computationResult);
+
+            try (ProgressTimer ignored = ProgressTimer.start(resultBuilder::withMutateMillis)) {
+                Relationships resultRelationships = getRelationships(
+                    computationResult,
+                    computationResult.result().graphResult(),
+                    resultBuilder
+                );
+
+                computationResult
+                    .graphStore()
+                    .addRelationshipType(
+                        RelationshipType.of(config.mutateRelationshipType()),
+                        Optional.of(config.mutateProperty()),
+                        Optional.of(NumberType.FLOATING_POINT),
+                        resultRelationships
+                    );
+            }
+            return Stream.of(resultBuilder.build());
+        });
     }
 
-    private HugeGraph.Relationships getRelationships(
+    private Relationships getRelationships(
         ComputationResult<NodeSimilarity, NodeSimilarityResult, NodeSimilarityMutateConfig> computationResult,
         SimilarityGraphResult similarityGraphResult,
         NodeSimilarityProc.NodeSimilarityResultBuilder<MutateResult> resultBuilder
     ) {
-        HugeGraph.Relationships resultRelationships;
+        Relationships resultRelationships;
 
         if (similarityGraphResult.isTopKGraph()) {
             TopKGraph topKGraph = (TopKGraph) similarityGraphResult.similarityGraph();

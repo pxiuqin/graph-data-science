@@ -21,6 +21,7 @@ package org.neo4j.graphalgo.gdl;
 
 import org.immutables.value.Value;
 import org.neo4j.graphalgo.Orientation;
+import org.neo4j.graphalgo.annotation.Configuration;
 import org.neo4j.graphalgo.annotation.ValueClass;
 import org.neo4j.graphalgo.api.GraphStoreFactory;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
@@ -29,7 +30,6 @@ import org.neo4j.graphalgo.config.GraphCreateConfig;
 @SuppressWarnings("immutables:subtype")
 public interface GraphCreateFromGdlConfig extends GraphCreateConfig {
 
-    @Value
     String gdlGraph();
 
     @Value.Default
@@ -39,6 +39,20 @@ public interface GraphCreateFromGdlConfig extends GraphCreateConfig {
 
     @Override
     default GraphStoreFactory.Supplier graphStoreFactory() {
-        return loaderContext -> GdlFactory.of(this);
+        return loaderContext -> GdlFactory.of(this, loaderContext.api().databaseId());
+    }
+
+    @Override
+    @Configuration.Ignore
+    default <R> R accept(GraphCreateConfig.Cases<R> cases) {
+        if (cases instanceof Cases) {
+            return ((Cases<R>) cases).gdl(this);
+        }
+        throw new IllegalArgumentException("Expected Visitor of type " + Cases.class.getName());
+    }
+
+    interface Cases<R> extends GraphCreateConfig.Cases<R> {
+
+        R gdl(GraphCreateFromGdlConfig gdlConfig);
     }
 }

@@ -21,9 +21,10 @@ package org.neo4j.graphalgo.api;
 
 import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.RelationshipType;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.api.schema.GraphStoreSchema;
-import org.neo4j.graphalgo.core.huge.HugeGraph;
 import org.neo4j.graphalgo.core.loading.DeletionResult;
+import org.neo4j.kernel.database.NamedDatabaseId;
 import org.neo4j.values.storable.NumberType;
 
 import java.time.ZonedDateTime;
@@ -31,6 +32,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -42,6 +44,8 @@ public interface GraphStore {
     enum PropertyState {
         PERSISTENT, TRANSIENT
     }
+
+    NamedDatabaseId databaseId();
 
     GraphStoreSchema schema();
 
@@ -56,8 +60,6 @@ public interface GraphStore {
     Set<String> nodePropertyKeys(NodeLabel label);
 
     Map<NodeLabel, Set<String>> nodePropertyKeys();
-
-    long nodePropertyCount();
 
     boolean hasNodeProperty(Collection<NodeLabel> labels, String propertyKey);
 
@@ -75,7 +77,7 @@ public interface GraphStore {
         return result;
     }
 
-    NumberType nodePropertyType(NodeLabel label, String propertyKey);
+    ValueType nodePropertyType(NodeLabel label, String propertyKey);
 
     PropertyState nodePropertyState(String propertyKey);
 
@@ -86,7 +88,6 @@ public interface GraphStore {
     void addNodeProperty(
         NodeLabel nodeLabel,
         String propertyKey,
-        NumberType propertyType,
         NodeProperties propertyValues
     );
 
@@ -119,8 +120,6 @@ public interface GraphStore {
 
     NumberType relationshipPropertyType(String propertyKey);
 
-    long relationshipPropertyCount();
-
     Set<String> relationshipPropertyKeys();
 
     Set<String> relationshipPropertyKeys(RelationshipType relationshipType);
@@ -129,7 +128,7 @@ public interface GraphStore {
         RelationshipType relationshipType,
         Optional<String> relationshipPropertyKey,
         Optional<NumberType> relationshipPropertyType,
-        HugeGraph.Relationships relationships
+        Relationships relationships
     );
 
     DeletionResult deleteRelationships(RelationshipType relationshipType);
@@ -144,6 +143,22 @@ public interface GraphStore {
 
     default Graph getGraph(Collection<RelationshipType> relationshipTypes, Optional<String> maybeRelationshipProperty) {
         return getGraph(nodeLabels(), relationshipTypes, maybeRelationshipProperty);
+    }
+
+    default Graph getGraph(
+        String nodeLabel,
+        String relationshipType,
+        Optional<String> maybeRelationshipProperty
+    ) {
+        return getGraph(NodeLabel.of(nodeLabel), RelationshipType.of(relationshipType), maybeRelationshipProperty);
+    }
+
+    default Graph getGraph(
+        NodeLabel nodeLabel,
+        RelationshipType relationshipType,
+        Optional<String> maybeRelationshipProperty
+    ) {
+        return getGraph(List.of(nodeLabel), List.of(relationshipType), maybeRelationshipProperty);
     }
 
     Graph getGraph(

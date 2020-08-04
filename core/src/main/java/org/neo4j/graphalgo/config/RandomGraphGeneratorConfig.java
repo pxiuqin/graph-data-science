@@ -40,7 +40,7 @@ import java.util.Collections;
 import java.util.Map;
 
 @ValueClass
-@Configuration("RandomGraphGeneratorConfigImpl")
+@Configuration
 @SuppressWarnings("immutables:subtype")
 public interface RandomGraphGeneratorConfig extends GraphCreateConfig {
 
@@ -116,7 +116,13 @@ public interface RandomGraphGeneratorConfig extends GraphCreateConfig {
     default GraphStoreFactory.Supplier graphStoreFactory() {
         // TODO: maybe we could introduce a RandomGraphFactory
         throw new UnsupportedOperationException("RandomGraphGeneratorConfig requires explicit graph generation.");
-    };
+    }
+
+    @Override
+    @Configuration.Ignore
+    default <R> R accept(Cases<R> visitor) {
+        return visitor.random(this);
+    }
 
     static RandomGraphGeneratorConfig of(
         String username,

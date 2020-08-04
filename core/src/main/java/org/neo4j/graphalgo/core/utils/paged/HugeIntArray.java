@@ -19,13 +19,14 @@
  */
 package org.neo4j.graphalgo.core.utils.paged;
 
+import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
 import org.neo4j.graphalgo.core.utils.ArrayUtil;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 
 import java.util.Arrays;
 import java.util.function.LongFunction;
 import java.util.function.LongToIntFunction;
 
+import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfInstance;
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfIntArray;
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfObjectArray;
 import static org.neo4j.graphalgo.core.utils.paged.HugeArrays.PAGE_SHIFT;
@@ -193,6 +194,21 @@ public abstract class HugeIntArray extends HugeArray<int[], Integer, HugeIntArra
         return dumpToArray(int[].class);
     }
 
+    @Override
+    public LongNodeProperties asNodeProperties() {
+        return new LongNodeProperties() {
+            @Override
+            public long getLong(long nodeId) {
+                return get(nodeId);
+            }
+
+            @Override
+            public long size() {
+                return HugeIntArray.this.size();
+            }
+        };
+    }
+
     /**
      * Creates a new array of the given size, tracking the memory requirements into the given {@link AllocationTracker}.
      * The tracker is no longer referenced, as the arrays do not dynamically change their size.
@@ -208,6 +224,24 @@ public abstract class HugeIntArray extends HugeArray<int[], Integer, HugeIntArra
         return new HugeIntArray.SingleHugeIntArray(values.length, values);
     }
 
+    public static long memoryEstimation(long size) {
+        assert size >= 0;
+
+        if (size <= ArrayUtil.MAX_ARRAY_LENGTH) {
+            return sizeOfInstance(SingleHugeIntArray.class) + sizeOfIntArray((int) size);
+        }
+        long sizeOfInstance = sizeOfInstance(PagedHugeIntArray.class);
+
+        int numPages = numberOfPages(size);
+
+        long memoryUsed = sizeOfObjectArray(numPages);
+        long pageBytes = sizeOfIntArray(PAGE_SIZE);
+        memoryUsed += (numPages - 1) * pageBytes;
+        int lastPageSize = exclusiveIndexOfPage(size);
+
+        return sizeOfInstance + memoryUsed + sizeOfIntArray(lastPageSize);
+    }
+
     /* test-only */
     static HugeIntArray newPagedArray(long size, AllocationTracker tracker) {
         return PagedHugeIntArray.of(size, tracker);
@@ -216,19 +250,6 @@ public abstract class HugeIntArray extends HugeArray<int[], Integer, HugeIntArra
     /* test-only */
     static HugeIntArray newSingleArray(int size, AllocationTracker tracker) {
         return SingleHugeIntArray.of(size, tracker);
-    }
-
-    /**
-     * A {@link PropertyTranslator} for instances of {@link HugeIntArray}s.
-     */
-    public static class Translator implements PropertyTranslator.OfInt<HugeIntArray> {
-
-        public static final Translator INSTANCE = new Translator();
-
-        @Override
-        public int toInt(final HugeIntArray data, final long nodeId) {
-            return data.get(nodeId);
-        }
     }
 
     private static final class SingleHugeIntArray extends HugeIntArray {

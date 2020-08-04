@@ -22,7 +22,7 @@ package org.neo4j.graphalgo;
 
 import org.immutables.builder.Builder;
 import org.immutables.value.Value;
-import org.neo4j.graphalgo.config.AlgoBaseConfig;
+import org.neo4j.graphalgo.config.ConcurrencyConfig;
 import org.neo4j.graphalgo.config.GraphCreateFromCypherConfig;
 import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
 import org.neo4j.graphalgo.config.ImmutableGraphCreateFromCypherConfig;
@@ -42,7 +42,7 @@ import static org.neo4j.graphalgo.config.GraphCreateFromCypherConfig.ALL_NODES_Q
 import static org.neo4j.graphalgo.config.GraphCreateFromCypherConfig.ALL_RELATIONSHIPS_QUERY;
 
 @Value.Style(builderVisibility = Value.Style.BuilderVisibility.PUBLIC, depluralize = true, deepImmutablesDetection = true)
-final class GraphCreateConfigBuilders {
+public final class GraphCreateConfigBuilders {
 
     private GraphCreateConfigBuilders() { }
 
@@ -50,7 +50,7 @@ final class GraphCreateConfigBuilders {
      * Factory method that defines the generation of {@link StoreConfigBuilder}.
      */
     @Builder.Factory
-    static GraphCreateFromStoreConfig storeConfig(
+    public static GraphCreateFromStoreConfig storeConfig(
         Optional<String> userName,
         Optional<String> graphName,
         List<String> nodeLabels,
@@ -118,7 +118,7 @@ final class GraphCreateConfigBuilders {
             .relationshipProjections(rp)
             .nodeProperties(PropertyMappings.of(nodeProperties))
             .relationshipProperties(relationshipPropertyMappings)
-            .readConcurrency(concurrency.orElse(AlgoBaseConfig.DEFAULT_CONCURRENCY))
+            .readConcurrency(concurrency.orElse(ConcurrencyConfig.DEFAULT_CONCURRENCY))
             .validateRelationships(validateRelationships.orElse(false))
             .build()
             .withNormalizedPropertyMappings();
@@ -128,7 +128,7 @@ final class GraphCreateConfigBuilders {
      * Factory method that defines the generation of {@link CypherConfigBuilder}.
      */
     @Builder.Factory
-    static GraphCreateFromCypherConfig cypherConfig(
+    public static GraphCreateFromCypherConfig cypherConfig(
         Optional<String> userName,
         Optional<String> graphName,
         Optional<String> nodeQuery,
@@ -143,17 +143,9 @@ final class GraphCreateConfigBuilders {
             .graphName(graphName.orElse(""))
             .nodeQuery(nodeQuery.orElse(ALL_NODES_QUERY))
             .relationshipQuery(relationshipQuery.orElse(ALL_RELATIONSHIPS_QUERY))
-            .readConcurrency(concurrency.orElse(AlgoBaseConfig.DEFAULT_CONCURRENCY))
+            .readConcurrency(concurrency.orElse(ConcurrencyConfig.DEFAULT_CONCURRENCY))
             .validateRelationships(validateRelationships.orElse(true))
             .parameters(parameters.orElse(Collections.emptyMap()))
             .build();
-    }
-
-    enum AnyLabel {
-        PROJECTION, LOAD
-    }
-
-    enum AnyRelationshipType {
-        PROJECTION, LOAD
     }
 }

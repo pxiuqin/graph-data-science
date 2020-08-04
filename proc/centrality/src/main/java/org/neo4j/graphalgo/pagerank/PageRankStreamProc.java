@@ -21,9 +21,10 @@ package org.neo4j.graphalgo.pagerank;
 
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.StreamProc;
+import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.common.CentralityStreamResult;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
@@ -36,11 +37,11 @@ import java.util.stream.Stream;
 import static org.neo4j.graphalgo.pagerank.PageRankProc.PAGE_RANK_DESCRIPTION;
 import static org.neo4j.procedure.Mode.READ;
 
-public class PageRankStreamProc extends StreamProc<PageRank, PageRank, PageRankStreamProc.StreamResult, PageRankStreamConfig> {
+public class PageRankStreamProc extends StreamProc<PageRank, PageRank, CentralityStreamResult, PageRankStreamConfig> {
 
     @Procedure(value = "gds.pageRank.stream", mode = READ)
     @Description(PAGE_RANK_DESCRIPTION)
-    public Stream<StreamResult> stream(
+    public Stream<CentralityStreamResult> stream(
         @Name(value = "graphName") Object graphNameOrConfig,
         @Name(value = "configuration", defaultValue = "{}") Map<String, Object> configuration
     ) {
@@ -61,8 +62,10 @@ public class PageRankStreamProc extends StreamProc<PageRank, PageRank, PageRankS
     }
 
     @Override
-    protected StreamResult streamResult(long originalNodeId, double value) {
-        return new StreamResult(originalNodeId, value);
+    protected CentralityStreamResult streamResult(
+        long originalNodeId, long internalNodeId, NodeProperties nodeProperties
+    ) {
+        return new CentralityStreamResult(originalNodeId, nodeProperties.getDouble(internalNodeId));
     }
 
     @Override
@@ -76,22 +79,12 @@ public class PageRankStreamProc extends StreamProc<PageRank, PageRank, PageRankS
     }
 
     @Override
-    protected AlgorithmFactory<PageRank, PageRankStreamConfig> algorithmFactory(PageRankStreamConfig config) {
-        return PageRankProc.algorithmFactory(config);
+    protected AlgorithmFactory<PageRank, PageRankStreamConfig> algorithmFactory() {
+        return new PageRankFactory<>();
     }
 
     @Override
-    protected PropertyTranslator<PageRank> nodePropertyTranslator(ComputationResult<PageRank, PageRank, PageRankStreamConfig> computationResult) {
-        return PageRankProc.ScoresTranslator.INSTANCE;
-    }
-
-    public static final class StreamResult {
-        public final long nodeId;
-        public final double score;
-
-        StreamResult(long nodeId, double score) {
-            this.nodeId = nodeId;
-            this.score = score;
-        }
+    protected NodeProperties getNodeProperties(ComputationResult<PageRank, PageRank, PageRankStreamConfig> computationResult) {
+        return PageRankProc.nodeProperties(computationResult);
     }
 }

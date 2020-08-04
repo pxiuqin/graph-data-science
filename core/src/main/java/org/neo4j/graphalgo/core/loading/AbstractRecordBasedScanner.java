@@ -189,7 +189,6 @@ abstract class AbstractRecordBasedScanner<Reference, Record extends AbstractBase
             };
         }
 
-        @SuppressWarnings("ConstantConditions")
         @Override
         public void close() {
             if (pageCursor != null) {
@@ -239,7 +238,7 @@ abstract class AbstractRecordBasedScanner<Reference, Record extends AbstractBase
         String storeFileName = storeFileName();
         try {
             for (PagedFile pf : pageCache.listExistingMappings()) {
-                if (pf.file().getName().equals(storeFileName)) {
+                if (Neo4jProxy.pagedFile(pf).getFileName().toString().equals(storeFileName)) {
                     pageSize = pf.pageSize();
                     recordsPerPage = pageSize / recordSize;
                     pagedFile = pf;
@@ -283,7 +282,7 @@ abstract class AbstractRecordBasedScanner<Reference, Record extends AbstractBase
                 throw new UncheckedIOException(e);
             }
             Record record = store.newRecord();
-            Reference reference = recordReference(record, store);
+            Reference reference = recordReference(record, store, transaction);
             cursor = new ScanCursor(pageCursor, record, reference);
             this.cursors.set(cursor);
         }
@@ -293,7 +292,7 @@ abstract class AbstractRecordBasedScanner<Reference, Record extends AbstractBase
     @Override
     public final long storeSize() {
         if (pagedFile != null) {
-            return pagedFile.file().length();
+            return Neo4jProxy.pagedFile(pagedFile).toFile().length();
         }
         long recordsInUse = 1L + Neo4jProxy.getHighestPossibleIdInUse(store, PageCursorTracer.NULL);
         long idsInPages = ((recordsInUse + (recordsPerPage - 1L)) / recordsPerPage) * recordsPerPage;
@@ -314,7 +313,7 @@ abstract class AbstractRecordBasedScanner<Reference, Record extends AbstractBase
      */
     abstract RecordFormat<Record> recordFormat(RecordFormats formats);
 
-    abstract Reference recordReference(Record record, Store store);
+    abstract Reference recordReference(Record record, Store store, KernelTransaction kernelTransaction);
 
     /**
      * Return the filename of the store file that the page cache maps

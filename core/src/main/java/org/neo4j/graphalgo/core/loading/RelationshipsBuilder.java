@@ -21,62 +21,76 @@ package org.neo4j.graphalgo.core.loading;
 
 
 import org.neo4j.graphalgo.RelationshipProjection;
+import org.neo4j.graphalgo.api.AdjacencyList;
+import org.neo4j.graphalgo.api.AdjacencyOffsets;
 import org.neo4j.graphalgo.core.Aggregation;
-import org.neo4j.graphalgo.core.huge.AdjacencyList;
-import org.neo4j.graphalgo.core.huge.AdjacencyOffsets;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 
 import java.util.Arrays;
+import java.util.function.Predicate;
+
+import static java.util.Objects.requireNonNull;
 
 public class RelationshipsBuilder {
 
     private static final AdjacencyListBuilder[] EMPTY_PROPERTY_BUILDERS = new AdjacencyListBuilder[0];
 
     private final RelationshipProjection projection;
-    final AdjacencyListBuilder adjacencyListBuilder;
-    final AdjacencyListBuilder[] propertyBuilders;
-
-    AdjacencyOffsets globalAdjacencyOffsets;
-    AdjacencyOffsets[] globalPropertyOffsets;
+    private final AdjacencyListBuilder adjacencyListBuilder;
+    private final AdjacencyOffsetsFactory offsetsFactory;
+    private final AdjacencyListBuilder[] propertyBuilders;
+    private long[][] globalAdjacencyOffsetsPages;
+    private AdjacencyOffsets globalAdjacencyOffsets;
+    private long[][][] globalPropertyOffsetsPages;
+    private AdjacencyOffsets[] globalPropertyOffsets;
 
     public RelationshipsBuilder(
         RelationshipProjection projection,
-        AllocationTracker tracker
+        AdjacencyListBuilderFactory listBuilderFactory,
+        AdjacencyOffsetsFactory offsetsFactory
     ) {
         this.projection = projection;
-
-        adjacencyListBuilder = AdjacencyListBuilder.newBuilder(tracker);
+        this.adjacencyListBuilder = listBuilderFactory.newAdjacencyListBuilder();
+        this.offsetsFactory = offsetsFactory;
 
         if (projection.properties().isEmpty()) {
-            propertyBuilders = EMPTY_PROPERTY_BUILDERS;
+            this.propertyBuilders = EMPTY_PROPERTY_BUILDERS;
         } else {
-            propertyBuilders = new AdjacencyListBuilder[projection.properties().numberOfMappings()];
-            Arrays.setAll(propertyBuilders, i -> AdjacencyListBuilder.newBuilder(tracker));
+            this.propertyBuilders = new AdjacencyListBuilder[projection.properties().numberOfMappings()];
+            Arrays.setAll(propertyBuilders, i -> listBuilderFactory.newAdjacencyListBuilder());
         }
     }
 
     final ThreadLocalRelationshipsBuilder threadLocalRelationshipsBuilder(
-            long[] adjacencyOffsets,
-            long[][] propertyOffsets,
-            Aggregation[] aggregations
+        long[] adjacencyOffsets,
+        long[][] propertyOffsets,
+        Aggregation[] aggregations
     ) {
         return new ThreadLocalRelationshipsBuilder(
             adjacencyListBuilder.newAllocator(),
             Arrays.stream(propertyBuilders)
                 .map(AdjacencyListBuilder::newAllocator)
-                .toArray(AdjacencyListBuilder.Allocator[]::new),
+                .toArray(AdjacencyListAllocator[]::new),
             adjacencyOffsets,
             propertyOffsets,
             aggregations
         );
     }
 
-    final void setGlobalAdjacencyOffsets(AdjacencyOffsets globalAdjacencyOffsets) {
-        this.globalAdjacencyOffsets = globalAdjacencyOffsets;
+    final void setGlobalAdjacencyOffsets(long[][] pages) {
+        this.globalAdjacencyOffsetsPages = pages;
     }
 
-    final void setGlobalPropertyOffsets(AdjacencyOffsets[] globalPropertyOffsets) {
-        this.globalPropertyOffsets = globalPropertyOffsets;
+    final void setGlobalPropertyOffsets(long[][][] allPages) {
+        globalPropertyOffsetsPages = allPages;
+    }
+
+    private boolean containsNonNull(long[][] pages) {
+        return Arrays.stream(pages).noneMatch(Predicate.isEqual(null));
+    }
+
+    boolean supportsProperties() {
+        // TODO temporary until Geri does support properties
+        return adjacencyListBuilder instanceof TransientAdjacencyListBuilder;
     }
 
     public AdjacencyList adjacencyList() {
@@ -84,6 +98,9 @@ public class RelationshipsBuilder {
     }
 
     public AdjacencyOffsets globalAdjacencyOffsets() {
+        if (globalAdjacencyOffsets == null) {
+            globalAdjacencyOffsets = offsetsFactory.newOffsets(requireNonNull(globalAdjacencyOffsetsPages));
+        }
         return globalAdjacencyOffsets;
     }
 
@@ -101,11 +118,28 @@ public class RelationshipsBuilder {
     }
 
     // TODO: This returns only the first of possibly multiple properties
-    public AdjacencyOffsets globalPropertyOffsets() {
-        return globalPropertyOffsets[0];
+    AdjacencyOffsets globalPropertyOffsets() {
+        return globalPropertyOffsets(0);
     }
 
     public AdjacencyOffsets globalPropertyOffsets(int propertyIndex) {
+        if (globalPropertyOffsets == null) {
+            globalPropertyOffsets = new AdjacencyOffsets[requireNonNull(globalPropertyOffsetsPages).length];
+            Arrays.setAll(globalPropertyOffsets, i -> {
+                var pages = globalPropertyOffsetsPages[i];
+                // TODO: the nested null check is for graphs that don't support properties (i.e. Geri)
+                return pages != null && containsNonNull(pages) ? offsetsFactory.newOffsets(pages) : null;
+            });
+        }
         return globalPropertyOffsets[propertyIndex];
+    }
+
+    void flush() {
+        adjacencyListBuilder.flush();
+        for (AdjacencyListBuilder propertyBuilder : propertyBuilders) {
+            if (propertyBuilder != null) {
+                propertyBuilder.flush();
+            }
+        }
     }
 }

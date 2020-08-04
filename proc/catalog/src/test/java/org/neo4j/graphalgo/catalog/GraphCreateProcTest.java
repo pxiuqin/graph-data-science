@@ -39,7 +39,7 @@ import org.neo4j.graphalgo.TestLog;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.compat.GraphDatabaseApiProxy;
 import org.neo4j.graphalgo.compat.MapUtil;
-import org.neo4j.graphalgo.config.AlgoBaseConfig;
+import org.neo4j.graphalgo.config.ConcurrencyConfig;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.config.GraphCreateFromCypherConfig;
 import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
@@ -80,8 +80,8 @@ import static org.neo4j.graphalgo.AbstractRelationshipProjection.AGGREGATION_KEY
 import static org.neo4j.graphalgo.AbstractRelationshipProjection.ORIENTATION_KEY;
 import static org.neo4j.graphalgo.AbstractRelationshipProjection.TYPE_KEY;
 import static org.neo4j.graphalgo.ElementProjection.PROPERTIES_KEY;
-import static org.neo4j.graphalgo.TestGraph.Builder.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.getCypherAggregation;
 import static org.neo4j.graphalgo.compat.GraphDatabaseApiProxy.newKernelTransaction;
 import static org.neo4j.graphalgo.compat.MapUtil.genericMap;
@@ -427,7 +427,7 @@ class GraphCreateProcTest extends BaseProcTest {
             ))
         );
 
-        Graph graph = GraphStoreCatalog.get("", name).graphStore().getUnion();
+        Graph graph = GraphStoreCatalog.get("", db.databaseId(), name).graphStore().getUnion();
         assertGraphEquals(fromGdl("()-[{w:55}]->()"), graph);
     }
 
@@ -451,7 +451,7 @@ class GraphCreateProcTest extends BaseProcTest {
         );
 
         assertGraphExists(name);
-        Graph graph = GraphStoreCatalog.get("", name).graphStore().getUnion();
+        Graph graph = GraphStoreCatalog.get("", db.databaseId(), name).graphStore().getUnion();
         assertGraphEquals(fromGdl("()-[{w: 55}]->()"), graph);
     }
 
@@ -549,7 +549,7 @@ class GraphCreateProcTest extends BaseProcTest {
         );
 
         assertGraphExists(name);
-        Graph graph = GraphStoreCatalog.get("", name).graphStore().getUnion();
+        Graph graph = GraphStoreCatalog.get("", db.databaseId(), name).graphStore().getUnion();
         assertGraphEquals(fromGdl(formatWithLocale("()-[{w: %d}]->()", expectedValue)), graph);
     }
 
@@ -773,7 +773,7 @@ class GraphCreateProcTest extends BaseProcTest {
 
         List<Future<?>> futures = new ArrayList<>();
         // block all available threads
-        for (int i = 0; i < AlgoBaseConfig.DEFAULT_CONCURRENCY; i++) {
+        for (int i = 0; i < ConcurrencyConfig.DEFAULT_CONCURRENCY; i++) {
             futures.add(
                 Pools.DEFAULT.submit(() -> LockSupport.parkNanos(Duration.ofSeconds(1).toNanos()))
             );
@@ -813,7 +813,7 @@ class GraphCreateProcTest extends BaseProcTest {
 
         runQuery(query, map());
 
-        Graph graph = GraphStoreCatalog.get("", "g").graphStore().getUnion();
+        Graph graph = GraphStoreCatalog.get("", db.databaseId(), "g").graphStore().getUnion();
         Graph expected = fromGdl("(:Node { fooProp: 42, barProp: 13.37D })" +
                                  "(:Node { fooProp: 43, barProp: 13.38D })" +
                                  "(:Node { fooProp: 44, barProp: 13.39D })" +
@@ -865,7 +865,7 @@ class GraphCreateProcTest extends BaseProcTest {
             assertEquals("MAX", maxCostParams.get("aggregation").toString());
         });
 
-        Graph actual = GraphStoreCatalog.get("", "aggGraph").graphStore().getUnion();
+        Graph actual = GraphStoreCatalog.get("", db.databaseId(), "aggGraph").graphStore().getUnion();
         Graph expected = fromGdl("(a:Node)-[{w:85.3D}]->(b:Node),(a)-[{w:42.1D}]->(b),(a)-[{w:2.0D}]->(b)");
         assertGraphEquals(expected, actual);
     }
@@ -1083,13 +1083,29 @@ class GraphCreateProcTest extends BaseProcTest {
     // Failure cases
 
     @ParameterizedTest(name = "projections: {0}")
-    @ValueSource(strings = {"'*', {}", "{}, '*'", "'', '*'", "'*', ''", "'', ''"})
+    @ValueSource(strings = {"'*', {}", "{}, '*'", "'', '*'", "'*', ''"})
     void failsOnEmptyProjection(String projection) {
         String query = "CALL gds.graph.create('g', " + projection + ")";
 
         assertErrorRegex(
             query,
             ".*An empty ((node)|(relationship)) projection was given; at least one ((node label)|(relationship type)) must be projected."
+        );
+
+        assertGraphDoesNotExist("g");
+    }
+
+    @Test
+    void failsOnBothEmptyProjection() {
+        String query = "CALL gds.graph.create('g','','')";
+
+        String expectedMsg = "Multiple errors in configuration arguments:\n" +
+                             "\t\t\t\tAn empty node projection was given; at least one node label must be projected.\n" +
+                             "\t\t\t\tAn empty relationship projection was given; at least one relationship type must be projected.";
+
+        assertError(
+            query,
+            expectedMsg
         );
 
         assertGraphDoesNotExist("g");
@@ -1398,7 +1414,7 @@ class GraphCreateProcTest extends BaseProcTest {
 
     private Graph relPropertyGraph(String graphName, RelationshipType relationshipType, String property) {
         return GraphStoreCatalog
-            .get(getUsername(), graphName)
+            .get(getUsername(), db.databaseId(), graphName)
             .graphStore()
             .getGraph(relationshipType, Optional.of(property));
     }

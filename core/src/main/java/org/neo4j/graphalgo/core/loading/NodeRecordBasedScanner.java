@@ -20,18 +20,17 @@
 package org.neo4j.graphalgo.core.loading;
 
 import org.neo4j.graphalgo.core.SecureTransaction;
-import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.internal.kernel.api.security.SecurityContext;
 import org.neo4j.io.layout.DatabaseFile;
+import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.NodeStore;
 import org.neo4j.kernel.impl.store.format.RecordFormat;
 import org.neo4j.kernel.impl.store.format.RecordFormats;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 
-final class NodeRecordBasedScanner extends AbstractRecordBasedScanner<NodeReference, NodeRecord, NodeStore> {
+public final class NodeRecordBasedScanner extends AbstractRecordBasedScanner<NodeReference, NodeRecord, NodeStore> {
 
-    static final StoreScanner.Factory<NodeReference> FACTORY = NodeRecordBasedScanner::new;
+    public static final StoreScanner.Factory<NodeReference> FACTORY = NodeRecordBasedScanner::new;
 
     private NodeRecordBasedScanner(int prefetchSize, SecureTransaction transaction) {
         super(prefetchSize, transaction);
@@ -48,8 +47,8 @@ final class NodeRecordBasedScanner extends AbstractRecordBasedScanner<NodeRefere
     }
 
     @Override
-    NodeReference recordReference(NodeRecord record, NodeStore store) {
-        return new NodeRecordReference(record, store);
+    NodeReference recordReference(NodeRecord record, NodeStore store, KernelTransaction kernelTransaction) {
+        return new NodeRecordReference(record, store, kernelTransaction.pageCursorTracer());
     }
 
     @Override

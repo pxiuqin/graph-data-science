@@ -22,9 +22,11 @@ package org.neo4j.graphalgo.catalog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.Tensor;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.L2Norm;
+import org.neo4j.gds.embeddings.graphsage.proc.GraphSageStreamProc;
 import org.neo4j.graphalgo.BaseProcTest;
 import org.neo4j.graphalgo.GdsCypher;
-import org.neo4j.graphalgo.TestGraph;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
 import org.neo4j.graphalgo.labelpropagation.LabelPropagationMutateProc;
@@ -33,8 +35,13 @@ import org.neo4j.graphalgo.nodesim.NodeSimilarityMutateProc;
 import org.neo4j.graphalgo.pagerank.PageRankMutateProc;
 import org.neo4j.graphalgo.wcc.WccMutateProc;
 
+import java.util.Collection;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 class GraphMutateProcIntegrationTest extends BaseProcTest {
@@ -66,7 +73,7 @@ class GraphMutateProcIntegrationTest extends BaseProcTest {
         ", (i)-[:TYPE]->(l)" +
         ", (j)-[:TYPE]->(k)";
 
-    private static final Graph EXPECTED_GRAPH = TestGraph.Builder.fromGdl(
+    private static final Graph EXPECTED_GRAPH = fromGdl(
         "(a {nodeId: 0,  labelPropagation: 2,  louvain: 6,  pageRank: 0.150000, wcc: 0})" +
         "(b {nodeId: 1,  labelPropagation: 3,  louvain: 6,  pageRank: 0.277500, wcc: 0})" +
         "(c {nodeId: 2,  labelPropagation: 5,  louvain: 6,  pageRank: 0.385875, wcc: 0})" +
@@ -106,7 +113,8 @@ class GraphMutateProcIntegrationTest extends BaseProcTest {
             WccMutateProc.class,
             LabelPropagationMutateProc.class,
             LouvainMutateProc.class,
-            NodeSimilarityMutateProc.class
+            NodeSimilarityMutateProc.class,
+            GraphSageStreamProc.class
         );
 
         runQuery(GdsCypher
@@ -170,7 +178,27 @@ class GraphMutateProcIntegrationTest extends BaseProcTest {
         runQuery(louvainQuery);
         runQuery(nodeSimilarityQuery);
 
-        assertGraphEquals(EXPECTED_GRAPH, GraphStoreCatalog.get(getUsername(), TEST_GRAPH).graphStore().getUnion());
+        assertGraphEquals(EXPECTED_GRAPH, GraphStoreCatalog.get(getUsername(), db.databaseId(), TEST_GRAPH).graphStore().getUnion());
+
+        int embeddingSize = 64;
+        String graphSageQuery = GdsCypher
+            .call()
+            .explicitCreation(TEST_GRAPH)
+            .algo("gds.alpha.graphSage")
+            .streamMode()
+            .addParameter("nodePropertyNames", List.of("pageRank", "louvain", "labelPropagation", "wcc"))
+            .addParameter("embeddingSize", embeddingSize)
+            .yields();
+
+        runQueryWithRowConsumer(graphSageQuery, row -> {
+            Collection<Double> embeddings = (Collection<Double>) row.get("embeddings");
+            assertEquals(embeddings.size(), embeddingSize);
+
+            double[] values = embeddings.stream()
+                .mapToDouble(Double::doubleValue)
+                .toArray();
+            assertNotEquals(0D, L2Norm.l2(Tensor.vector(values)));
+        });
 
         // write new properties and relationships to Neo
         String writeNodePropertiesQuery = formatWithLocale(
@@ -209,6 +237,6 @@ class GraphMutateProcIntegrationTest extends BaseProcTest {
             .yields()
         );
 
-        assertGraphEquals(EXPECTED_GRAPH, GraphStoreCatalog.get(getUsername(), TEST_GRAPH).graphStore().getUnion());
+        assertGraphEquals(EXPECTED_GRAPH, GraphStoreCatalog.get(getUsername(), db.databaseId(), TEST_GRAPH).graphStore().getUnion());
     }
 }

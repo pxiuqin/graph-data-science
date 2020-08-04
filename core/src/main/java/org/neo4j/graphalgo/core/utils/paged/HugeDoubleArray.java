@@ -19,11 +19,10 @@
  */
 package org.neo4j.graphalgo.core.utils.paged;
 
+import org.neo4j.graphalgo.api.nodeproperties.DoubleNodeProperties;
 import org.neo4j.graphalgo.core.utils.ArrayUtil;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 
 import java.util.Arrays;
-import java.util.function.IntToDoubleFunction;
 import java.util.function.LongFunction;
 import java.util.function.LongToDoubleFunction;
 import java.util.stream.DoubleStream;
@@ -88,7 +87,7 @@ public abstract class HugeDoubleArray extends HugeArray<double[], Double, HugeDo
     /**
      * Set all elements using the provided generator function to compute each element.
      * <p>
-     * The behavior is identical to {@link Arrays#setAll(double[], IntToDoubleFunction)}.
+     * The behavior is identical to {@link Arrays#setAll(double[], java.util.function.IntToDoubleFunction)}.
      */
     abstract public void setAll(LongToDoubleFunction gen);
 
@@ -181,6 +180,21 @@ public abstract class HugeDoubleArray extends HugeArray<double[], Double, HugeDo
         return dumpToArray(double[].class);
     }
 
+    @Override
+    public DoubleNodeProperties asNodeProperties() {
+        return new DoubleNodeProperties() {
+            @Override
+            public double getDouble(long nodeId) {
+                return get(nodeId);
+            }
+
+            @Override
+            public long size() {
+                return HugeDoubleArray.this.size();
+            }
+        };
+    }
+
     /**
      * Creates a new array of the given size, tracking the memory requirements into the given {@link AllocationTracker}.
      * The tracker is no longer referenced, as the arrays do not dynamically change their size.
@@ -222,19 +236,6 @@ public abstract class HugeDoubleArray extends HugeArray<double[], Double, HugeDo
     /* test-only */
     static HugeDoubleArray newSingleArray(int size, AllocationTracker tracker) {
         return SingleHugeDoubleArray.of(size, tracker);
-    }
-
-    /**
-     * A {@link PropertyTranslator} for instances of {@link HugeDoubleArray}s.
-     */
-    public static class Translator implements PropertyTranslator.OfDouble<HugeDoubleArray> {
-
-        public static final Translator INSTANCE = new Translator();
-
-        @Override
-        public double toDouble(final HugeDoubleArray data, final long nodeId) {
-            return data.get(nodeId);
-        }
     }
 
     private static final class SingleHugeDoubleArray extends HugeDoubleArray {

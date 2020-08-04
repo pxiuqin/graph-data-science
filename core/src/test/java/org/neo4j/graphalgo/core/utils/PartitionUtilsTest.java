@@ -21,7 +21,6 @@ package org.neo4j.graphalgo.core.utils;
 
 import com.carrotsearch.hppc.BitSet;
 import org.junit.jupiter.api.Test;
-import org.neo4j.graphalgo.TestGraph;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.utils.partition.Partition;
 import org.neo4j.graphalgo.core.utils.partition.PartitionUtils;
@@ -31,6 +30,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 class PartitionUtilsTest {
@@ -86,7 +86,7 @@ class PartitionUtilsTest {
 
     @Test
     void testDegreePartitioning() {
-        Graph graph = TestGraph.Builder.fromGdl(
+        Graph graph = fromGdl(
             "(a)-->(b)" +
             "(a)-->(c)" +
             "(b)-->(a)" +
@@ -103,7 +103,7 @@ class PartitionUtilsTest {
 
     @Test
     void testDegreePartitioningWithNodeFilter() {
-        Graph graph = TestGraph.Builder.fromGdl(
+        Graph graph = fromGdl(
             "(a)-->(b)" +
             "(a)-->(c)" +
             "(b)-->(a)" +

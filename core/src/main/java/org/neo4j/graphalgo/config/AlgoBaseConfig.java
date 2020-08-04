@@ -33,15 +33,9 @@ import java.util.stream.Collectors;
 
 import static org.neo4j.graphalgo.ElementProjection.PROJECT_ALL;
 
-public interface AlgoBaseConfig extends BaseConfig {
+public interface AlgoBaseConfig extends BaseConfig, ConcurrencyConfig {
 
-    int DEFAULT_CONCURRENCY = 4;
     String NODE_LABELS_KEY = "nodeLabels";
-
-    @Value.Default
-    default int concurrency() {
-        return DEFAULT_CONCURRENCY;
-    }
 
     @Configuration.Parameter
     Optional<String> graphName();

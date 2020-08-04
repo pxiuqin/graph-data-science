@@ -23,11 +23,9 @@ import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.centrality.ArticleRankProc;
-import org.neo4j.graphalgo.centrality.BetweennessCentralityProc;
 import org.neo4j.graphalgo.centrality.ClosenessCentralityProc;
 import org.neo4j.graphalgo.centrality.DegreeCentralityProc;
 import org.neo4j.graphalgo.centrality.HarmonicCentralityProc;
-import org.neo4j.graphalgo.centrality.SampledBetweennessCentralityProc;
 import org.neo4j.graphalgo.centrality.eigenvector.EigenvectorCentralityProc;
 import org.neo4j.graphalgo.compat.MapUtil;
 import org.neo4j.graphalgo.functions.IsFiniteFunc;
@@ -70,10 +68,6 @@ class AlphaListProcTest extends BaseProcTest {
         "gds.alpha.allShortestPaths.stream",
         "gds.alpha.articleRank.write",
         "gds.alpha.articleRank.stream",
-        "gds.alpha.betweenness.write",
-        "gds.alpha.betweenness.stream",
-        "gds.alpha.betweenness.sampled.write",
-        "gds.alpha.betweenness.sampled.stream",
         "gds.alpha.bfs.stream",
         "gds.alpha.closeness.write",
         "gds.alpha.closeness.stream",
@@ -149,7 +143,6 @@ class AlphaListProcTest extends BaseProcTest {
             AllShortestPathsProc.class,
             ApproxNearestNeighborsProc.class,
             ArticleRankProc.class,
-            BetweennessCentralityProc.class,
             ClosenessCentralityProc.class,
             DegreeCentralityProc.class,
             DijkstraProc.class,
@@ -166,7 +159,6 @@ class AlphaListProcTest extends BaseProcTest {
             RandomWalkProc.class,
             OneHotEncodingFunc.class,
             SpanningTreeProc.class,
-            SampledBetweennessCentralityProc.class,
             ShortestPathDeltaSteppingProc.class,
             ShortestPathAStarProc.class,
             ShortestPathsProc.class,

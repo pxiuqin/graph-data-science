@@ -47,6 +47,7 @@ import org.neo4j.io.pagecache.PageCursor;
 import org.neo4j.io.pagecache.PagedFile;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
 import org.neo4j.io.pagecache.tracing.cursor.PageCursorTracer;
+import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.query.ExecutingQuery;
 import org.neo4j.kernel.impl.store.NodeStore;
 import org.neo4j.kernel.impl.store.RecordStore;
@@ -55,14 +56,22 @@ import org.neo4j.kernel.impl.store.format.RecordFormats;
 import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.store.record.RecordLoad;
-import org.neo4j.logging.FormattedLog;
+import org.neo4j.kernel.lifecycle.LifeSupport;
+import org.neo4j.logging.Level;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.internal.LogService;
 import org.neo4j.memory.MemoryTracker;
 import org.neo4j.scheduler.JobScheduler;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.nio.file.OpenOption;
+import java.nio.file.Path;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.ServiceLoader;
 
 public final class Neo4jProxy {
@@ -124,6 +133,15 @@ public final class Neo4jProxy {
         return IMPL.pageFileIO(pagedFile, pageId, pageFileFlags, pageCursorTracer);
     }
 
+    public static PagedFile pageCacheMap(PageCache pageCache, File file, int pageSize, OpenOption... openOptions)
+    throws IOException {
+        return IMPL.pageCacheMap(pageCache, file, pageSize, openOptions);
+    }
+
+    public static Path pagedFile(PagedFile pagedFile) {
+        return IMPL.pagedFile(pagedFile);
+    }
+
     public static PropertyCursor allocatePropertyCursor(
         CursorFactory cursorFactory,
         PageCursorTracer cursorTracer,
@@ -158,12 +176,36 @@ public final class Neo4jProxy {
         IMPL.nodeLabelScan(dataRead, label, cursor);
     }
 
+    public static CompositeNodeCursor compositeNodeCursor(List<NodeLabelIndexCursor> cursors, int[] labelIds) {
+        return IMPL.compositeNodeCursor(cursors, labelIds);
+    }
+
     public static OffHeapLongArray newOffHeapLongArray(long length, long defaultValue, long base) {
         return IMPL.newOffHeapLongArray(length, defaultValue, base);
     }
 
     public static LongArray newChunkedLongArray(NumberArrayFactory numberArrayFactory, int size, long defaultValue) {
         return IMPL.newChunkedLongArray(numberArrayFactory, size, defaultValue);
+    }
+
+    public static MemoryTracker memoryTracker(KernelTransaction kernelTransaction) {
+        return IMPL.memoryTracker(kernelTransaction);
+    }
+
+    public static LogService logProviderForStoreAndRegister(
+        Path storeLogPath,
+        FileSystemAbstraction fs,
+        LifeSupport lifeSupport
+    ) throws IOException {
+        return IMPL.logProviderForStoreAndRegister(storeLogPath, fs, lifeSupport);
+    }
+
+    public static Path metadataStore(DatabaseLayout databaseLayout) {
+        return IMPL.metadataStore(databaseLayout);
+    }
+
+    public static Path homeDirectory(DatabaseLayout databaseLayout) {
+        return IMPL.homeDirectory(databaseLayout);
     }
 
     public static BatchImporter instantiateBatchImporter(
@@ -208,8 +250,24 @@ public final class Neo4jProxy {
         return IMPL.queryText(query);
     }
 
-    public static Log toPrintWriter(FormattedLog.Builder builder, PrintWriter writer) {
-        return IMPL.toPrintWriter(builder, writer);
+    public static Log logger(
+        Level level,
+        ZoneId zoneId,
+        DateTimeFormatter dateTimeFormatter,
+        String category,
+        PrintWriter writer
+    ) {
+        return IMPL.logger(level, zoneId, dateTimeFormatter, category, writer);
+    }
+
+    public static Log logger(
+        Level level,
+        ZoneId zoneId,
+        DateTimeFormatter dateTimeFormatter,
+        String category,
+        OutputStream outputStream
+    ) {
+        return IMPL.logger(level, zoneId, dateTimeFormatter, category, outputStream);
     }
 
     public static Setting<Boolean> onlineBackupEnabled() {

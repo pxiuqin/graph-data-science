@@ -24,6 +24,7 @@ import com.carrotsearch.hppc.LongIntScatterMap;
 import com.carrotsearch.hppc.procedures.LongIntProcedure;
 import org.neo4j.graphalgo.Algorithm;
 import org.neo4j.graphalgo.api.Graph;
+import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
 import org.neo4j.graphalgo.core.utils.AtomicDoubleArray;
 import org.neo4j.graphalgo.core.utils.container.Paths;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
@@ -32,8 +33,13 @@ import org.neo4j.graphalgo.impl.msbfs.BfsSources;
 import org.neo4j.graphalgo.impl.msbfs.BfsWithPredecessorConsumer;
 import org.neo4j.graphalgo.impl.msbfs.MultiSourceBFS;
 
+import java.util.AbstractCollection;
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
@@ -68,21 +74,43 @@ public class MSBetweennessCentrality extends Algorithm<MSBetweennessCentrality, 
         this.centrality = new AtomicDoubleArray(nodeCount);
     }
 
+    private Queue<MSBetweennessCentralityConsumer> initConsumerPool() {
+        ArrayBlockingQueue<MSBetweennessCentralityConsumer> queue = new ArrayBlockingQueue<>(concurrency);
+
+        for (int i = 0; i < concurrency; i++) {
+            queue.offer(new MSBetweennessCentralityConsumer(
+                bfsCount,
+                nodeCount,
+                centrality,
+                undirected ? 2.0 : 1.0
+            ));
+        }
+
+        return queue;
+    }
+
     @Override
     public AtomicDoubleArray compute() {
-        var consumer = new MSBCBFSConsumer(bfsCount, nodeCount, centrality, undirected ? 2.0 : 1.0);
+        var taskCount = (int) ParallelUtil.threadCount(bfsCount, graph.nodeCount());
+        var consumerPool = initConsumerPool();
+        var multiSourceBFS = MultiSourceBFS.predecessorProcessing(graph, tracker);
 
-        for (long offset = 0; offset < nodeCount; offset += bfsCount) {
-            var limit = Math.min(offset + bfsCount, nodeCount);
-            var startNodes = LongStream.range(offset, limit).toArray();
-            consumer.init(startNodes, offset > 0);
-            // forward traversal for all start nodes
-            MultiSourceBFS
-                .predecessorProcessing(graph, graph, consumer, consumer, tracker, startNodes)
-                .run();
-            // backward traversal for all start nodes
-            consumer.updateCentrality();
-        }
+        var taskProvider = new MSBetweennessCentrality.TaskProvider(
+            multiSourceBFS,
+            graph.nodeCount(),
+            taskCount,
+            bfsCount,
+            consumerPool
+        );
+
+        ParallelUtil.runWithConcurrency(
+            concurrency,
+            taskProvider,
+            taskCount << 2,
+            100L,
+            TimeUnit.MICROSECONDS,
+            executorService
+        );
 
         return centrality;
     }
@@ -101,16 +129,99 @@ public class MSBetweennessCentrality extends Algorithm<MSBetweennessCentrality, 
         return centrality;
     }
 
-    public Stream<BetweennessCentrality.Result> resultStream() {
+    public Stream<Result> resultStream() {
         return IntStream
             .range(0, nodeCount)
             .mapToObj(nodeId ->
-                new BetweennessCentrality.Result(
+                new Result(
                     graph.toOriginalNodeId(nodeId),
                     centrality.get(nodeId)));
     }
 
-    static class MSBCBFSConsumer implements BfsConsumer, BfsWithPredecessorConsumer {
+    static final class TaskProvider extends AbstractCollection<MSBetweennessCentralityTask> implements Iterator<MSBetweennessCentralityTask> {
+
+        private final MultiSourceBFS multiSourceBFS;
+        private final long nodeCount;
+        private final int taskCount;
+        private final int bfsCount;
+        private final Queue<MSBetweennessCentralityConsumer> consumerPool;
+
+        private long offset = 0L;
+        private int currentTask = 0;
+
+        TaskProvider(
+            MultiSourceBFS multiSourceBFS,
+            long nodeCount,
+            int taskCount,
+            int bfsCount,
+            Queue<MSBetweennessCentralityConsumer> consumerPool
+        ) {
+            this.multiSourceBFS = multiSourceBFS;
+            this.nodeCount = nodeCount;
+            this.taskCount = taskCount;
+            this.bfsCount = bfsCount;
+            this.consumerPool = consumerPool;
+        }
+
+        @Override
+        public Iterator<MSBetweennessCentralityTask> iterator() {
+            offset = 0L;
+            currentTask = 0;
+            return this;
+        }
+
+        @Override
+        public int size() {
+            return taskCount;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return currentTask < taskCount;
+        }
+
+        @Override
+        public MSBetweennessCentralityTask next() {
+            var limit = Math.min(offset + bfsCount, nodeCount);
+            var startNodes = LongStream.range(offset, limit).toArray();
+            offset += startNodes.length;
+            currentTask++;
+            return new MSBetweennessCentralityTask(multiSourceBFS, startNodes, consumerPool);
+        }
+    }
+
+    static final class MSBetweennessCentralityTask implements Runnable {
+
+        private final MultiSourceBFS multiSourceBFS;
+        private final long[] startNodes;
+        private final Queue<MSBetweennessCentralityConsumer> consumerPool;
+
+        MSBetweennessCentralityTask(
+            MultiSourceBFS multiSourceBFS,
+            long[] startNodes,
+            Queue<MSBetweennessCentralityConsumer> consumerPool
+        ) {
+            this.multiSourceBFS = multiSourceBFS;
+            this.startNodes = startNodes;
+            this.consumerPool = consumerPool;
+        }
+
+        @Override
+        public void run() {
+            // pick a consumer from the pool
+            var consumer = consumerPool.poll();
+            //noinspection ConstantConditions
+            consumer.init(startNodes);
+            // concurrent forward traversal for all start nodes
+            multiSourceBFS.initPredecessorProcessing(consumer, consumer, startNodes).run();
+            // sequential backward traversal for all start nodes
+            consumer.updateCentrality();
+            // release the consumer back to the pool
+            consumerPool.offer(consumer);
+        }
+    }
+
+    static final class MSBetweennessCentralityConsumer implements BfsConsumer, BfsWithPredecessorConsumer {
 
         private final LongIntScatterMap idMapping;
         private final double divisor;
@@ -122,9 +233,8 @@ public class MSBetweennessCentrality extends Algorithm<MSBetweennessCentrality, 
         private final int[][] sigmas;
         private final int[][] distances;
 
-        MSBCBFSConsumer(int bfsCount, int nodeCount, AtomicDoubleArray centrality, double divisor) {
+        MSBetweennessCentralityConsumer(int bfsCount, int nodeCount, AtomicDoubleArray centrality, double divisor) {
             this.centrality = centrality;
-
             this.idMapping = new LongIntScatterMap(bfsCount);
             this.paths = new Paths[bfsCount];
             this.stacks = new IntStack[bfsCount];
@@ -142,17 +252,24 @@ public class MSBetweennessCentrality extends Algorithm<MSBetweennessCentrality, 
             }
         }
 
-        void init(long[] startNodes, boolean clear) {
+        void init(long[] startNodes) {
+            // clear the mapping
+            idMapping.clear();
+
             for (int i = 0; i < startNodes.length; i++) {
-                if (clear) {
-                    Arrays.fill(sigmas[i], 0);
-                    Arrays.fill(deltas[i], 0);
-                    idMapping.clear();
-                    paths[i].clear();
-                    stacks[i].clear();
-                }
-                idMapping.put(startNodes[i], i);
+                // fill arrays
+                Arrays.fill(sigmas[i], 0);
+                Arrays.fill(deltas[i], 0);
                 Arrays.fill(distances[i], -1);
+
+                // remove results from prior task
+                paths[i].clear();
+                stacks[i].clear();
+
+                // re-map the new batch of nodes
+                idMapping.put(startNodes[i], i);
+
+                // starting values for each node
                 sigmas[i][(int) startNodes[i]] = 1;
                 distances[i][(int) startNodes[i]] = 0;
             }
@@ -210,4 +327,29 @@ public class MSBetweennessCentrality extends Algorithm<MSBetweennessCentrality, 
             }
         }
     }
+
+    /**
+     * Result class used for streaming
+     */
+    public static final class Result {
+
+        // original node id
+        public final long nodeId;
+        // centrality value
+        public final double centrality;
+
+        public Result(long nodeId, double centrality) {
+            this.nodeId = nodeId;
+            this.centrality = centrality;
+        }
+
+        @Override
+        public String toString() {
+            return "Result{" +
+                   "nodeId=" + nodeId +
+                   ", centrality=" + centrality +
+                   '}';
+        }
+    }
+
 }

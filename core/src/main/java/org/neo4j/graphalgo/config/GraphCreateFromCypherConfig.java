@@ -39,7 +39,7 @@ import static org.neo4j.graphalgo.config.GraphCreateFromStoreConfig.RELATIONSHIP
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 @ValueClass
-@Configuration("GraphCreateFromCypherConfigImpl")
+@Configuration
 @SuppressWarnings("immutables:subtype")
 public interface GraphCreateFromCypherConfig extends GraphCreateConfig {
 
@@ -80,6 +80,12 @@ public interface GraphCreateFromCypherConfig extends GraphCreateConfig {
     @Value.Parameter(false)
     default boolean sudo() {
         return true;
+    }
+
+    @Override
+    @Configuration.Ignore
+    default <R> R accept(Cases<R> visitor) {
+        return visitor.cypher(this);
     }
 
     static GraphCreateFromCypherConfig of(

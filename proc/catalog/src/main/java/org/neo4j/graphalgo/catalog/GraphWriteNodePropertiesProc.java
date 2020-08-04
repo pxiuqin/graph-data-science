@@ -22,7 +22,6 @@ package org.neo4j.graphalgo.catalog;
 import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
-import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.GraphWriteNodePropertiesConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.concurrency.Pools;
@@ -60,7 +59,7 @@ public class GraphWriteNodePropertiesProc extends CatalogProc {
         // input
         CypherMapWrapper cypherConfig = CypherMapWrapper.create(configuration);
         GraphWriteNodePropertiesConfig config = GraphWriteNodePropertiesConfig.of(
-            getUsername(),
+            username(),
             graphName,
             nodeProperties,
             nodeLabels,
@@ -68,7 +67,7 @@ public class GraphWriteNodePropertiesProc extends CatalogProc {
         );
         // validation
         validateConfig(cypherConfig, config);
-        GraphStore graphStore = GraphStoreCatalog.get(getUsername(), graphName).graphStore();
+        GraphStore graphStore = GraphStoreCatalog.get(username(), databaseId(), graphName).graphStore();
         config.validate(graphStore);
 
         // writing
@@ -107,8 +106,7 @@ public class GraphWriteNodePropertiesProc extends CatalogProc {
                     .map(nodePropertyKey ->
                         ImmutableNodeProperty.of(
                             nodePropertyKey,
-                            subGraph.nodeProperties(nodePropertyKey),
-                            NodeProperties.translatorFor(graphStore.nodePropertyType(nodeLabel, nodePropertyKey))
+                            subGraph.nodeProperties(nodePropertyKey)
                         )
                     )
                     .collect(Collectors.toList());

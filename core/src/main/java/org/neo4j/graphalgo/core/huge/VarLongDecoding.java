@@ -22,11 +22,12 @@ package org.neo4j.graphalgo.core.huge;
 final class VarLongDecoding {
 
     static int decodeDeltaVLongs(
-            long startValue,
-            byte[] adjacencyPage,
-            int offset,
-            int limit,
-            long[] out) {
+        long startValue,
+        byte[] adjacencyPage,
+        int offset,
+        int limit,
+        long[] out
+    ) {
         long input, value = 0L;
         int into = 0, shift = 0;
         while (into < limit) {

@@ -35,8 +35,11 @@ The following table lists all production-quality graph operations in the GDS lib
 |<<catalog-graph-drop, Remove a named graph from memory>> | `gds.graph.drop`
 |<<catalog-graph-stream-node-properties, Stream a single node property to the procedure caller>> | `gds.graph.streamNodeProperty`
 |<<catalog-graph-stream-node-properties, Stream node properties to the procedure caller>> | `gds.graph.streamNodeProperties`
+|<<catalog-graph-stream-relationship-properties, Stream a single relationship property to the procedure caller>> | `gds.graph.streamRelationshipProperty`
+|<<catalog-graph-stream-relationship-properties, Stream relationship properties to the procedure caller>> | `gds.graph.streamRelationshipProperties`
 |<<catalog-graph-write-node-properties, Write node properties to Neo4j>> | `gds.graph.writeNodeProperties`
 |<<catalog-graph-write-relationship, Write relationships to Neo4j>> | `gds.graph.writeRelationship`
+|<<catalog-graph-export, Graph Export>> | `gds.graph.export`
 |===
 
 [[production-quality-tier]]
@@ -112,6 +115,15 @@ The following table lists all production-quality procedures in the GDS library:
 | `gds.localClusteringCoefficient.write.estimate`
 | `gds.localClusteringCoefficient.mutate`
 | `gds.localClusteringCoefficient.mutate.estimate`
+.8+<.^| <<algorithms-betweenness-centrality-syntax, Betweenness Centrality>>
+| `gds.betweenness.stream`
+| `gds.betweenness.stream.estimate`
+| `gds.betweenness.stats`
+| `gds.betweenness.stats.estimate`
+| `gds.betweenness.mutate`
+| `gds.betweenness.mutate.estimate`
+| `gds.betweenness.write`
+| `gds.betweenness.write.estimate`
 |===
 
 [[beta-tier]]
@@ -154,15 +166,6 @@ The following table lists all beta procedures in the GDS library:
 [[alpha-tier]]
 == Alpha tier
 
-The following table lists all beta graph operations in the GDS library:
-
-[role=procedure-listing]
-[opts=header,cols="1, 1"]
-|===
-|Operation | Procedure
-|<<catalog-graph-export, Graph Export>> | `gds.beta.graph.export`
-|===
-
 The following table lists all alpha procedures in the GDS library:
 
 [[table-alpha]]
@@ -174,11 +177,6 @@ The following table lists all alpha procedures in the GDS library:
 .2+<.^|<<algorithms-articlerank, Article Rank>>
 | `gds.alpha.articleRank.stream`
 | `gds.alpha.articleRank.write`
-.4+<.^|<<algorithms-betweenness-centrality, Betweenness Centrality>>
-| `gds.alpha.betweenness.stream`
-| `gds.alpha.betweenness.write`
-| `gds.alpha.betweenness.sampled.stream`
-| `gds.alpha.betweenness.sampled.write`
 |<<algorithms-bfs, Breadth First Search>> | `gds.alpha.bfs.stream`
 .4+<.^|<<algorithms-closeness-centrality, Closeness Centrality>>
 | `gds.alpha.closeness.stream`
@@ -236,6 +234,15 @@ The following table lists all alpha procedures in the GDS library:
 | `gds.alpha.ml.ann.write`
 .1+<.^| Triangle Finding
 | `gds.alpha.triangles`
+.2+<.^|<<algorithms-embeddings-node2vec, Node2Vec>>
+| `gds.alpha.node2vec.stream`
+| `gds.alpha.node2vec.write`
+.2+<.^|<<algorithms-embeddings-graph-sage, GraphSAGE>>
+| `gds.alpha.graphSage.stream`
+| `gds.alpha.graphSage.write`
+.2+<.^| RandomProjections
+| `gds.alpha.randomProjection.stream`
+| `gds.alpha.randomProjection.write`
 |===
 
 The following table lists all functions in the GDS library:

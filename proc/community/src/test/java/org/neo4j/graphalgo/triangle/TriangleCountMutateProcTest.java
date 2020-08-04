@@ -26,9 +26,9 @@ import org.neo4j.graphalgo.MutateNodePropertyTest;
 import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.RelationshipProjection;
 import org.neo4j.graphalgo.api.Graph;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
-import org.neo4j.values.storable.NumberType;
 
 import java.util.List;
 import java.util.Map;
@@ -38,8 +38,8 @@ import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.isA;
 import static org.neo4j.graphalgo.ElementProjection.PROJECT_ALL;
 import static org.neo4j.graphalgo.RelationshipType.ALL_RELATIONSHIPS;
-import static org.neo4j.graphalgo.TestGraph.Builder.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 
 class TriangleCountMutateProcTest
     extends TriangleCountBaseProcTest<TriangleCountMutateConfig>
@@ -51,8 +51,8 @@ class TriangleCountMutateProcTest
     }
 
     @Override
-    public NumberType mutatePropertyType() {
-        return NumberType.INTEGRAL;
+    public ValueType mutatePropertyType() {
+        return ValueType.LONG;
     }
 
     @Override
@@ -128,7 +128,7 @@ class TriangleCountMutateProcTest
             "mutateMillis", greaterThan(-1L)
         )));
 
-        Graph actualGraph = GraphStoreCatalog.get(getUsername(), "testGraph").graphStore().getUnion();
+        Graph actualGraph = GraphStoreCatalog.get(getUsername(), namedDatabaseId(), "testGraph").graphStore().getUnion();
 
         assertGraphEquals(
             fromGdl(

@@ -21,10 +21,10 @@ package org.neo4j.graphalgo.beta.k1coloring;
 
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.StreamProc;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
@@ -32,7 +32,6 @@ import org.neo4j.procedure.Procedure;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.neo4j.graphalgo.beta.k1coloring.K1ColoringProc.K1_COLORING_DESCRIPTION;
@@ -69,18 +68,20 @@ public class K1ColoringStreamProc extends StreamProc<K1Coloring, HugeLongArray, 
     }
 
     @Override
-    protected AlgorithmFactory<K1Coloring, K1ColoringStreamConfig> algorithmFactory(K1ColoringStreamConfig config) {
+    protected AlgorithmFactory<K1Coloring, K1ColoringStreamConfig> algorithmFactory() {
         return new K1ColoringFactory<>();
     }
 
     @Override
-    protected StreamResult streamResult(long originalNodeId, double value) {
-        return new StreamResult(originalNodeId, (long) value);
+    protected StreamResult streamResult(
+        long originalNodeId, long internalNodeId, NodeProperties nodeProperties
+    ) {
+        return new StreamResult(originalNodeId, nodeProperties.getLong(internalNodeId));
     }
 
     @Override
-    protected PropertyTranslator<HugeLongArray> nodePropertyTranslator(ComputationResult<K1Coloring, HugeLongArray, K1ColoringStreamConfig> computationResult) {
-        return K1ColoringProc.nodePropertyTranslator();
+    protected NodeProperties getNodeProperties(ComputationResult<K1Coloring, HugeLongArray, K1ColoringStreamConfig> computationResult) {
+        return K1ColoringProc.nodeProperties(computationResult);
     }
 
     public static class StreamResult {

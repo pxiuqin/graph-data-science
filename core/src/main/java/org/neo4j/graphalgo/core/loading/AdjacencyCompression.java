@@ -28,7 +28,7 @@ import java.util.Arrays;
 
 import static org.neo4j.graphalgo.core.loading.VarLongEncoding.encodeVLongs;
 
-final class AdjacencyCompression {
+public final class AdjacencyCompression {
 
     private static long[] growWithDestroy(long[] values, int newLength) {
         if (values.length < newLength) {
@@ -43,12 +43,12 @@ final class AdjacencyCompression {
         return values;
     }
 
-    static void copyFrom(LongsRef into, CompressedLongArray array) {
+    public static void copyFrom(LongsRef into, CompressedLongArray array) {
         into.longs = growWithDestroy(into.longs, array.length());
         into.length = array.uncompress(into.longs);
     }
 
-    static int applyDeltaEncoding(LongsRef data, Aggregation aggregation) {
+    public static int applyDeltaEncoding(LongsRef data, Aggregation aggregation) {
         Arrays.sort(data.longs, 0, data.length);
         return data.length = applyDelta(data.longs, data.length, aggregation);
     }
@@ -80,21 +80,20 @@ final class AdjacencyCompression {
         return data.length;
     }
 
-    static int compress(LongsRef data, byte[] out) {
+    public static int compress(LongsRef data, byte[] out) {
         return compress(data.longs, out, data.length);
     }
 
-    static int compress(long[] data, byte[] out, int length) {
+    private static int compress(long[] data, byte[] out, int length) {
         return encodeVLongs(data, length, out, 0);
     }
 
     //@formatter:off
-    static int writeDegree(byte[] out, int offset, int degree) {
+    static void writeDegree(byte[] out, int offset, int degree) {
         out[    offset] = (byte) (degree);
         out[1 + offset] = (byte) (degree >>> 8);
         out[2 + offset] = (byte) (degree >>> 16);
         out[3 + offset] = (byte) (degree >>> 24);
-        return 4 + offset;
     }
     //@formatter:on
 

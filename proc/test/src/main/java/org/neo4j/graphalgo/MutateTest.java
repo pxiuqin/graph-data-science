@@ -22,6 +22,7 @@ package org.neo4j.graphalgo;
 import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.api.schema.GraphStoreSchema;
 import org.neo4j.graphalgo.config.AlgoBaseConfig;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
@@ -29,10 +30,11 @@ import org.neo4j.graphalgo.config.MutateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
 import org.neo4j.graphalgo.utils.ExceptionUtil;
-import org.neo4j.values.storable.NumberType;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -40,8 +42,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
 import static org.neo4j.graphalgo.QueryRunner.runQuery;
 import static org.neo4j.graphalgo.TestSupport.FactoryType.NATIVE;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 public interface MutateTest<ALGORITHM extends Algorithm<ALGORITHM, RESULT>, CONFIG extends MutateConfig & AlgoBaseConfig, RESULT>
@@ -53,7 +57,7 @@ public interface MutateTest<ALGORITHM extends Algorithm<ALGORITHM, RESULT>, CONF
 
     String mutateProperty();
 
-    NumberType mutatePropertyType();
+    ValueType mutatePropertyType();
 
     @Override
     default CypherMapWrapper createMinimalConfig(CypherMapWrapper mapWrapper) {
@@ -92,8 +96,8 @@ public interface MutateTest<ALGORITHM extends Algorithm<ALGORITHM, RESULT>, CONF
                 })
         );
 
-        GraphStore graphStore = GraphStoreCatalog.get(TEST_USERNAME, graphName).graphStore();
-        TestSupport.assertGraphEquals(TestGraph.Builder.fromGdl(expectedMutatedGraph()), graphStore.getUnion());
+        GraphStore graphStore = GraphStoreCatalog.get(TEST_USERNAME, namedDatabaseId(), graphName).graphStore();
+        TestSupport.assertGraphEquals(fromGdl(expectedMutatedGraph()), graphStore.getUnion());
 
         GraphStoreSchema schema = graphStore.schema();
         boolean nodesContainMutateProperty = containsMutateProperty(schema.nodeSchema().properties());
@@ -101,11 +105,27 @@ public interface MutateTest<ALGORITHM extends Algorithm<ALGORITHM, RESULT>, CONF
         assertTrue(nodesContainMutateProperty || relationshipsContainMutateProperty);
     }
 
-    default boolean containsMutateProperty(Map<?, Map<String, NumberType>> entitySchema) {
+    default boolean containsMutateProperty(Map<?, Map<String, ValueType>> entitySchema) {
         return entitySchema
             .values()
             .stream()
             .anyMatch(props -> props.containsKey(mutateProperty()) && props.get(mutateProperty()) == mutatePropertyType());
+    }
+
+    @Test
+    default void testExceptionLogging() {
+
+        List<TestLog> log = new ArrayList<>(1);
+        assertThrows(
+            NullPointerException.class,
+            () -> applyOnProcedure(procedure -> {
+                var computationResult = mock(AlgoBaseProc.ComputationResult.class);
+                log.add(0, ((TestLog) procedure.log));
+                ((MutateProc) procedure).mutate(computationResult);
+            })
+        );
+
+        assertTrue(log.get(0).containsMessage(TestLog.WARN, "Graph mutation failed"));
     }
 
     @Test
@@ -121,11 +141,8 @@ public interface MutateTest<ALGORITHM extends Algorithm<ALGORITHM, RESULT>, CONF
             .graphStore(NATIVE);
 
         String graphName = "myGraph";
-        GraphStoreCatalog.set(withNameAndRelationshipProjections(
-            "",
-            graphName,
-            relationshipProjections()
-        ), graphStore);
+        var createConfig = withNameAndRelationshipProjections("", graphName, relationshipProjections());
+        GraphStoreCatalog.set(createConfig, graphStore);
 
         applyOnProcedure(procedure ->
             getProcedureMethods(procedure)
@@ -145,7 +162,7 @@ public interface MutateTest<ALGORITHM extends Algorithm<ALGORITHM, RESULT>, CONF
                 })
         );
 
-        GraphStore mutatedGraph = GraphStoreCatalog.get(TEST_USERNAME, graphName).graphStore();
+        GraphStore mutatedGraph = GraphStoreCatalog.get(TEST_USERNAME, namedDatabaseId(), graphName).graphStore();
         assertEquals(
             Collections.singleton(mutateProperty()),
             mutatedGraph.nodePropertyKeys(NodeLabel.of("A"))
@@ -196,8 +213,8 @@ public interface MutateTest<ALGORITHM extends Algorithm<ALGORITHM, RESULT>, CONF
                 })
         );
 
-        Graph mutatedGraph = GraphStoreCatalog.get(TEST_USERNAME, graphName).graphStore().getUnion();
-        TestSupport.assertGraphEquals(TestGraph.Builder.fromGdl(expectedMutatedGraph()), mutatedGraph);
+        Graph mutatedGraph = GraphStoreCatalog.get(TEST_USERNAME, namedDatabaseId(), graphName).graphStore().getUnion();
+        TestSupport.assertGraphEquals(fromGdl(expectedMutatedGraph()), mutatedGraph);
     }
 
     @Test

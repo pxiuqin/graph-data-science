@@ -26,7 +26,6 @@ import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.StoreLoaderBuilder;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.loading.NativeFactory;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.impl.closeness.MSClosenessCentrality;
 
@@ -85,7 +84,7 @@ class ClosenessCentralityDiscoTest extends AlgoTestBase {
         algo.resultStream()
             .forEach(r -> mock.accept(r.centrality));
 
-        verify(mock, times(3)).accept(eq(0.25, 0.01));
-        verify(mock, times(2)).accept(eq(0.0, 0.01));
+        verify(mock, times(3)).accept(eq(0.5, 0.01));
+        verify(mock, times(2)).accept(eq(0.25, 0.01));
     }
 }

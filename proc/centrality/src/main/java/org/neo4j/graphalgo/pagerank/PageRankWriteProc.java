@@ -21,10 +21,9 @@ package org.neo4j.graphalgo.pagerank;
 
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.WriteProc;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.internal.kernel.api.procs.ProcedureCallContext;
@@ -65,18 +64,18 @@ public class PageRankWriteProc extends WriteProc<PageRank, PageRank, PageRankWri
     }
 
     @Override
-    protected PropertyTranslator<PageRank> nodePropertyTranslator(ComputationResult<PageRank, PageRank, PageRankWriteConfig> computationResult) {
-        return PageRankProc.ScoresTranslator.INSTANCE;
+    protected NodeProperties getNodeProperties(ComputationResult<PageRank, PageRank, PageRankWriteConfig> computationResult) {
+        return PageRankProc.nodeProperties(computationResult);
     }
 
     @Override
     protected AbstractResultBuilder<WriteResult> resultBuilder(ComputationResult<PageRank, PageRank, PageRankWriteConfig> computeResult) {
-        return PageRankProc.resultBuilder(new WriteResult.Builder(callContext, computeResult.tracker()), computeResult);
+        return PageRankProc.resultBuilder(new WriteResult.Builder(callContext), computeResult);
     }
 
     @Override
-    protected AlgorithmFactory<PageRank, PageRankWriteConfig> algorithmFactory(PageRankWriteConfig config) {
-        return PageRankProc.algorithmFactory(config);
+    protected AlgorithmFactory<PageRank, PageRankWriteConfig> algorithmFactory() {
+        return new PageRankFactory<>();
     }
 
     @Override
@@ -125,14 +124,8 @@ public class PageRankWriteProc extends WriteProc<PageRank, PageRank, PageRankWri
 
         static class Builder extends PageRankProc.PageRankResultBuilder<WriteResult> {
 
-            Builder(
-                ProcedureCallContext context,
-                AllocationTracker tracker
-            ) {
-                super(
-                    context,
-                    tracker
-                );
+            Builder(ProcedureCallContext context) {
+                super(context);
             }
 
             @Override

@@ -24,9 +24,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
 import org.neo4j.common.Validator;
 import org.neo4j.configuration.Config;
-import org.neo4j.configuration.GraphDatabaseSettings;
 import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.RelationshipType;
+import org.neo4j.graphalgo.annotation.ValueClass;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.api.NodeMapping;
 import org.neo4j.graphalgo.api.NodeProperties;
@@ -48,11 +48,12 @@ import org.neo4j.io.layout.Neo4jLayout;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
 import org.neo4j.kernel.impl.store.format.RecordFormatSelector;
 import org.neo4j.kernel.lifecycle.LifeSupport;
+import org.neo4j.logging.internal.LogService;
 import org.neo4j.logging.internal.NullLogService;
-import org.neo4j.logging.internal.StoreLogService;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -60,6 +61,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 import static org.neo4j.io.ByteUnit.mebiBytes;
 import static org.neo4j.kernel.impl.scheduler.JobSchedulerFactory.createScheduler;
 
@@ -67,18 +69,18 @@ public class GraphStoreExport {
 
     private final GraphStore graphStore;
 
-    private final File neo4jHome;
+    private final Path neo4jHome;
 
     private final GraphStoreExportConfig config;
 
-    public GraphStoreExport(GraphStore graphStore, File neo4jHome, GraphStoreExportConfig config) {
+    public GraphStoreExport(GraphStore graphStore, Path neo4jHome, GraphStoreExportConfig config) {
         this.graphStore = graphStore;
         this.neo4jHome = neo4jHome;
         this.config = config;
     }
 
-    public void run() {
-        run(false);
+    public ImportedProperties run() {
+        return run(false);
     }
 
     /**
@@ -91,27 +93,42 @@ public class GraphStoreExport {
         run(true);
     }
 
-    private void run(boolean defaultSettingsSuitableForTests) {
+    private ImportedProperties run(boolean defaultSettingsSuitableForTests) {
         DIRECTORY_IS_WRITABLE.validate(neo4jHome);
-        var databaseConfig = Config.defaults(GraphDatabaseSettings.neo4j_home, neo4jHome.toPath());
+        var databaseConfig = Config.defaults(Settings.neo4jHome(), neo4jHome);
         var databaseLayout = Neo4jLayout.of(databaseConfig).databaseLayout(config.dbName());
         var importConfig = getImportConfig(defaultSettingsSuitableForTests);
 
         var lifeSupport = new LifeSupport();
 
         try (FileSystemAbstraction fs = new DefaultFileSystemAbstraction()) {
-            var logService = config.enableDebugLog()
-                ? lifeSupport.add(StoreLogService.withInternalLog(databaseConfig.get(Settings.storeInternalLogPath()).toFile()).build(fs))
-                : NullLogService.getInstance();
+            LogService logService;
+            if (config.enableDebugLog()) {
+                var storeInternalLogPath = databaseConfig.get(Settings.storeInternalLogPath());
+                logService = Neo4jProxy.logProviderForStoreAndRegister(storeInternalLogPath, fs, lifeSupport);
+            } else {
+                logService = NullLogService.getInstance();
+            }
             var jobScheduler = lifeSupport.add(createScheduler());
 
             lifeSupport.start();
 
+            var nodeStore = NodeStore.of(graphStore);
+            var relationshipStore = RelationshipStore.of(graphStore, config.defaultRelationshipType());
             Input input = Neo4jProxy.batchInputFrom(new GraphStoreInput(
-                NodeStore.of(graphStore),
-                RelationshipStore.of(graphStore, config.defaultRelationshipType()),
+                nodeStore,
+                relationshipStore,
                 config.batchSize()
             ));
+
+            var metaDataPath = Neo4jProxy.metadataStore(databaseLayout);
+            var dbExists = Files.exists(metaDataPath) && Files.isReadable(metaDataPath);
+            if (dbExists) {
+                throw new IllegalArgumentException(formatWithLocale(
+                    "The database [%s] already exists. The graph export procedure can only create new databases.",
+                    config.dbName()
+                ));
+            }
 
             var importer = Neo4jProxy.instantiateBatchImporter(
                 BatchImporterFactory.withHighestPriority(),
@@ -130,11 +147,17 @@ public class GraphStoreExport {
                 Collector.EMPTY
             );
             importer.doImport(input);
+
+            long importedNodeProperties = nodeStore.propertyCount() * graphStore.nodes().nodeCount();
+            long importedRelationshipProperties = relationshipStore.propertyCount() * graphStore.relationshipCount();
+            return ImmutableImportedProperties.of(importedNodeProperties, importedRelationshipProperties);
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
             lifeSupport.shutdown();
         }
+
+        return null;
     }
 
     @NotNull
@@ -155,6 +178,13 @@ public class GraphStoreExport {
                 return false;
             }
         };
+    }
+
+    @ValueClass
+    public interface ImportedProperties {
+
+        long nodePropertyCount();
+        long relationshipPropertyCount();
     }
 
     static class NodeStore {
@@ -240,7 +270,7 @@ public class GraphStoreExport {
                 });
             }
 
-            if (graphStore.nodePropertyCount() == 0) {
+            if (graphStore.nodePropertyKeys().isEmpty()) {
                 nodeProperties = null;
             } else {
                 nodeProperties = graphStore.nodePropertyKeys().entrySet().stream().collect(Collectors.toMap(
@@ -252,11 +282,11 @@ public class GraphStoreExport {
                 ));
             }
             return new NodeStore(
-                graphStore.nodeCount(),
-                labelCounts,
-                nodeLabels.containsOnlyAllNodesLabel() ? null : nodeLabels,
-                nodeProperties
-            );
+                    graphStore.nodeCount(),
+                    labelCounts,
+                    nodeLabels.containsOnlyAllNodesLabel() ? null : nodeLabels,
+                    nodeProperties
+                );
         }
     }
 
@@ -351,18 +381,17 @@ public class GraphStoreExport {
         }
     }
 
-    private static final Validator<File> DIRECTORY_IS_WRITABLE = value -> {
-        if (value.mkdirs()) {   // It's OK, we created the directory right now, which means we have write access to it
-            return;
-        }
-
-        var test = new File(value, "_______test___");
+    private static final Validator<Path> DIRECTORY_IS_WRITABLE = value -> {
         try {
-            test.createNewFile();
+            Files.createDirectories(value);
+            if (!Files.isDirectory(value)) {
+                throw new IllegalArgumentException("'" + value + "' is not a directory");
+            }
+            if (!Files.isWritable(value)) {
+                throw new IllegalArgumentException("Directory '" + value + "' not writable");
+            }
         } catch (IOException e) {
-            throw new IllegalArgumentException("Directory '" + value + "' not writable: " + e.getMessage());
-        } finally {
-            test.delete();
+            throw new IllegalArgumentException("Directory '" + value + "' not writable: ", e);
         }
     };
 }

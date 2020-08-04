@@ -22,9 +22,9 @@ package org.neo4j.graphalgo.triangle;
 
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.StreamProc;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import static org.neo4j.graphalgo.triangle.LocalClusteringCoefficientCompanion.warnOnGraphWithParallelRelationships;
 import static org.neo4j.procedure.Mode.READ;
 
 public class LocalClusteringCoefficientStreamProc
@@ -74,15 +75,15 @@ public class LocalClusteringCoefficientStreamProc
     }
 
     @Override
-    protected AlgorithmFactory<LocalClusteringCoefficient, LocalClusteringCoefficientStreamConfig> algorithmFactory(
-        LocalClusteringCoefficientStreamConfig config
-    ) {
+    protected AlgorithmFactory<LocalClusteringCoefficient, LocalClusteringCoefficientStreamConfig> algorithmFactory() {
         return new LocalClusteringCoefficientFactory<>();
     }
 
     @Override
-    protected Result streamResult(long originalNodeId, double value) {
-        return new Result(originalNodeId, value);
+    protected Result streamResult(
+        long originalNodeId, long internalNodeId, NodeProperties nodeProperties
+    ) {
+        return new Result(originalNodeId, nodeProperties.getDouble(internalNodeId));
     }
 
     @Override
@@ -90,13 +91,14 @@ public class LocalClusteringCoefficientStreamProc
         GraphCreateConfig graphCreateConfig, LocalClusteringCoefficientStreamConfig config
     ) {
         validateIsUndirectedGraph(graphCreateConfig, config);
+        warnOnGraphWithParallelRelationships(graphCreateConfig, config, log);
     }
 
     @Override
-    protected PropertyTranslator<LocalClusteringCoefficient.Result> nodePropertyTranslator(
+    protected NodeProperties getNodeProperties(
         ComputationResult<LocalClusteringCoefficient, LocalClusteringCoefficient.Result, LocalClusteringCoefficientStreamConfig> computationResult
     ) {
-        return LocalClusteringCoefficientCompanion.nodePropertyTranslator();
+        return LocalClusteringCoefficientCompanion.nodeProperties(computationResult);
     }
 
     public static class Result {

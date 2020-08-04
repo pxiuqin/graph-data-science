@@ -29,14 +29,11 @@ import org.neo4j.graphalgo.TestGraphLoader;
 import org.neo4j.graphalgo.TestSupport;
 import org.neo4j.graphalgo.TestSupport.AllGraphStoreFactoryTypesTest;
 import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.core.loading.StoreScanner;
 import org.neo4j.graphalgo.core.utils.TerminationFlag;
 
-import java.io.PrintWriter;
-
-import static org.neo4j.graphalgo.TestGraph.Builder.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
 import static org.neo4j.graphalgo.TestSupport.assertTransactionTermination;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 
 class GraphLoaderTest extends BaseTest {
 
@@ -52,7 +49,6 @@ class GraphLoaderTest extends BaseTest {
 
     @BeforeEach
     void setup() {
-        StoreScanner.useKernelCursors(true);
         runQuery(DB_CYPHER);
     }
 

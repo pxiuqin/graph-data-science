@@ -23,9 +23,9 @@ import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.MutatePropertyConfig;
+import org.neo4j.graphalgo.core.huge.FilteredNodeProperties;
 import org.neo4j.graphalgo.core.huge.NodeFilteredGraph;
 import org.neo4j.graphalgo.core.utils.ProgressTimer;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 
 import java.util.Collection;
@@ -37,46 +37,53 @@ public abstract class MutateProc<
     PROC_RESULT,
     CONFIG extends MutatePropertyConfig> extends AlgoBaseProc<ALGO, ALGO_RESULT, CONFIG> {
 
-    protected abstract PropertyTranslator<ALGO_RESULT> nodePropertyTranslator(ComputationResult<ALGO, ALGO_RESULT, CONFIG> computationResult);
+    protected abstract NodeProperties getNodeProperties(ComputationResult<ALGO, ALGO_RESULT, CONFIG> computationResult);
 
     protected abstract AbstractResultBuilder<PROC_RESULT> resultBuilder(ComputationResult<ALGO, ALGO_RESULT, CONFIG> computeResult);
 
     protected Stream<PROC_RESULT> mutate(ComputationResult<ALGO, ALGO_RESULT, CONFIG> computeResult) {
-        CONFIG config = computeResult.config();
-        AbstractResultBuilder<PROC_RESULT> builder = resultBuilder(computeResult)
-            .withCreateMillis(computeResult.createMillis())
-            .withComputeMillis(computeResult.computeMillis())
-            .withNodeCount(computeResult.graph().nodeCount())
-            .withConfig(config);
+        return runWithExceptionLogging("Graph mutation failed", () -> {
+            CONFIG config = computeResult.config();
 
-        if (computeResult.isGraphEmpty()) {
-            return Stream.of(builder.build());
-        } else {
-            updateGraphStore(builder, computeResult);
-            computeResult.graph().releaseProperties();
-            return Stream.of(builder.build());
-        }
+            AbstractResultBuilder<PROC_RESULT> builder = resultBuilder(computeResult)
+                .withCreateMillis(computeResult.createMillis())
+                .withComputeMillis(computeResult.computeMillis())
+                .withNodeCount(computeResult.graph().nodeCount())
+                .withConfig(config);
+
+            if (computeResult.isGraphEmpty()) {
+                return Stream.of(builder.build());
+            } else {
+                updateGraphStore(builder, computeResult);
+                computeResult.graph().releaseProperties();
+                return Stream.of(builder.build());
+            }
+        });
     }
 
     private void updateGraphStore(
         AbstractResultBuilder<?> resultBuilder,
         ComputationResult<ALGO, ALGO_RESULT, CONFIG> computationResult
     ) {
-        PropertyTranslator<ALGO_RESULT> resultPropertyTranslator = nodePropertyTranslator(computationResult);
+        Graph graph = computationResult.graph();
+
+        NodeProperties nodeProperties = getNodeProperties(computationResult);
+        if (graph instanceof NodeFilteredGraph) {
+            nodeProperties = new ReverseFilteredNodeProperties(nodeProperties, (NodeFilteredGraph) graph);
+        }
+
         MutatePropertyConfig mutatePropertyConfig = computationResult.config();
+
         try (ProgressTimer ignored = ProgressTimer.start(resultBuilder::withMutateMillis)) {
             log.debug("Updating in-memory graph store");
             GraphStore graphStore = computationResult.graphStore();
-            Graph graph = computationResult.graph();
-
             Collection<NodeLabel> labelsToUpdate = mutatePropertyConfig.nodeLabelIdentifiers(graphStore);
 
             for (NodeLabel label : labelsToUpdate) {
                 graphStore.addNodeProperty(
                     label,
                     mutatePropertyConfig.mutateProperty(),
-                    resultPropertyTranslator.numberType(),
-                    nodeProperties(resultPropertyTranslator, computationResult.result(), graph)
+                    nodeProperties
                 );
             }
 
@@ -84,37 +91,14 @@ public abstract class MutateProc<
         }
     }
 
-    private NodeProperties nodeProperties(
-        PropertyTranslator<ALGO_RESULT> resultPropertyTranslator,
-        ALGO_RESULT result,
-        Graph graph
-    ) {
-        if (graph instanceof NodeFilteredGraph) {
-            return new NodeProperties() {
-                @Override
-                public double nodeProperty(long nodeId) {
-                    return !graph.contains(nodeId) ?
-                        PropertyMapping.DEFAULT_FALLBACK_VALUE :
-                        resultPropertyTranslator.toDouble(result, ((NodeFilteredGraph) graph).getMappedNodeId(nodeId));
-                }
+    static class ReverseFilteredNodeProperties extends FilteredNodeProperties {
+        ReverseFilteredNodeProperties(NodeProperties properties, NodeFilteredGraph idMap) {
+            super(properties, idMap);
+        }
 
-                @Override
-                public long size() {
-                    return graph.nodeCount();
-                }
-            };
-        } else {
-            return new NodeProperties() {
-                @Override
-                public double nodeProperty(long nodeId) {
-                    return resultPropertyTranslator.toDouble(result, nodeId);
-                }
-
-                @Override
-                public long size() {
-                    return graph.nodeCount();
-                }
-            };
+        @Override
+        protected long translateId(long nodeId) {
+            return graph.getFilteredMappedNodeId(nodeId);
         }
     }
 }

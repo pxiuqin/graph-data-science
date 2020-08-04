@@ -32,12 +32,12 @@ import org.neo4j.graphalgo.RelationshipProjection;
 import org.neo4j.graphalgo.RelationshipProjections;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
 import org.neo4j.graphalgo.config.ImmutableGraphCreateFromStoreConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
-import org.neo4j.values.storable.NumberType;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,8 +59,8 @@ class ModularityOptimizationMutateProcTest extends ModularityOptimizationProcTes
     }
 
     @Override
-    public NumberType mutatePropertyType() {
-        return NumberType.INTEGRAL;
+    public ValueType mutatePropertyType() {
+        return ValueType.LONG;
     }
 
     @BeforeEach
@@ -111,7 +111,7 @@ class ModularityOptimizationMutateProcTest extends ModularityOptimizationProcTes
 
         runQuery(query);
 
-        GraphStore mutatedGraph = GraphStoreCatalog.get(TEST_USERNAME, TEST_GRAPH_NAME).graphStore();
+        GraphStore mutatedGraph = GraphStoreCatalog.get(TEST_USERNAME, namedDatabaseId(), TEST_GRAPH_NAME).graphStore();
         NodeProperties communities = mutatedGraph.nodePropertyValues(mutateProperty());
         NodeProperties seeds = mutatedGraph.nodePropertyValues("seed1");
         for (int i = 0; i < mutatedGraph.nodeCount(); i++) {

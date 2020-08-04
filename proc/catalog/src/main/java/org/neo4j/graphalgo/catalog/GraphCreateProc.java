@@ -61,12 +61,12 @@ public class GraphCreateProc extends CatalogProc {
         @Name(value = "relationshipProjection") @Nullable Object relationshipProjection,
         @Name(value = "configuration", defaultValue = "{}") Map<String, Object> configuration
     ) {
-        validateGraphName(getUsername(), graphName);
+        validateGraphName(username(), graphName);
 
         // input
         CypherMapWrapper cypherConfig = CypherMapWrapper.create(configuration);
         GraphCreateFromStoreConfig config = GraphCreateFromStoreConfig.of(
-            getUsername(),
+            username(),
             graphName,
             nodeProjection,
             relationshipProjection,
@@ -92,7 +92,7 @@ public class GraphCreateProc extends CatalogProc {
     ) {
         CypherMapWrapper cypherConfig = CypherMapWrapper.create(configuration);
         GraphCreateConfig config = GraphCreateFromStoreConfig.of(
-            getUsername(),
+            username(),
             NO_GRAPH_NAME,
             nodeProjection,
             relationshipProjection,
@@ -110,12 +110,12 @@ public class GraphCreateProc extends CatalogProc {
         @Name(value = "relationshipQuery") String relationshipQuery,
         @Name(value = "configuration", defaultValue = "{}") Map<String, Object> configuration
     ) {
-        validateGraphName(getUsername(), graphName);
+        validateGraphName(username(), graphName);
 
         // input
         CypherMapWrapper cypherConfig = CypherMapWrapper.create(configuration);
         GraphCreateFromCypherConfig config = GraphCreateFromCypherConfig.of(
-            getUsername(),
+            username(),
             graphName,
             nodeQuery,
             relationshipQuery,
@@ -141,7 +141,7 @@ public class GraphCreateProc extends CatalogProc {
     ) {
         CypherMapWrapper cypherConfig = CypherMapWrapper.create(configuration);
         GraphCreateFromCypherConfig config = GraphCreateFromCypherConfig.of(
-            getUsername(),
+            username(),
             NO_GRAPH_NAME,
             nodeQuery,
             relationshipQuery,
@@ -179,7 +179,7 @@ public class GraphCreateProc extends CatalogProc {
 
     public MemoryTreeWithDimensions memoryTreeWithDimensions(GraphCreateConfig config) {
         GraphLoader loader = newLoader(config, AllocationTracker.EMPTY);
-        GraphStoreFactory<?> graphStoreFactory = loader.graphStoreFactory();
+        GraphStoreFactory<?, ?> graphStoreFactory = loader.graphStoreFactory();
         GraphDimensions dimensions = updateDimensions(config, graphStoreFactory, graphStoreFactory.estimationDimensions());
 
         MemoryTree memoryTree = estimate(graphStoreFactory, dimensions, config);
@@ -188,7 +188,7 @@ public class GraphCreateProc extends CatalogProc {
 
     private GraphDimensions updateDimensions(
         GraphCreateConfig config,
-        GraphStoreFactory<?> graphStoreFactory,
+        GraphStoreFactory<?, ?> graphStoreFactory,
         GraphDimensions dimensions
     ) {
         if (config.nodeCount() > -1) {
@@ -203,7 +203,7 @@ public class GraphCreateProc extends CatalogProc {
         return dimensions;
     }
 
-    public MemoryTree estimate(GraphStoreFactory<?> factory, GraphDimensions dimensions, GraphCreateConfig config) {
+    public MemoryTree estimate(GraphStoreFactory<?, ?> factory, GraphDimensions dimensions, GraphCreateConfig config) {
         return factory.memoryEstimation().estimate(dimensions, config.readConcurrency());
     }
 

@@ -30,7 +30,6 @@ import org.neo4j.graphalgo.CypherLoaderBuilder;
 import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.PropertyMapping;
 import org.neo4j.graphalgo.PropertyMappings;
-import org.neo4j.graphalgo.TestGraph;
 import org.neo4j.graphalgo.TestGraphLoader;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
@@ -54,9 +53,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.neo4j.graphalgo.RelationshipType.ALL_RELATIONSHIPS;
-import static org.neo4j.graphalgo.TestGraph.Builder.fromGdl;
 import static org.neo4j.graphalgo.TestSupport.FactoryType.CYPHER;
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
+import static org.neo4j.graphalgo.TestSupport.fromGdl;
 import static org.neo4j.graphalgo.compat.GraphDatabaseApiProxy.applyInTransaction;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
@@ -90,7 +89,7 @@ class CypherFactoryTest extends BaseTest {
                 .graph()
         );
 
-        assertGraphEquals(TestGraph.Builder.fromGdl(
+        assertGraphEquals(fromGdl(
             "(a {partition: 6.0, foo: 5.0})" +
             "(b {partition: 0.0, foo: 4.0})" +
             "(c {partition: 0.0, foo: 5.0})" +
@@ -338,8 +337,8 @@ class CypherFactoryTest extends BaseTest {
                 "Node properties",
                 "MATCH (n) RETURN id(n) as id, n.id as idProp",
                 "MATCH (n)-[r]->(m) RETURN id(n) AS source, id(m) AS target",
-                523000,
-                719720
+                621376,
+                621376
             ),
 
             Arguments.of(

@@ -26,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import org.neo4j.graphalgo.Algorithm;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
 import org.neo4j.graphalgo.beta.k1coloring.ImmutableK1ColoringStreamConfig;
 import org.neo4j.graphalgo.beta.k1coloring.K1Coloring;
 import org.neo4j.graphalgo.beta.k1coloring.K1ColoringFactory;
@@ -37,7 +38,6 @@ import org.neo4j.graphalgo.core.utils.paged.HugeAtomicDoubleArray;
 import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongLongMap;
-import org.neo4j.graphalgo.core.utils.paged.PageFiller;
 import org.neo4j.graphalgo.utils.CloseableThreadLocal;
 
 import java.util.ArrayList;
@@ -270,7 +270,7 @@ public final class ModularityOptimization extends Algorithm<ModularityOptimizati
         );
 
         // reset communityWeightUpdates
-        communityWeightUpdates = HugeAtomicDoubleArray.newArray(nodeCount, PageFiller.allZeros(concurrency), tracker);
+        communityWeightUpdates = HugeAtomicDoubleArray.newArray(nodeCount, tracker);
     }
 
     private Collection<ModularityOptimizationTask> createModularityOptimizationTasks(long currentColor) {
@@ -365,5 +365,19 @@ public final class ModularityOptimization extends Algorithm<ModularityOptimizati
 
     public double getTolerance() {
         return tolerance;
+    }
+
+    public LongNodeProperties asNodeProperties() {
+        return new LongNodeProperties() {
+            @Override
+            public long getLong(long nodeId) {
+                return getCommunityId(nodeId);
+            }
+
+            @Override
+            public long size() {
+                return currentCommunities.size();
+            }
+        };
     }
 }

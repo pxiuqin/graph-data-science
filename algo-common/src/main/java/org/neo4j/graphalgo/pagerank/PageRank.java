@@ -31,7 +31,6 @@ import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
 import org.neo4j.graphalgo.core.utils.partition.Partition;
 import org.neo4j.graphalgo.core.utils.partition.PartitionUtils;
 import org.neo4j.graphalgo.result.CentralityResult;
-import org.neo4j.logging.Log;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,11 +40,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.stream.LongStream;
 
 import static org.neo4j.graphalgo.core.utils.BitUtil.ceilDiv;
-import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.humanReadable;
-import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfDoubleArray;
-import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfInstance;
-import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfIntArray;
-import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfLongArray;
 import static org.neo4j.graphalgo.core.utils.mem.MemoryUsage.sizeOfObjectArray;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
@@ -107,8 +101,8 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
     public static final Double DEFAULT_TOLERANCE = 0.0000001D;
 
     private final ExecutorService executor;
-    private final int concurrency;
     private final int batchSize;
+    private final int concurrency;
     private final AllocationTracker tracker;
     private final IdMapping idMapping;
     private final double dampingFactor;
@@ -139,7 +133,6 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         PageRankVariant pageRankVariant,
         LongStream sourceNodeIds,   //给定源节点情况
         PageRankBaseConfig algoConfig,
-        int concurrency,
         ExecutorService executor,
         int batchSize,
         ProgressLogger progressLogger,
@@ -147,8 +140,8 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
     ) {
         assert algoConfig.maxIterations() >= 1;
         this.executor = executor;
-        this.concurrency = concurrency;
         this.batchSize = batchSize;
+        this.concurrency = algoConfig.concurrency();
         this.tracker = tracker;
         this.idMapping = graph;
         this.graph = graph;
@@ -222,7 +215,8 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         List<Partition> partitions = PartitionUtils.degreePartition(graph, adjustBatchSize(batchSize));
 
         ExecutorService executor = ParallelUtil.canRunInParallel(this.executor)
-                ? this.executor : null;
+            ? this.executor
+            : null;
 
         computeSteps = createComputeSteps(
                 concurrency,
@@ -249,16 +243,16 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
 
     //创建计算单元
     private ComputeSteps createComputeSteps(
-            int concurrency,
-            long nodeCount,
-            double dampingFactor,
-            long[] sourceNodeIds,
-            List<Partition> partitions,
-            ExecutorService pool) {
-        concurrency = findIdealConcurrency(nodeCount, partitions, concurrency, progressLogger.getLog());
+        long nodeCount,
+        double dampingFactor,
+        long[] sourceNodeIds,
+        List<Partition> partitions,
+        ExecutorService pool
+    ) {
         final int expectedParallelism = Math.min(
-                concurrency,
-                partitions.size());
+            concurrency,
+            partitions.size()
+        );
 
         List<ComputeStep> computeSteps = new ArrayList<>(expectedParallelism);  //并行数
         LongArrayList starts = new LongArrayList(expectedParallelism);
@@ -290,16 +284,16 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
 
             //添加一个可计算单元，使用PageRankVariant来创建计算单元
             computeSteps.add(pageRankVariant.createComputeStep(
-                    dampingFactor,
-                    toleranceValue,
-                    sourceNodeIds,
-                    graph,
-                    tracker,
-                    partitionSize,
-                    start,
-                    degreeCache,
-                    nodeCount,
-                    progressLogger
+                dampingFactor,
+                toleranceValue,
+                sourceNodeIds,
+                graph,
+                tracker,
+                partitionSize,
+                start,
+                degreeCache,
+                nodeCount,
+                progressLogger
             ));
         }
 
@@ -455,10 +449,11 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         private final int concurrency;
 
         private ComputeSteps(
-                AllocationTracker tracker,
-                List<ComputeStep> steps,
-                int concurrency,
-                ExecutorService pool) {
+            AllocationTracker tracker,
+            List<ComputeStep> steps,
+            int concurrency,
+            ExecutorService pool
+        ) {
             this.concurrency = concurrency;
             assert !steps.isEmpty();
             this.steps = steps;

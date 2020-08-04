@@ -20,13 +20,15 @@
 package org.neo4j.graphalgo.core.huge;
 
 import org.neo4j.graphalgo.NodeLabel;
-import org.neo4j.graphalgo.api.FilterGraph;
-import org.neo4j.graphalgo.api.Graph;
+import org.neo4j.graphalgo.api.CSRFilterGraph;
+import org.neo4j.graphalgo.api.CSRGraph;
+import org.neo4j.graphalgo.api.ImmutableTopology;
 import org.neo4j.graphalgo.api.NodeMapping;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.api.RelationshipConsumer;
 import org.neo4j.graphalgo.api.RelationshipIntersect;
 import org.neo4j.graphalgo.api.RelationshipWithPropertyConsumer;
+import org.neo4j.graphalgo.api.Relationships;
 import org.neo4j.graphalgo.core.loading.IdMap;
 import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterable;
 import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterator;
@@ -35,11 +37,11 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.function.LongPredicate;
 
-public class NodeFilteredGraph extends FilterGraph {
+public class NodeFilteredGraph extends CSRFilterGraph {
 
     private final IdMap filteredIdMap;
 
-    public NodeFilteredGraph(Graph graph, IdMap filteredIdMap) {
+    public NodeFilteredGraph(CSRGraph graph, IdMap filteredIdMap) {
         super(graph);
         this.filteredIdMap = filteredIdMap;
     }
@@ -70,13 +72,18 @@ public class NodeFilteredGraph extends FilterGraph {
     }
 
     @Override
+    public int degreeWithoutParallelRelationships(long nodeId) {
+        return super.degreeWithoutParallelRelationships(filteredIdMap.toOriginalNodeId(nodeId));
+    }
+
+    @Override
     public long nodeCount() {
         return filteredIdMap.nodeCount();
     }
 
     @Override
-    public long toMappedNodeId(long nodeId) {
-        return filteredIdMap.toMappedNodeId(super.toMappedNodeId(nodeId));
+    public long toMappedNodeId(long neoNodeId) {
+        return filteredIdMap.toMappedNodeId(super.toMappedNodeId(neoNodeId));
     }
 
     @Override
@@ -108,8 +115,12 @@ public class NodeFilteredGraph extends FilterGraph {
         return consumer.target;
     }
 
-    public long getMappedNodeId(long nodeId) {
+    public long getFilteredMappedNodeId(long nodeId) {
         return filteredIdMap.toMappedNodeId(nodeId);
+    }
+
+    public long getIntermediateOriginalNodeId(long nodeId) {
+        return filteredIdMap.toOriginalNodeId(nodeId);
     }
 
     @Override
@@ -128,8 +139,8 @@ public class NodeFilteredGraph extends FilterGraph {
     }
 
     @Override
-    public Graph concurrentCopy() {
-        return new NodeFilteredGraph((HugeGraph) graph.concurrentCopy(), filteredIdMap);
+    public CSRGraph concurrentCopy() {
+        return new NodeFilteredGraph(graph.concurrentCopy(), filteredIdMap);
     }
 
     @Override
@@ -158,7 +169,22 @@ public class NodeFilteredGraph extends FilterGraph {
         if (properties == null) {
             return null;
         }
-        return new FilteredNodeProperties(properties, filteredIdMap);
+        return new FilteredNodeProperties(properties, this);
+    }
+
+    @Override
+    public Relationships.Topology relationshipTopology() {
+        Relationships.Topology topology = graph.relationshipTopology();
+
+        TransientFilteredAdjacencyOffsets offsets = new TransientFilteredAdjacencyOffsets(
+            filteredIdMap,
+            topology.offsets()
+        );
+
+        return ImmutableTopology.builder()
+            .from(topology)
+            .offsets(offsets)
+            .build();
     }
 
     private boolean filterAndConsume(long source, long target, RelationshipConsumer consumer) {

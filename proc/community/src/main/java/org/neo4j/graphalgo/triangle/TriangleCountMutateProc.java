@@ -21,9 +21,9 @@ package org.neo4j.graphalgo.triangle;
 
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.MutateProc;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
-import org.neo4j.graphalgo.core.write.PropertyTranslator;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.procedure.Description;
@@ -80,17 +80,15 @@ public class TriangleCountMutateProc extends MutateProc<IntersectingTriangleCoun
     }
 
     @Override
-    protected AlgorithmFactory<IntersectingTriangleCount, TriangleCountMutateConfig> algorithmFactory(
-        TriangleCountMutateConfig config
-    ) {
+    protected AlgorithmFactory<IntersectingTriangleCount, TriangleCountMutateConfig> algorithmFactory() {
         return new IntersectingTriangleCountFactory<>();
     }
 
     @Override
-    protected PropertyTranslator<IntersectingTriangleCount.TriangleCountResult> nodePropertyTranslator(
+    protected NodeProperties getNodeProperties(
         ComputationResult<IntersectingTriangleCount, IntersectingTriangleCount.TriangleCountResult, TriangleCountMutateConfig> computationResult
     ) {
-        return TriangleCountCompanion.nodePropertyTranslator();
+        return TriangleCountCompanion.nodePropertyTranslator(computationResult);
     }
 
     @Override
@@ -104,7 +102,7 @@ public class TriangleCountMutateProc extends MutateProc<IntersectingTriangleCoun
         public long mutateMillis;
 
         public MutateResult(
-            long triangleCount,
+            long globalTriangleCount,
             long nodeCount,
             long nodePropertiesWritten,
             long createMillis,
@@ -113,7 +111,7 @@ public class TriangleCountMutateProc extends MutateProc<IntersectingTriangleCoun
             Map<String, Object> configuration
         ) {
             super(
-                triangleCount,
+                globalTriangleCount,
                 nodeCount,
                 createMillis,
                 computeMillis,
@@ -129,7 +127,7 @@ public class TriangleCountMutateProc extends MutateProc<IntersectingTriangleCoun
         @Override
         public MutateResult build() {
             return new MutateResult(
-                triangleCount,
+                globalTriangleCount,
                 nodeCount,
                 nodePropertiesWritten,
                 createMillis,
