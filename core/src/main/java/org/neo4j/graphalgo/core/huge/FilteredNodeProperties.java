@@ -20,10 +20,12 @@
 package org.neo4j.graphalgo.core.huge;
 
 import org.apache.commons.lang3.mutable.MutableDouble;
+import org.apache.commons.lang3.mutable.MutableLong;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.values.storable.Value;
 
+import java.util.OptionalDouble;
 import java.util.OptionalLong;
 
 public class FilteredNodeProperties implements NodeProperties {
@@ -40,20 +42,11 @@ public class FilteredNodeProperties implements NodeProperties {
         return properties.getDouble(translateId(nodeId));
     }
 
-    @Override
-    public double getDouble(long nodeId, double defaultValue) {
-        return properties.getDouble(translateId(nodeId), defaultValue);
-    }
-
-    @Override
+        @Override
     public long getLong(long nodeId) {
         return properties.getLong(translateId(nodeId));
     }
 
-    @Override
-    public long getLong(long nodeId, long defaultValue) {
-        return properties.getLong(translateId(nodeId), defaultValue);
-    }
 
     @Override
     public double[] getDoubleArray(long nodeId) {
@@ -61,18 +54,8 @@ public class FilteredNodeProperties implements NodeProperties {
     }
 
     @Override
-    public double[] getDoubleArray(long nodeId, double[] defaultValue) {
-        return properties.getDoubleArray(translateId(nodeId), defaultValue);
-    }
-
-    @Override
     public Object getObject(long nodeId) {
         return properties.getObject(translateId(nodeId));
-    }
-
-    @Override
-    public Object getObject(long nodeId, Object defaultValue) {
-        return properties.getObject(translateId(nodeId), defaultValue);
     }
 
     @Override
@@ -86,15 +69,57 @@ public class FilteredNodeProperties implements NodeProperties {
     }
 
     @Override
-    public OptionalLong getMaxPropertyValue() {
-        MutableDouble currentMax = new MutableDouble(Double.NEGATIVE_INFINITY);
-        graph.forEachNode(id -> {
-            currentMax.setValue(Math.max(currentMax.doubleValue(), nodeProperty(id, Double.MIN_VALUE)));
-            return true;
-        });
-        return currentMax.doubleValue() == Double.NEGATIVE_INFINITY
-            ? OptionalLong.empty()
-            : OptionalLong.of((long) currentMax.doubleValue());
+    public OptionalLong getMaxLongPropertyValue() {
+        if (getType() == ValueType.LONG) {
+            MutableLong currentMax = new MutableLong(Long.MIN_VALUE);
+            graph.forEachNode(id -> {
+                currentMax.setValue(Math.max(currentMax.doubleValue(), getLong(id)));
+                return true;
+            });
+            return currentMax.longValue() == Long.MIN_VALUE
+                ? OptionalLong.empty()
+                : OptionalLong.of(currentMax.longValue());
+
+        } else if (getType() == ValueType.DOUBLE) {
+            MutableDouble currentMax = new MutableDouble(Double.NEGATIVE_INFINITY);
+            graph.forEachNode(id -> {
+                currentMax.setValue(Math.max(currentMax.doubleValue(), getDouble(id)));
+                return true;
+            });
+            return currentMax.doubleValue() == Double.NEGATIVE_INFINITY
+                ? OptionalLong.empty()
+                : OptionalLong.of(currentMax.toDouble().longValue());
+
+        } else {
+            return OptionalLong.empty();
+        }
+    }
+
+    @Override
+    public OptionalDouble getMaxDoublePropertyValue() {
+        if (getType() == ValueType.LONG) {
+            MutableLong currentMax = new MutableLong(Long.MIN_VALUE);
+            graph.forEachNode(id -> {
+                currentMax.setValue(Math.max(currentMax.doubleValue(), getLong(id)));
+                return true;
+            });
+            return currentMax.longValue() == Long.MIN_VALUE
+                ? OptionalDouble.empty()
+                : OptionalDouble.of(currentMax.toLong().doubleValue());
+
+        } else if (getType() == ValueType.DOUBLE) {
+            MutableDouble currentMax = new MutableDouble(Double.NEGATIVE_INFINITY);
+            graph.forEachNode(id -> {
+                currentMax.setValue(Math.max(currentMax.doubleValue(), getDouble(id)));
+                return true;
+            });
+            return currentMax.doubleValue() == Double.NEGATIVE_INFINITY
+                ? OptionalDouble.empty()
+                : OptionalDouble.of(currentMax.doubleValue());
+
+        } else {
+            return OptionalDouble.empty();
+        }
     }
 
     @Override

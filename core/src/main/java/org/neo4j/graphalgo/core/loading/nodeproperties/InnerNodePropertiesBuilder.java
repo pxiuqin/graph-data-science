@@ -17,30 +17,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.graphalgo.api.nodeproperties;
+package org.neo4j.graphalgo.core.loading.nodeproperties;
 
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.values.storable.Value;
-import org.neo4j.values.storable.Values;
 
-public interface LongArrayNodeProperties extends NodeProperties {
+public abstract class InnerNodePropertiesBuilder {
 
-    @Override
-    long[] getLongArray(long nodeId);
+    abstract void setValue(long nodeId, Value value);
 
-    @Override
-    default Object getObject(long nodeId) {
-        return getLongArray(nodeId);
-    }
-
-    @Override
-    default Value getValue(long nodeId) {
-        var value = getLongArray(nodeId);
-        return value == null ? null : Values.longArray(value);
-    };
-
-    @Override
-    default ValueType getType() {
-        return ValueType.DOUBLE_ARRAY;
-    };
+    abstract NodeProperties build(long size);
 }

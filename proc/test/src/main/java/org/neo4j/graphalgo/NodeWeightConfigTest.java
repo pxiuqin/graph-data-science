@@ -24,6 +24,7 @@ import org.eclipse.collections.impl.tuple.Tuples;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.catalog.GraphCreateProc;
@@ -166,7 +167,7 @@ public interface NodeWeightConfigTest<ALGORITHM extends Algorithm<ALGORITHM, RES
             .addNodeLabel("Node")
             .addNodeProjection(NodeProjection.builder()
                 .label("Ignore")
-                .addProperty("foo", "foo", 0)
+                .addProperty("foo", "foo", DefaultValue.of(0))
                 .build()
             ).build();
 
@@ -206,7 +207,7 @@ public interface NodeWeightConfigTest<ALGORITHM extends Algorithm<ALGORITHM, RES
 
             Graph graph = proc.createGraph(configAndName);
             graph.forEachNode(nodeId -> {
-                assertEquals(expectedWeight, graph.nodeProperties(propertyName).nodeProperty(nodeId));
+                assertEquals(expectedWeight, graph.nodeProperties(propertyName).getDouble(nodeId));
                 return true;
             });
 

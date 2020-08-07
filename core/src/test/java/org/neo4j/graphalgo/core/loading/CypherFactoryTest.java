@@ -90,9 +90,9 @@ class CypherFactoryTest extends BaseTest {
         );
 
         assertGraphEquals(fromGdl(
-            "(a {partition: 6.0, foo: 5.0})" +
-            "(b {partition: 0.0, foo: 4.0})" +
-            "(c {partition: 0.0, foo: 5.0})" +
+            "(a {partition: 6, foo: 5.0})" +
+            "(b {partition: 0, foo: 4.0})" +
+            "(c {partition: 0, foo: 5.0})" +
             "(a)-[{w:1.0}]->(b)" +
             "(a)-[{w:3.0}]->(c)" +
             "(b)-[{w:2.0}]->(c)"
@@ -137,9 +137,9 @@ class CypherFactoryTest extends BaseTest {
             ", ({prop2: 2})" +
             ", ({prop3: 3})"
         );
-        PropertyMapping prop1 = PropertyMapping.of("prop1", 0D);
-        PropertyMapping prop2 = PropertyMapping.of("prop2", 0D);
-        PropertyMapping prop3 = PropertyMapping.of("prop3", 0D);
+        PropertyMapping prop1 = PropertyMapping.of("prop1", 0);
+        PropertyMapping prop2 = PropertyMapping.of("prop2", 0);
+        PropertyMapping prop3 = PropertyMapping.of("prop3", 0);
 
         Graph graph = TestGraphLoader
             .from(db)
@@ -160,9 +160,9 @@ class CypherFactoryTest extends BaseTest {
             "CREATE" +
             "  (n1)" +
             ", (n2)" +
-            ", (n1)-[:REL {prop1: 1}]->(n2)" +
-            ", (n1)-[:REL {prop2: 2}]->(n2)" +
-            ", (n1)-[:REL {prop3: 3}]->(n2)"
+            ", (n1)-[:REL {prop1: 1.0}]->(n2)" +
+            ", (n1)-[:REL {prop2: 2.0}]->(n2)" +
+            ", (n1)-[:REL {prop3: 3.0}]->(n2)"
         );
         PropertyMapping prop1 = PropertyMapping.of("prop1", 0D);
         PropertyMapping prop2 = PropertyMapping.of("prop2", 0D);
@@ -180,17 +180,17 @@ class CypherFactoryTest extends BaseTest {
             ", (a)-[{w: %f}]->(b)";
 
         assertGraphEquals(
-            fromGdl(formatWithLocale(expectedGraph, 1.0f, prop1.defaultValue(), prop1.defaultValue())),
+            fromGdl(formatWithLocale(expectedGraph, 1.0f, prop1.defaultValue().getDouble(), prop1.defaultValue().getDouble())),
             graphs.getGraph(ALL_RELATIONSHIPS, Optional.of(prop1.propertyKey()))
         );
 
         assertGraphEquals(
-            fromGdl(formatWithLocale(expectedGraph, prop2.defaultValue(), 2.0, prop2.defaultValue())),
+            fromGdl(formatWithLocale(expectedGraph, prop2.defaultValue().getDouble(), 2.0, prop2.defaultValue().getDouble())),
             graphs.getGraph(ALL_RELATIONSHIPS, Optional.of(prop2.propertyKey()))
         );
 
         assertGraphEquals(
-            fromGdl(formatWithLocale(expectedGraph, prop3.defaultValue(), prop3.defaultValue(), 3.0)),
+            fromGdl(formatWithLocale(expectedGraph, prop3.defaultValue().getDouble(), prop3.defaultValue().getDouble(), 3.0)),
             graphs.getGraph(ALL_RELATIONSHIPS, Optional.of(prop3.propertyKey()))
         );
     }
@@ -329,24 +329,24 @@ class CypherFactoryTest extends BaseTest {
                 "Topology Only",
                 "MATCH (n) RETURN id(n) as id",
                 "MATCH (n)-[r]->(m) RETURN id(n) AS source, id(m) AS target",
-                522928,
-                522928
+                522936,
+                522936
             ),
 
             Arguments.of(
                 "Node properties",
                 "MATCH (n) RETURN id(n) as id, n.id as idProp",
                 "MATCH (n)-[r]->(m) RETURN id(n) AS source, id(m) AS target",
-                621376,
-                621376
+                621392,
+                621392
             ),
 
             Arguments.of(
                 "Relationship properties",
                 "MATCH (n) RETURN id(n) as id",
                 "MATCH (n)-[r]->(m) RETURN id(n) AS source, id(m) AS target, r.prop as prop",
-                867304,
-                867304
+                867312,
+                867312
             )
         );
     }

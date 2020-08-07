@@ -34,6 +34,7 @@ import org.neo4j.graphalgo.PropertyMappings;
 import org.neo4j.graphalgo.RelationshipProjection;
 import org.neo4j.graphalgo.RelationshipType;
 import org.neo4j.graphalgo.StoreLoaderBuilder;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.api.Relationships;
@@ -261,8 +262,8 @@ class GraphStoreTest extends BaseTest {
             .aggregation(Aggregation.NONE)
             .properties(
                 PropertyMappings.builder()
-                    .addMapping("property1", "property1", 42D, Aggregation.NONE)
-                    .addMapping("property2", "property2", 1337D, Aggregation.NONE)
+                    .addMapping("property1", "property1", DefaultValue.of(42D), Aggregation.NONE)
+                    .addMapping("property2", "property2", DefaultValue.of(1337D), Aggregation.NONE)
                     .build()
             ).build();
 
@@ -272,7 +273,7 @@ class GraphStoreTest extends BaseTest {
             .aggregation(Aggregation.NONE)
             .properties(
                 PropertyMappings.builder()
-                    .addMapping("property1", "property1", 42D, Aggregation.NONE)
+                    .addMapping("property1", "property1", DefaultValue.of(42D), Aggregation.NONE)
                     .build()
             ).build();
 
@@ -282,7 +283,7 @@ class GraphStoreTest extends BaseTest {
             .aggregation(Aggregation.NONE)
             .properties(
                 PropertyMappings.builder()
-                    .addMapping("property2", "property2", 42D, Aggregation.NONE)
+                    .addMapping("property2", "property2", DefaultValue.of(42D), Aggregation.NONE)
                     .build()
             ).build();
 
@@ -313,13 +314,13 @@ class GraphStoreTest extends BaseTest {
                 "filterByRelationshipProperty",
                 Arrays.asList(RelationshipType.of("T1"), RelationshipType.of("T2")),
                 Optional.of("property1"),
-                "(a:A), (b:B), (a)-[T1 {property1: 42}]->(b), (a)-[T2 {property1: 43}]->(b)"
+                "(a:A), (b:B), (a)-[T1 {property1: 42.0}]->(b), (a)-[T2 {property1: 43.0}]->(b)"
             ),
             Arguments.of(
                 "filterByRelationshipTypeAndProperty",
                 singletonList(RelationshipType.of("T1")),
                 Optional.of("property1"),
-                "(a:A), (b:B), (a)-[T1 {property1: 42}]->(b)"
+                "(a:A), (b:B), (a)-[T1 {property1: 42.0}]->(b)"
             )
         );
     }
@@ -329,12 +330,12 @@ class GraphStoreTest extends BaseTest {
             Arguments.of(
                 "filterAllLabels",
                 Arrays.asList(NodeLabel.of("A"), NodeLabel.of("B"), NodeLabel.of("Ignore")),
-                "(a:A {nodeProperty: 33, a: 33, b: 'NaN'}), (b:B {nodeProperty: 42, a: 'NaN', b: 42}), (a)-[T1]->(b)"
+                "(a:A {nodeProperty: 33, a: 33}), (b:B {nodeProperty: 42, b: 42}), (a)-[T1]->(b)"
             ),
             Arguments.of(
                 "filterAllTypesExplicit",
                 Arrays.asList(NodeLabel.of("A"), NodeLabel.of("B")),
-                "(a:A {nodeProperty: 33, a: 33, b: 'NaN'}), (b:B {nodeProperty: 42, a: 'NaN', b: 42}), (a)-[T1]->(b)"
+                "(a:A {nodeProperty: 33, a: 33}), (b:B {nodeProperty: 42, b: 42}), (a)-[T1]->(b)"
             ),
             Arguments.of(
                 "FilterA",

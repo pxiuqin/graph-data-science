@@ -28,6 +28,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.neo4j.cypher.internal.evaluator.EvaluationException;
 import org.neo4j.cypher.internal.evaluator.Evaluator;
 import org.neo4j.cypher.internal.evaluator.ExpressionEvaluator;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.compat.MapUtil;
 import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
 import org.neo4j.graphalgo.config.ImmutableGraphCreateFromStoreConfig;
@@ -40,12 +41,10 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.neo4j.graphalgo.ElementProjection.PROJECT_ALL;
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
@@ -120,7 +119,7 @@ class GdsCypherTest {
             "      properties: {" +
             "        relProp: {" +
             "          property: 'RelationshipPropertyName'," +
-            "          defaultValue: 1337.0," +
+            "          defaultValue: 1337," +
             "          aggregation: 'MAX'" +
             "        }" +
             "      }" +
@@ -145,14 +144,14 @@ class GdsCypherTest {
 
         NodeProjection fooNode = NodeProjection.builder()
             .label("Foo")
-            .addProperty("nodeProp", "NodePropertyName", 42.1337)
+            .addProperty("nodeProp", "NodePropertyName", DefaultValue.of(42.1337))
             .build();
 
         RelationshipProjection barRel = RelationshipProjection.builder()
             .type("Bar")
             .orientation(Orientation.UNDIRECTED)
             .aggregation(Aggregation.SINGLE)
-            .addProperty("relProp", "RelationshipPropertyName", 1337, Aggregation.MAX)
+            .addProperty("relProp", "RelationshipPropertyName", DefaultValue.of(1337), Aggregation.MAX)
             .build();
 
         GraphCreateFromStoreConfig configFromBuilder = ImmutableGraphCreateFromStoreConfig
@@ -354,7 +353,7 @@ class GdsCypherTest {
                     "properties: {" +
                         "relProp: {" +
                             "property: \"RelationshipPropertyName\", " +
-                            "defaultValue: 1337.0, " +
+                            "defaultValue: 1337, " +
                             "aggregation: \"MAX\"" +
                         "}, " +
                         "global: {" +
@@ -639,19 +638,6 @@ class GdsCypherTest {
         );
     }
 
-    @Test
-    void testEmptyPlaceholder() {
-        assertThrows(NoSuchElementException.class, () -> {
-            GdsCypher
-                .call()
-                .explicitCreation("")
-                .algo("algoName")
-                .writeMode()
-                .addPlaceholder("foo", "")
-                .yields();
-        });
-    }
-
     static Stream<Arguments> variables() {
         return Stream.of(
             //@formatter:off
@@ -684,19 +670,6 @@ class GdsCypherTest {
             formatWithLocale("CALL gds.algoName.write(\"\", {foo: %s})", expected),
             query
         );
-    }
-
-    @Test
-    void testEmptyVariable() {
-        assertThrows(NoSuchElementException.class, () -> {
-            GdsCypher
-                .call()
-                .explicitCreation("")
-                .algo("algoName")
-                .writeMode()
-                .addVariable("foo", "")
-                .yields();
-        });
     }
 
     @Test

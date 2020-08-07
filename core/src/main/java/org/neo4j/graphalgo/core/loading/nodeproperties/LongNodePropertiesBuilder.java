@@ -17,25 +17,26 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.graphalgo.core.loading;
+package org.neo4j.graphalgo.core.loading.nodeproperties;
 
-import org.jetbrains.annotations.TestOnly;
-import org.neo4j.graphalgo.api.nodeproperties.ValueType;
+import org.neo4j.graphalgo.api.DefaultValue;
+import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeSparseLongArray;
+import org.neo4j.values.storable.NumberValue;
+import org.neo4j.values.storable.Value;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.OptionalLong;
-import java.util.concurrent.atomic.LongAdder;
-import java.util.function.Consumer;
 
-public final class NodePropertiesBuilder {
+public class LongNodePropertiesBuilder extends InnerNodePropertiesBuilder {
 
-    private final double defaultValue;
-    private final ValueType valueType;
-    private final HugeSparseLongArray.Builder valuesBuilder;
-    private final LongAdder size;
+    // Value is changed with a VarHandle and needs to be non final for that
+    // even though our favourite IDE/OS doesn't pick that up
+    @SuppressWarnings({"FieldMayBeFinal", "FieldCanBeLocal"})
+    private volatile long maxValue;
 
     private static final VarHandle MAX_VALUE;
 
@@ -44,53 +45,36 @@ public final class NodePropertiesBuilder {
         try {
             maxValueHandle = MethodHandles
                 .lookup()
-                .findVarHandle(NodePropertiesBuilder.class, "maxValue", long.class);
+                .findVarHandle(LongNodePropertiesBuilder.class, "maxValue", long.class);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
         MAX_VALUE = maxValueHandle;
     }
 
-    // Value is changed with a VarHandle and needs to be non final for that
-    // even though our favourite IDE/OS doesn't pick that up
-    @SuppressWarnings({"FieldMayBeFinal", "FieldCanBeLocal"})
-    private volatile long maxValue;
+    private final HugeSparseLongArray.Builder valuesBuilder;
 
-    public static NodePropertiesBuilder of(long nodeSize, ValueType valueType, AllocationTracker tracker, double defaultValue) {
-        return new NodePropertiesBuilder(valueType, defaultValue, nodeSize, tracker);
-    }
-
-    @TestOnly
-    static NodePropertyArray of(long size, ValueType valueType, double defaultValue, Consumer<NodePropertiesBuilder> buildBlock) {
-        var builder = of(size, valueType, AllocationTracker.EMPTY, defaultValue);
-        buildBlock.accept(builder);
-        return builder.build();
-    }
-
-    private NodePropertiesBuilder(ValueType valueType, double defaultValue, long nodeSize, AllocationTracker tracker) {
-        this.valueType = valueType;
-        this.defaultValue = defaultValue;
-        this.valuesBuilder = HugeSparseLongArray.Builder.create(nodeSize, tracker);
-        this.size = new LongAdder();
+    public LongNodePropertiesBuilder(long nodeCount, DefaultValue defaultValue, AllocationTracker tracker) {
         this.maxValue = Long.MIN_VALUE;
+        this.valuesBuilder = HugeSparseLongArray.Builder.create(nodeCount, defaultValue.getLong(), tracker);
     }
 
-    public void set(long nodeId, double value) {
-        valuesBuilder.set(nodeId, Double.doubleToRawLongBits(value));
-        size.increment();
-        updateMaxValue((long) value);
+    @Override
+    void setValue(long nodeId, Value value) {
+        long longValue = ((NumberValue) value).longValue();
+        valuesBuilder.set(nodeId, longValue);
+        updateMaxValue(longValue);
     }
 
-    public NodePropertyArray build() {
-        var size = this.size.sum();
-        var maxValue = size == 0 ? OptionalLong.empty() : OptionalLong.of((long) MAX_VALUE.getVolatile(this));
-        return new NodePropertyArray(
-            valueType,
-            defaultValue,
-            maxValue,
-            size,
-            valuesBuilder.build()
-        );
+    @Override
+    NodeProperties build(long size) {
+        HugeSparseLongArray propertyValues = valuesBuilder.build();
+
+        var maybeMaxValue = size > 0
+            ? OptionalLong.of((long) MAX_VALUE.getVolatile(LongNodePropertiesBuilder.this))
+            : OptionalLong.empty();
+
+        return new LongStoreNodeProperties(propertyValues, size, maybeMaxValue);
     }
 
     private void updateMaxValue(long value) {
@@ -124,6 +108,33 @@ public final class NodePropertiesBuilder {
             }
             // update local copy and try again
             currentMax = newMax;
+        }
+    }
+
+    static class LongStoreNodeProperties implements LongNodeProperties {
+        private final HugeSparseLongArray propertyValues;
+        private final long size;
+        private final OptionalLong maxValue;
+
+        LongStoreNodeProperties(HugeSparseLongArray propertyValues, long size, OptionalLong maxValue) {
+            this.propertyValues = propertyValues;
+            this.size = size;
+            this.maxValue = maxValue;
+        }
+
+        @Override
+        public long getLong(long nodeId) {
+            return propertyValues.get(nodeId);
+        }
+
+        @Override
+        public OptionalLong getMaxLongPropertyValue() {
+            return maxValue;
+        }
+
+        @Override
+        public long size() {
+            return size;
         }
     }
 }

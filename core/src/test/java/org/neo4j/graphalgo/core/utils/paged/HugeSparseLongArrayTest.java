@@ -20,6 +20,8 @@
 package org.neo4j.graphalgo.core.utils.paged;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.neo4j.graphalgo.PrivateLookup;
 import org.neo4j.graphalgo.core.utils.BitUtil;
 import org.neo4j.graphalgo.core.utils.mem.MemoryRange;
@@ -114,9 +116,10 @@ final class HugeSparseLongArrayTest {
         }
     }
 
-    @Test
-    void shouldReturnNegativeOneForMissingValues() {
-        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.EMPTY);
+    @ParameterizedTest
+    @ValueSource(longs = {-1, Long.MIN_VALUE})
+    void shouldReturnDefaultValueForMissingValues(long defaultValue) {
+        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, defaultValue, AllocationTracker.EMPTY);
         int index = integer(2, 8);
         int value = integer(42, 1337);
         array.set(index, value);
@@ -127,7 +130,7 @@ final class HugeSparseLongArrayTest {
             String message = expectedContains
                     ? "Expected value at index " + i + " to be set to " + value + ", but got " + actual + " instead"
                     : "Expected value at index " + i + " to be missing (-1), but got " + actual + " instead";
-            assertEquals(expectedContains ? value : -1L, actual, message);
+            assertEquals(expectedContains ? value : defaultValue, actual, message);
         }
     }
 
@@ -208,11 +211,11 @@ final class HugeSparseLongArrayTest {
 
     @Test
     void shouldComputeMemoryEstimation() {
-        assertEquals(MemoryRange.of(40L), HugeSparseLongArray.memoryEstimation(0L, 0L));
-        assertEquals(MemoryRange.of(32832L), HugeSparseLongArray.memoryEstimation(100L, 100L));
-        assertEquals(MemoryRange.of(97_689_080L), HugeSparseLongArray.memoryEstimation(100_000_000_000L, 1L));
-        assertEquals(MemoryRange.of(177_714_824L, 327_937_656_296L), HugeSparseLongArray.memoryEstimation(100_000_000_000L, 10_000_000L));
-        assertEquals(MemoryRange.of(898_077_656L, 800_488_297_688L), HugeSparseLongArray.memoryEstimation(100_000_000_000L, 100_000_000L));
+        assertEquals(MemoryRange.of(48L), HugeSparseLongArray.memoryEstimation(0L, 0L));
+        assertEquals(MemoryRange.of(32840L), HugeSparseLongArray.memoryEstimation(100L, 100L));
+        assertEquals(MemoryRange.of(97_689_088L), HugeSparseLongArray.memoryEstimation(100_000_000_000L, 1L));
+        assertEquals(MemoryRange.of(177_714_832L, 327_937_656_304L), HugeSparseLongArray.memoryEstimation(100_000_000_000L, 10_000_000L));
+        assertEquals(MemoryRange.of(898_077_664L, 800_488_297_696L), HugeSparseLongArray.memoryEstimation(100_000_000_000L, 100_000_000L));
     }
 
     @Test
@@ -238,7 +241,8 @@ final class HugeSparseLongArrayTest {
         long classSizeComponents =
                 8L /* capacity */ +
                 4L /* ref for long[][] array */ +
-                12L /* object header */;
+                12L /* object header */ +
+                8L /* defaultValue */;
 
         long classSize = BitUtil.align(classSizeComponents, 8 /* object alignment */);
 

@@ -26,13 +26,13 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.RelationshipType;
 import org.neo4j.graphalgo.TestProgressLogger;
-import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.beta.generator.RandomGraphGenerator;
 import org.neo4j.graphalgo.beta.generator.RelationshipDistribution;
 import org.neo4j.graphalgo.core.GraphDimensions;
 import org.neo4j.graphalgo.core.ImmutableGraphDimensions;
 import org.neo4j.graphalgo.core.concurrency.Pools;
+import org.neo4j.graphalgo.core.huge.HugeGraph;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.TerminationFlag;
 import org.neo4j.graphalgo.core.utils.mem.MemoryTree;
@@ -322,12 +322,12 @@ class LouvainTest {
 
     static Stream<Arguments> memoryEstimationTuples() {
         return Stream.of(
-            arguments(1, 1, 6414145, 23941592),
-            arguments(1, 10, 6414145, 31141952),
-            arguments(4, 1, 6417433, 29745968),
-            arguments(4, 10, 6417433, 36946328),
-            arguments(42, 1, 6459081, 105719456),
-            arguments(42, 10, 6459081, 112919816)
+            arguments(1, 1, 6414145, 23941600),
+            arguments(1, 10, 6414145, 31141960),
+            arguments(4, 1, 6417433, 29745976),
+            arguments(4, 10, 6417433, 36946336),
+            arguments(42, 1, 6459081, 105719464),
+            arguments(42, 10, 6459081, 112919824)
         );
     }
 
@@ -395,13 +395,13 @@ class LouvainTest {
 
     @Test
     void testCanBeInterruptedByTxCancellation() {
-        Graph graph = new RandomGraphGenerator(
-            100_000,
-            10,
-            RelationshipDistribution.UNIFORM,
-            Optional.empty(),
-            AllocationTracker.EMPTY
-        ).generate();
+        HugeGraph graph = RandomGraphGenerator.builder()
+            .nodeCount(100_000)
+            .averageDegree(10)
+            .relationshipDistribution(RelationshipDistribution.UNIFORM)
+            .allocationTracker(AllocationTracker.EMPTY)
+            .build()
+            .generate();
 
         assertTerminates((terminationFlag) ->
             new Louvain(

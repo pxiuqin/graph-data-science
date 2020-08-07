@@ -93,5 +93,4 @@ class NodePropertyFuncTest  extends BaseProcTest {
         String query = "MATCH (n) RETURN gds.util.nodeProperty('testGraph', id(n), 'noProp', 'A') AS prop";
         assertError(query, "Node projection 'A' does not have property key 'noProp'. Available keys: ['prop'].");
     }
-
 }

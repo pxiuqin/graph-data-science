@@ -45,7 +45,6 @@ import org.neo4j.logging.Log;
 import org.neo4j.logging.NullLog;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -102,17 +101,16 @@ class GraphSageModelTrainEmbedTest extends BaseProcTest {
     }
 
     private void createRandomGraph(int nodeCount, int averageDegree) {
-        RandomGraphGenerator randomGraphGenerator = new RandomGraphGenerator(
-            nodeCount,
-            averageDegree,
-            RelationshipDistribution.POWER_LAW,
-            123L,
-            Optional.empty(),
-            Aggregation.SINGLE,
-            Orientation.UNDIRECTED,
-            RandomGraphGeneratorConfig.AllowSelfLoops.NO,
-            AllocationTracker.EMPTY
-        );
+        RandomGraphGenerator randomGraphGenerator = RandomGraphGenerator.builder()
+            .nodeCount(nodeCount)
+            .averageDegree(averageDegree)
+            .relationshipDistribution(RelationshipDistribution.POWER_LAW)
+            .seed(123L)
+            .aggregation(Aggregation.SINGLE)
+            .orientation(Orientation.UNDIRECTED)
+            .allowSelfLoops(RandomGraphGeneratorConfig.AllowSelfLoops.NO)
+            .allocationTracker(AllocationTracker.EMPTY)
+            .build();
         graph = randomGraphGenerator.generate();
     }
 

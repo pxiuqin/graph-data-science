@@ -21,11 +21,13 @@ package org.neo4j.graphalgo.core.utils.paged.dss;
 
 import com.carrotsearch.hppc.IntIntHashMap;
 import org.junit.jupiter.api.Test;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.NodeProperties;
-import org.neo4j.graphalgo.api.nodeproperties.DoubleNodeProperties;
+import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
 import org.neo4j.graphalgo.core.utils.mem.MemoryRange;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 
+import java.util.OptionalDouble;
 import java.util.OptionalLong;
 import java.util.stream.StreamSupport;
 
@@ -94,7 +96,7 @@ class IncrementalDisjointSetStructTest extends DisjointSetStructTest {
         assertMemoryEstimation(memoryEstimation(), 100_000_000_000L, MemoryRange.of(2_400_366_211_280L));
     }
 
-    static final class TestNodeProperties implements DoubleNodeProperties {
+    static final class TestNodeProperties implements LongNodeProperties {
         private final IntIntHashMap weights;
 
         private TestNodeProperties(final IntIntHashMap weights) {
@@ -117,26 +119,26 @@ class IncrementalDisjointSetStructTest extends DisjointSetStructTest {
         }
 
         @Override
-        public double getDouble(long nodeId) {
-            return getDouble(nodeId, 0.0);
-        }
-
-        @Override
-        public double getDouble(long nodeId, double defaultValue) {
+        public long getLong(long nodeId) {
             int key = Math.toIntExact(nodeId);
             int index = weights.indexOf(key);
             if (weights.indexExists(index)) {
                 return weights.indexGet(index);
             }
-            return defaultValue;
+            return DefaultValue.LONG_DEFAULT_FALLBACK;
         }
 
         @Override
-        public OptionalLong getMaxPropertyValue() {
+        public OptionalLong getMaxLongPropertyValue() {
             return StreamSupport
                 .stream(weights.values().spliterator(), false)
                 .mapToLong(d -> d.value)
                 .max();
+        }
+
+        @Override
+        public OptionalDouble getMaxDoublePropertyValue() {
+            return getMaxLongPropertyValue().stream().mapToDouble(l -> Long.valueOf(l).doubleValue()).findFirst();
         }
 
         @Override
