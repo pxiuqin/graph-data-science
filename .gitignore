@@ -38,6 +38,7 @@
 out/
 
 # Ignore misc.xml due to JDK naming conflicts
+.idea
 .idea/misc.xml
 .idea/compiler.xml
 
@@ -49,6 +50,7 @@ out/
 *~
 \#*
 .cache
+.vscode
 build/
 !**/src/**/build/
 .cache-main
