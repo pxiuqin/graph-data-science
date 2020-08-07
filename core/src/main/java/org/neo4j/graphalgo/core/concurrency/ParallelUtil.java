@@ -115,9 +115,9 @@ public final class ParallelUtil {
             throw new IllegalArgumentException("Invalid batch size: " + batchSize);
         }
         if (batchSize >= elementCount) {
-            return 1;
+            return 1;  //如果batchSize>记录个数直接降级线程为1
         }
-        return BitUtil.ceilDiv(elementCount, batchSize);
+        return BitUtil.ceilDiv(elementCount, batchSize);  //给定整除上界
     }
 
     /**
@@ -159,7 +159,7 @@ public final class ParallelUtil {
         final long minBatchSize
     ) {
         if (concurrency <= 0) {
-            concurrency = (int) Math.min(nodeCount, Integer.MAX_VALUE);
+            concurrency = (int) Math.min(nodeCount, Integer.MAX_VALUE);  //如果并行度小于0直接按照节点大小来设置
         }
         long targetBatchSize = threadCount(concurrency, nodeCount);
         return Math.max(minBatchSize, targetBatchSize);

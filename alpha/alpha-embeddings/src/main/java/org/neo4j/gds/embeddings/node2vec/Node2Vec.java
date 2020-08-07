@@ -26,6 +26,31 @@ import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeObjectArray;
 
+/**
+ * node2vec的思想同DeepWalk一样：生成随机游走，对随机游走采样得到（节点，上下文）的组合，
+ * 然后用处理词向量的方法对这样的组合建模得到网络节点的表示。本方法针对生成随机游走过程中做了一些创新，给定q和p参数来控制随机游走情况
+ *
+ * 算法逻辑【参考论文：node2vec: Scalable Feature Learning for Networks】：
+ * 算法的参数，图G、表示向量维度d、每个节点生成的游走个数r，游走长度l，上下文的窗口长度k，以及之前提到的p、q参数。
+ *
+ * 1、根据p、q和之前的公式计算一个节点到它的邻居的转移概率。
+ * 2、将这个转移概率加到图G中形成G'。
+ * 3、walks用来存储随机游走，先初始化为空。
+ * 4、外循环r次表示每个节点作为初始节点要生成r个随机游走。
+ * 5、然后对图中每个节点。
+ * 6、生成一条随机游走walk。
+ * 7、将walk添加到walks中保存。
+ * 8、然后用SGD的方法对walks进行训练。
+ *
+ * 第6步中一条walk的生成方式如下：
+ *
+ * 1、将初始节点u添加进去。
+ * 2、walk的长度为l，因此还要再循环添加l-1个节点。
+ * 3、当前节点设为walk最后添加的节点。
+ * 4、找出当前节点的所有邻居节点。
+ * 5、根据转移概率采样选择某个邻居s。【这里采用AliasSample，别名采样，应用场景:加权采样,即按照随机事件出现的概率抽样】
+ * 6、将该邻居添加到walk中。
+ */
 public class Node2Vec extends Algorithm<Node2Vec, HugeObjectArray<Vector>> {
 
     private final Graph graph;
@@ -43,23 +68,23 @@ public class Node2Vec extends Algorithm<Node2Vec, HugeObjectArray<Vector>> {
     public HugeObjectArray<Vector> compute() {
         RandomWalk randomWalk = new RandomWalk(
             graph,
-            config.walkLength(),
-            new RandomWalk.NextNodeStrategy(graph, config.returnFactor(), config.inOutFactor()),
+            config.walkLength(),  //随机游走的的步数
+            new RandomWalk.NextNodeStrategy(graph, config.returnFactor(), config.inOutFactor()),  //构建一个找下一个节点的策略
             config.concurrency(),
             config.walksPerNode(),
-            config.walkBufferSize()
+            config.walkBufferSize()  //队列大小
         );
 
         HugeObjectArray<long[]> walks = HugeObjectArray.newArray(
             long[].class,
             graph.nodeCount() * config.walksPerNode(),
             tracker
-        );
+        );  //记录下节点随机游走的结果
         MutableLong counter = new MutableLong(0);
         randomWalk
             .compute()
             .forEach(walk -> {
-                walks.set(counter.longValue(), walk);
+                walks.set(counter.longValue(), walk);  //给定计数添加
                 counter.increment();
             });
 
