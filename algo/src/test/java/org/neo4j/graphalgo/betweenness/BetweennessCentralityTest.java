@@ -25,7 +25,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeAtomicDoubleArray;
 import org.neo4j.graphalgo.extension.TestGraph;
 
@@ -41,7 +41,7 @@ import static org.neo4j.graphalgo.TestSupport.fromGdl;
 
 class BetweennessCentralityTest {
 
-    private static final AllocationTracker TRACKER = AllocationTracker.EMPTY;
+    private static final AllocationTracker TRACKER = AllocationTracker.empty();
 
     private static final BetweennessCentralityStreamConfig DEFAULT_CONFIG = BetweennessCentralityStreamConfig.of(
         "",

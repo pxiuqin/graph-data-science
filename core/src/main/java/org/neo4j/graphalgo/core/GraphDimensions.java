@@ -34,7 +34,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Consumer;
 
 @ValueClass
@@ -107,14 +106,19 @@ public interface GraphDimensions {
         return Collections.emptyMap();
     }
 
-    default Set<NodeLabel> nodeLabels() {
+    @Value.Default
+    default int estimationNodeLabelCount() {
         var nodeLabels = new HashSet<NodeLabel>();
-        if (tokenNodeLabelMapping() != null) {
-            for (var tokenToLabels : tokenNodeLabelMapping()) {
+        var tokenNodeLabelMapping = tokenNodeLabelMapping();
+        if (tokenNodeLabelMapping != null) {
+            for (var tokenToLabels : tokenNodeLabelMapping) {
                 nodeLabels.addAll(tokenToLabels.value);
             }
         }
-        return nodeLabels;
+
+        return nodeLabels.stream().allMatch(l -> l.equals(NodeLabel.ALL_NODES))
+            ? 0
+            : nodeLabels.size();
     }
 
     static GraphDimensions of(long nodeCount) {

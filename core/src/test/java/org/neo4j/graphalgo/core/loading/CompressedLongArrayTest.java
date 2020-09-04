@@ -20,24 +20,28 @@
 package org.neo4j.graphalgo.core.loading;
 
 import org.junit.jupiter.api.Test;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
+import org.neo4j.internal.unsafe.UnsafeUtil;
 
 import java.util.Arrays;
+import java.util.function.Consumer;
 import java.util.stream.DoubleStream;
 import java.util.stream.LongStream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.neo4j.graphalgo.core.loading.AdjacencyBuilder.IGNORE_VALUE;
 
 class CompressedLongArrayTest {
 
     @Test
     void add() {
-        CompressedLongArray compressedLongArray = new CompressedLongArray(AllocationTracker.EMPTY);
+        CompressedLongArray compressedLongArray = new CompressedLongArray(AllocationTracker.empty());
 
         final long[] inValues = {1, 2, 3, 4};
-        compressedLongArray.add(inValues.clone(), 0, inValues.length);
+        compressedLongArray.add(inValues.clone(), 0, inValues.length, inValues.length);
 
         assertTrue(compressedLongArray.storage().length >= inValues.length);
 
@@ -50,17 +54,17 @@ class CompressedLongArrayTest {
 
     @Test
     void addSameValues() {
-        CompressedLongArray compressedLongArray1 = new CompressedLongArray(AllocationTracker.EMPTY);
-        CompressedLongArray compressedLongArray2 = new CompressedLongArray(AllocationTracker.EMPTY);
+        CompressedLongArray compressedLongArray1 = new CompressedLongArray(AllocationTracker.empty());
+        CompressedLongArray compressedLongArray2 = new CompressedLongArray(AllocationTracker.empty());
 
         int count = 10;
 
         long[] inValues1 = LongStream.range(0, count).toArray();
-        compressedLongArray1.add(inValues1, 0, count);
+        compressedLongArray1.add(inValues1, 0, count, count);
 
         long[] inValues2 = LongStream.range(0, count).toArray();
         for (int i = 0; i < count; i++) {
-            compressedLongArray2.add(inValues2, i, i + 1);
+            compressedLongArray2.add(inValues2, i, i + 1, 1);
         }
 
         long[] outValues1 = new long[count];
@@ -74,12 +78,12 @@ class CompressedLongArrayTest {
 
     @Test
     void addReverseOrder() {
-        CompressedLongArray compressedLongArray = new CompressedLongArray(AllocationTracker.EMPTY);
+        CompressedLongArray compressedLongArray = new CompressedLongArray(AllocationTracker.empty());
 
         int count = 10;
 
         long[] inValues = LongStream.range(0, count).map(i -> count - i).toArray();
-        compressedLongArray.add(inValues.clone(), 0, inValues.length);
+        compressedLongArray.add(inValues.clone(), 0, inValues.length, inValues.length);
 
         assertTrue(compressedLongArray.storage().length >= 10);
 
@@ -91,12 +95,29 @@ class CompressedLongArrayTest {
     }
 
     @Test
+    void addWithPreAggregation() {
+        var valuesToAdd = 3;
+        CompressedLongArray compressedLongArray = new CompressedLongArray(AllocationTracker.empty());
+
+        final long[] inValues = {1, IGNORE_VALUE, IGNORE_VALUE, 2, 3};
+        compressedLongArray.add(inValues.clone(), 0, inValues.length, valuesToAdd);
+
+        assertTrue(compressedLongArray.storage().length >= valuesToAdd);
+
+        long[] outValues = new long[3];
+        int uncompressedValueCount = compressedLongArray.uncompress(outValues);
+
+        assertEquals(3, uncompressedValueCount);
+        assertArrayEquals(new long[]{1, 2, 3}, outValues);
+    }
+
+    @Test
     void addWithWeights() {
-        CompressedLongArray compressedLongArray = new CompressedLongArray(AllocationTracker.EMPTY, 1);
+        CompressedLongArray compressedLongArray = new CompressedLongArray(AllocationTracker.empty(), 1);
 
         final long[] inValues = {1, 2, 3, 4};
         final long[] inWeights = DoubleStream.of(1.0, 2.0, 3.0, 4.0).mapToLong(Double::doubleToLongBits).toArray();
-        compressedLongArray.add(inValues.clone(), new long[][]{inWeights.clone()}, 0, inValues.length);
+        compressedLongArray.add(inValues.clone(), new long[][]{inWeights.clone()}, 0, inValues.length, inValues.length);
 
         // 10 bytes are enough to store the input values (1 byte each)
         assertTrue(compressedLongArray.storage().length >= inValues.length);
@@ -107,5 +128,75 @@ class CompressedLongArrayTest {
         assertArrayEquals(inValues, outValues);
 
         assertArrayEquals(inWeights, Arrays.copyOf(compressedLongArray.weights()[0], inWeights.length));
+    }
+
+    @Test
+    void addWithPreAggregatedWeights() {
+        CompressedLongArray compressedLongArray = new CompressedLongArray(AllocationTracker.empty(), 1);
+
+        var inValues = new long[]{1, IGNORE_VALUE, 2, 3};
+        var expectedValues = new long[]{1, 2, 3};
+        var inWeights = DoubleStream.of(3.0, 2.0, 3.0, 4.0).mapToLong(Double::doubleToLongBits).toArray();
+        var expectedWeights = DoubleStream.of(3.0, 3.0, 4.0).mapToLong(Double::doubleToLongBits).toArray();
+
+        compressedLongArray.add(inValues.clone(), new long[][]{inWeights.clone()}, 0, inValues.length, 3);
+
+        // 10 bytes are enough to store the input values (1 byte each)
+        assertTrue(compressedLongArray.storage().length >= inValues.length);
+
+        long[] outValues = new long[3];
+        int uncompressedValueCount = compressedLongArray.uncompress(outValues);
+        assertEquals(3, uncompressedValueCount);
+
+        assertArrayEquals(expectedValues, outValues);
+
+        assertArrayEquals(expectedWeights, Arrays.copyOf(compressedLongArray.weights()[0], expectedWeights.length));
+    }
+
+    @Test
+    void throwsOnOverflowInEnsureCapacity() {
+        CompressedLongArray longArray = new CompressedLongArray(AllocationTracker.empty());
+        var e = assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+                int almostIntMax = 2147483622;
+                givenAnByteArrayOfUnsafeFakeLength(almostIntMax, data -> {
+                    longArray.ensureCapacity(almostIntMax, 100, data);
+                });
+            }
+        );
+        assertTrue(e.getMessage().contains("numeric overflow in internal buffer"));
+    }
+
+    private void givenAnByteArrayOfUnsafeFakeLength(int length, Consumer<byte[]> code) {
+        /*
+        byte[] B = new byte[14];
+        [B object internals:
+         OFFSET  SIZE   TYPE DESCRIPTION                               VALUE
+              0     4        (object header)                           01 00 00 00 (00000001 00000000 00000000 00000000) (1)
+              4     4        (object header)                           00 00 00 00 (00000000 00000000 00000000 00000000) (0)
+              8     4        (object header)                           20 08 00 00 (00100000 00001000 00000000 00000000) (2080)
+             12     4        (object header)                           0e 00 00 00 (00001110 00000000 00000000 00000000) (14)
+             16    14   byte [B.<elements>                             N/A
+             30     2        (loss due to the next object alignment)
+        Instance size: 32 bytes
+        Space losses: 0 bytes internal + 2 bytes external = 2 bytes total
+         */
+        // Offset 16 where the array elements start
+        int arrayBaseOffset = UnsafeUtil.arrayBaseOffset(byte[].class);
+        // Offset 12 which is the `length` field in the array object header
+        int arrayLengthOffset = arrayBaseOffset - Integer.BYTES;
+
+        byte[] bytes = {};
+        // Override the internal `length` field to be the requested `length`
+        UnsafeUtil.putInt(bytes, arrayLengthOffset, length);
+        assertEquals(length, bytes.length);
+
+        try {
+            code.accept(bytes);
+        } finally {
+            // Set it back to 0 to avoid shenanigans when it is cleaned up
+            UnsafeUtil.putInt(bytes, arrayLengthOffset, 0);
+        }
     }
 }

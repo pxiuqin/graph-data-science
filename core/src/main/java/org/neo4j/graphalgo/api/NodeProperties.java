@@ -19,6 +19,7 @@
  */
 package org.neo4j.graphalgo.api;
 
+import org.jetbrains.annotations.Nullable;
 import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.values.storable.Value;
 
@@ -27,29 +28,41 @@ import java.util.OptionalLong;
 
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
+<<<<<<< HEAD
+=======
+//节点属性信息描述
+>>>>>>> neo4j-master
 public interface NodeProperties {
 
-    default double getDouble(long nodeId) {
+    default double doubleValue(long nodeId) {
         throw unsupportedTypeException(ValueType.DOUBLE);
     }
 
-    default long getLong(long nodeId) {
+    default long longValue(long nodeId) {
         throw unsupportedTypeException(ValueType.LONG);
     };
 
-    default double[] getDoubleArray(long nodeId) {
+    @Nullable
+    default double[] doubleArrayValue(long nodeId) {
         throw unsupportedTypeException(ValueType.DOUBLE_ARRAY);
     }
 
-    default long[] getLongArray(long nodeId) {
+    @Nullable
+    default float[] floatArrayValue(long nodeId) {
+        throw unsupportedTypeException(ValueType.FLOAT_ARRAY);
+    }
+
+    @Nullable
+    default long[] longArrayValue(long nodeId) {
         throw unsupportedTypeException(ValueType.LONG_ARRAY);
     }
 
+    @Nullable
     Object getObject(long nodeId);
 
-    ValueType getType();
+    ValueType valueType();
 
-    Value getValue(long nodeId);
+    Value value(long nodeId);
 
     /**
      * Release internal data structures and return an estimate how many bytes were freed.
@@ -73,7 +86,7 @@ public interface NodeProperties {
      * @throws java.lang.UnsupportedOperationException if the type is not coercible into a long.
      */
     default OptionalLong getMaxLongPropertyValue() {
-        if (getType() == ValueType.LONG) {
+        if (valueType() == ValueType.LONG) {
             throw new UnsupportedOperationException(formatWithLocale("%s does not overwrite `getMaxLongPropertyValue`", getClass().getSimpleName()));
         } else {
             throw unsupportedTypeException(ValueType.LONG);
@@ -86,7 +99,7 @@ public interface NodeProperties {
      * @throws java.lang.UnsupportedOperationException if the type is not coercible into a double.
      */
     default OptionalDouble getMaxDoublePropertyValue() {
-        if (getType() == ValueType.DOUBLE) {
+        if (valueType() == ValueType.DOUBLE) {
             throw new UnsupportedOperationException(formatWithLocale("%s does not overwrite `getMaxDoublePropertyValue`", getClass().getSimpleName()));
         } else {
             throw unsupportedTypeException(ValueType.DOUBLE);
@@ -94,6 +107,6 @@ public interface NodeProperties {
     }
 
     private UnsupportedOperationException unsupportedTypeException(ValueType expectedType) {
-        return new UnsupportedOperationException(formatWithLocale("Tried to retrieve a value of type %s value from properties of type %s", expectedType, getType()));
+        return new UnsupportedOperationException(formatWithLocale("Tried to retrieve a value of type %s value from properties of type %s", expectedType, valueType()));
     }
 }

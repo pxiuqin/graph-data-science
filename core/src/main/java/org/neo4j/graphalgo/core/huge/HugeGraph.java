@@ -33,7 +33,7 @@ import org.neo4j.graphalgo.core.huge.TransientAdjacencyList.DecompressingCursor;
 import org.neo4j.graphalgo.core.loading.IdMap;
 import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterable;
 import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterator;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import java.util.Collection;
 import java.util.Map;
@@ -174,6 +174,8 @@ public class HugeGraph implements CSRGraph {
     public NodeMapping nodeMapping() {
         return idMapping;
     }
+
+    public Map<String, NodeProperties> nodeProperties() { return nodeProperties; }
 
     @Override
     public long relationshipCount() {

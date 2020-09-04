@@ -21,6 +21,7 @@ package org.neo4j.graphalgo.core.utils.paged;
 
 import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
 import org.neo4j.graphalgo.core.utils.ArrayUtil;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import java.util.Arrays;
 import java.util.function.LongFunction;
@@ -208,7 +209,7 @@ public abstract class HugeLongArray extends HugeArray<long[], Long, HugeLongArra
     public LongNodeProperties asNodeProperties() {
         return new LongNodeProperties() {
             @Override
-            public long getLong(long nodeId) {
+            public long longValue(long nodeId) {
                 return get(nodeId);
             }
 

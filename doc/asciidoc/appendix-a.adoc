@@ -10,6 +10,7 @@ This chapter contains a reference of all the procedures and functions in the Neo
 This chapter contains the following sections:
 
 * <<appendix-a-graph-ops>>
+* <<appendix-a-model-ops>>
 * <<production-quality-tier>>
 * <<beta-tier>>
 * <<alpha-tier>>
@@ -40,6 +41,18 @@ The following table lists all production-quality graph operations in the GDS lib
 |<<catalog-graph-write-node-properties, Write node properties to Neo4j>> | `gds.graph.writeNodeProperties`
 |<<catalog-graph-write-relationship, Write relationships to Neo4j>> | `gds.graph.writeRelationship`
 |<<catalog-graph-export, Graph Export>> | `gds.graph.export`
+|===
+
+[[appendix-a-model-ops]]
+== Model Catalog Operations
+
+[role=procedure-listing]
+[opts=header,cols="1, 1"]
+|===
+| Operation               | Procedure
+| Check if a model exists | `gds.beta.model.exists`
+| Remove a model          | `gds.beta.model.drop`
+| List models             | `gds.beta.model.list`
 |===
 
 [[production-quality-tier]]
@@ -237,9 +250,10 @@ The following table lists all alpha procedures in the GDS library:
 .2+<.^|<<algorithms-embeddings-node2vec, Node2Vec>>
 | `gds.alpha.node2vec.stream`
 | `gds.alpha.node2vec.write`
-.2+<.^|<<algorithms-embeddings-graph-sage, GraphSAGE>>
+.3+<.^|<<algorithms-embeddings-graph-sage, GraphSAGE>>
 | `gds.alpha.graphSage.stream`
 | `gds.alpha.graphSage.write`
+| `gds.alpha.graphSage.train`
 .2+<.^| RandomProjections
 | `gds.alpha.randomProjection.stream`
 | `gds.alpha.randomProjection.write`

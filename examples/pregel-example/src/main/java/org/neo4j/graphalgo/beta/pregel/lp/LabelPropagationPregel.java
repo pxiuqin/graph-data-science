@@ -19,6 +19,9 @@
  */
 package org.neo4j.graphalgo.beta.pregel.lp;
 
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
+import org.neo4j.graphalgo.beta.pregel.NodeSchemaBuilder;
+import org.neo4j.graphalgo.beta.pregel.Pregel;
 import org.neo4j.graphalgo.beta.pregel.PregelComputation;
 import org.neo4j.graphalgo.beta.pregel.PregelConfig;
 import org.neo4j.graphalgo.beta.pregel.PregelContext;
@@ -26,7 +29,6 @@ import org.neo4j.graphalgo.beta.pregel.annotation.GDSMode;
 import org.neo4j.graphalgo.beta.pregel.annotation.PregelProcedure;
 
 import java.util.Arrays;
-import java.util.Queue;
 
 /**
  * Basic implementation potentially suffering from oscillating vertex states due to synchronous computation.
@@ -34,24 +36,35 @@ import java.util.Queue;
 @PregelProcedure(name = "example.pregel.lp", modes = {GDSMode.STREAM})
 public class LabelPropagationPregel implements PregelComputation<PregelConfig> {
 
+    public static final String LABEL_KEY = "label";
+
     @Override
-    public void compute(PregelContext<PregelConfig> pregel, long nodeId, Queue<Double> messages) {
-        if (pregel.isInitialSuperstep()) {
-            pregel.setNodeValue(nodeId, nodeId);
-            pregel.sendMessages(nodeId, nodeId);
+    public Pregel.NodeSchema nodeSchema() {
+        return new NodeSchemaBuilder().putElement(LABEL_KEY, ValueType.LONG).build();
+    }
+
+    @Override
+    public void init(PregelContext.InitContext<PregelConfig> context) {
+        context.setNodeValue(LABEL_KEY, context.nodeId());
+    }
+
+    @Override
+    public void compute(PregelContext.ComputeContext<PregelConfig> context, Pregel.Messages messages) {
+        if (context.isInitialSuperstep()) {
+            context.sendToNeighbors(context.nodeId());
         } else {
             if (messages != null) {
-                long oldValue = (long) pregel.getNodeValue(nodeId);
+                long oldValue = context.longNodeValue(LABEL_KEY);
                 long newValue = oldValue;
 
                 // TODO: could be shared across compute functions per thread
                 // We receive at most |degree| messages
-                long[] buffer = new long[pregel.getDegree(nodeId)];
+                long[] buffer = new long[context.degree()];
 
                 int messageCount = 0;
-                Double nextMessage;
-                while (!(nextMessage = messages.poll()).isNaN()) {
-                    buffer[messageCount++] = nextMessage.longValue();
+
+                for (var message : messages) {
+                    buffer[messageCount++] = message.longValue();
                 }
 
                 int maxOccurences = 1;
@@ -78,11 +91,11 @@ public class LabelPropagationPregel implements PregelComputation<PregelConfig> {
                 }
 
                 if (newValue != oldValue) {
-                    pregel.setNodeValue(nodeId, newValue);
-                    pregel.sendMessages(nodeId, newValue);
+                    context.setNodeValue(LABEL_KEY, newValue);
+                    context.sendToNeighbors(newValue);
                 }
             }
         }
-        pregel.voteToHalt(nodeId);
+        context.voteToHalt();
     }
 }

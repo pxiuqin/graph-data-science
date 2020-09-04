@@ -19,11 +19,12 @@
  */
 package org.neo4j.graphalgo.beta.pregel.cc;
 
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
+import org.neo4j.graphalgo.beta.pregel.NodeSchemaBuilder;
+import org.neo4j.graphalgo.beta.pregel.Pregel;
 import org.neo4j.graphalgo.beta.pregel.PregelComputation;
 import org.neo4j.graphalgo.beta.pregel.PregelContext;
 import org.neo4j.graphalgo.beta.pregel.annotation.PregelProcedure;
-
-import java.util.Queue;
 
 import static org.neo4j.graphalgo.beta.pregel.annotation.GDSMode.MUTATE;
 import static org.neo4j.graphalgo.beta.pregel.annotation.GDSMode.STATS;
@@ -37,28 +38,37 @@ import static org.neo4j.graphalgo.beta.pregel.annotation.GDSMode.WRITE;
 )
 public class ConnectedComponentsPregel implements PregelComputation<ConnectedComponentsConfig> {
 
-    @Override
-    public void compute(PregelContext<ConnectedComponentsConfig> context, long nodeId, Queue<Double> messages) {
-        double oldComponentId = context.getNodeValue(nodeId);
-        double newComponentId = oldComponentId;
+    public static final String COMPONENT = "component";
 
-        if (context.isInitialSuperstep()) {
-            // In the first superstep, each node needs to initialize its value.
-            // If the computation is seeded with an initial value, that value
-            // is taken, otherwise the node id is used as initial value.
-            newComponentId = context.isSeeded() ? oldComponentId : nodeId;
-        } else if (messages != null && !messages.isEmpty()) {
-                Double nextComponentId;
-                while ((nextComponentId = messages.poll()) != null) {
-                    if (nextComponentId.longValue() < newComponentId) {
-                        newComponentId = nextComponentId.longValue();
-                    }
-                }
+    @Override
+    public Pregel.NodeSchema nodeSchema() {
+        return new NodeSchemaBuilder()
+            .putElement(COMPONENT, ValueType.LONG)
+            .build();
+    }
+
+    @Override
+    public void init(PregelContext.InitContext<ConnectedComponentsConfig> context) {
+        var initialValue = context.config().seedProperty() != null
+            ? context.nodeProperties(context.config().seedProperty()).longValue(context.nodeId())
+            : context.nodeId();
+        context.setNodeValue(COMPONENT, initialValue);
+    }
+
+    @Override
+    public void compute(PregelContext.ComputeContext<ConnectedComponentsConfig> context, Pregel.Messages messages) {
+        long oldComponentId = context.longNodeValue(COMPONENT);
+        long newComponentId = oldComponentId;
+
+        for (var nextComponentId : messages) {
+            if (nextComponentId.longValue() < newComponentId) {
+                newComponentId = nextComponentId.longValue();
+            }
         }
 
         if (context.isInitialSuperstep() || newComponentId != oldComponentId) {
-            context.setNodeValue(nodeId, newComponentId);
-            context.sendMessages(nodeId, newComponentId);
+            context.setNodeValue(COMPONENT, newComponentId);
+            context.sendToNeighbors(newComponentId);
         }
     }
 }

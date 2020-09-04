@@ -27,7 +27,7 @@ import org.neo4j.graphalgo.beta.generator.RelationshipDistribution;
 import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.huge.HugeGraph;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import static org.neo4j.graphalgo.TestSupport.assertAlgorithmTermination;
 import static org.neo4j.graphalgo.nodesim.NodeSimilarityTest.configBuilder;
@@ -41,7 +41,7 @@ class NodeSimilarityTerminationTest extends AlgoTestBase {
             .nodeCount(10)
             .averageDegree(2)
             .relationshipDistribution(RelationshipDistribution.POWER_LAW)
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .build()
             .generate();
 
@@ -50,7 +50,7 @@ class NodeSimilarityTerminationTest extends AlgoTestBase {
             configBuilder().concurrency(1).build(),
             Pools.DEFAULT,
             ProgressLogger.NULL_LOGGER,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         assertAlgorithmTermination(

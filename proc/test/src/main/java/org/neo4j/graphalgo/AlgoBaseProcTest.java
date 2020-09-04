@@ -35,9 +35,9 @@ import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.config.GraphCreateFromCypherConfig;
 import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
+import org.neo4j.graphalgo.core.GdsEdition;
 import org.neo4j.graphalgo.core.GraphLoader;
 import org.neo4j.graphalgo.core.ImmutableGraphLoader;
-import org.neo4j.graphalgo.core.GdsEdition;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
 import org.neo4j.internal.kernel.api.procs.ProcedureCallContext;
 import org.neo4j.internal.kernel.api.security.AuthSubject;
@@ -52,6 +52,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -69,6 +71,7 @@ import static org.neo4j.graphalgo.RelationshipType.ALL_RELATIONSHIPS;
 import static org.neo4j.graphalgo.TestSupport.FactoryType.CYPHER;
 import static org.neo4j.graphalgo.compat.GraphDatabaseApiProxy.newKernelTransaction;
 import static org.neo4j.graphalgo.config.GraphCreateConfig.IMPLICIT_GRAPH_NAME;
+import static org.neo4j.graphalgo.config.GraphCreateConfig.READ_CONCURRENCY_KEY;
 import static org.neo4j.graphalgo.config.GraphCreateFromCypherConfig.ALL_NODES_QUERY;
 import static org.neo4j.graphalgo.config.GraphCreateFromCypherConfig.ALL_RELATIONSHIPS_QUERY;
 import static org.neo4j.graphalgo.config.GraphCreateFromCypherConfig.NODE_QUERY_KEY;
@@ -96,6 +99,8 @@ public interface AlgoBaseProcTest<ALGORITHM extends Algorithm<ALGORITHM, RESULT>
     }
 
     Class<? extends AlgoBaseProc<ALGORITHM, RESULT, CONFIG>> getProcedureClazz();
+
+    String createQuery();
 
     GraphDatabaseAPI graphDb();
 
@@ -269,6 +274,25 @@ public interface AlgoBaseProcTest<ALGORITHM extends Algorithm<ALGORITHM, RESULT>
         });
     }
 
+    @Test
+    default void useReadConcurrencyWhenSetOnImplicitlyLoadedGraph() {
+        CypherMapWrapper config = createMinimalConfig(
+            CypherMapWrapper.create(
+                Map.of(
+                    NODE_PROJECTION_KEY, NodeProjections.ALL,
+                    RELATIONSHIP_PROJECTION_KEY, relationshipProjections(),
+                    READ_CONCURRENCY_KEY, 2
+                )
+            )
+        );
+
+        applyOnProcedure((proc) -> {
+            CONFIG algoConfig = proc.newConfig(Optional.empty(), config);
+            assertTrue(algoConfig.implicitCreateConfig().isPresent());
+            assertEquals(2, algoConfig.implicitCreateConfig().get().readConcurrency());
+        });
+    }
+
     default RelationshipProjections relationshipProjections() {
         return RelationshipProjections.ALL;
     }
@@ -320,6 +344,48 @@ public interface AlgoBaseProcTest<ALGORITHM extends Algorithm<ALGORITHM, RESULT>
                     }
                 });
         });
+    }
+
+    @Test
+    default void testNonConsecutiveIds() {
+        RESULT originalResult = loadGraphAndRunCompute("originalGraph");
+
+        createRandomNodes();
+        emptyDb();
+        runQuery(graphDb(), createQuery());
+
+        RESULT reloadedResult = loadGraphAndRunCompute("reloadedGraph");
+
+        assertResultEquals(originalResult, reloadedResult);
+    }
+
+    default void loadGraph(String graphName){
+        runQuery(
+            graphDb(),
+            GdsCypher.call()
+                .loadEverything()
+                .graphCreate(graphName)
+                .yields()
+        );
+    }
+
+    private RESULT loadGraphAndRunCompute(String graphName) {
+        loadGraph(graphName);
+
+        AtomicReference<AlgoBaseProc.ComputationResult<?, RESULT, CONFIG>> computationResult = new AtomicReference<>();
+        applyOnProcedure((proc) -> {
+            Map<String, Object> configMap = createMinimalConfig(CypherMapWrapper.empty()).toMap();
+            computationResult.set(proc.compute(graphName, configMap));
+        });
+        return computationResult.get().result();
+    }
+
+    private void createRandomNodes() {
+        runQuery(
+            graphDb(),
+            "UNWIND range(1,$size) as _ CREATE (:Fake)",
+            Map.of("size", new Random().nextInt(1000))
+        );
     }
 
     @Test

@@ -27,6 +27,7 @@ import org.neo4j.graphalgo.GdsCypher;
 import org.neo4j.graphalgo.HeapControlTest;
 import org.neo4j.graphalgo.IterationsConfigTest;
 import org.neo4j.graphalgo.MemoryEstimateTest;
+import org.neo4j.graphalgo.catalog.GraphCreateProc;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
@@ -39,14 +40,16 @@ abstract class K1ColoringProcBaseTest<CONFIG extends K1ColoringConfig> extends B
     MemoryEstimateTest<K1Coloring, CONFIG, HugeLongArray>,
     HeapControlTest<K1Coloring, CONFIG, HugeLongArray> {
 
-    private final String DB_CYPHER =
-        "CREATE" +
-        " (a)" +
-        ",(b)" +
-        ",(c)" +
-        ",(d)" +
-        ",(a)-[:REL]->(b)" +
-        ",(a)-[:REL]->(c)";
+    @Override
+    public String createQuery() {
+        return "CREATE" +
+               " (a)" +
+               ",(b)" +
+               ",(c)" +
+               ",(d)" +
+               ",(a)-[:REL]->(b)" +
+               ",(a)-[:REL]->(c)";
+    }
 
     @Override
     public GraphDatabaseAPI graphDb() {
@@ -59,9 +62,10 @@ abstract class K1ColoringProcBaseTest<CONFIG extends K1ColoringConfig> extends B
             K1ColoringWriteProc.class,
             K1ColoringStatsProc.class,
             K1ColoringStreamProc.class,
-            K1ColoringMutateProc.class
+            K1ColoringMutateProc.class,
+            GraphCreateProc.class
         );
-        runQuery(DB_CYPHER);
+        runQuery(createQuery());
     }
 
     @AfterEach
@@ -80,4 +84,5 @@ abstract class K1ColoringProcBaseTest<CONFIG extends K1ColoringConfig> extends B
             .withAnyRelationshipType()
             .algo("gds", "beta", "k1coloring");
     }
+
 }

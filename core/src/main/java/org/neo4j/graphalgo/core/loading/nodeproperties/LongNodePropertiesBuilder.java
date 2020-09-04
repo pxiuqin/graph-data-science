@@ -22,9 +22,9 @@ package org.neo4j.graphalgo.core.loading.nodeproperties;
 import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeSparseLongArray;
-import org.neo4j.values.storable.NumberValue;
+import org.neo4j.graphalgo.utils.ValueConversion;
 import org.neo4j.values.storable.Value;
 
 import java.lang.invoke.MethodHandles;
@@ -56,12 +56,12 @@ public class LongNodePropertiesBuilder extends InnerNodePropertiesBuilder {
 
     public LongNodePropertiesBuilder(long nodeCount, DefaultValue defaultValue, AllocationTracker tracker) {
         this.maxValue = Long.MIN_VALUE;
-        this.valuesBuilder = HugeSparseLongArray.Builder.create(nodeCount, defaultValue.getLong(), tracker);
+        this.valuesBuilder = HugeSparseLongArray.Builder.create(nodeCount, defaultValue.longValue(), tracker);
     }
 
     @Override
     void setValue(long nodeId, Value value) {
-        long longValue = ((NumberValue) value).longValue();
+        var longValue = ValueConversion.getLongValue(value);
         valuesBuilder.set(nodeId, longValue);
         updateMaxValue(longValue);
     }
@@ -123,7 +123,7 @@ public class LongNodePropertiesBuilder extends InnerNodePropertiesBuilder {
         }
 
         @Override
-        public long getLong(long nodeId) {
+        public long longValue(long nodeId) {
             return propertyValues.get(nodeId);
         }
 

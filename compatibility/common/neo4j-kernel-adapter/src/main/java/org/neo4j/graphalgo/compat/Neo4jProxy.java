@@ -19,6 +19,7 @@
  */
 package org.neo4j.graphalgo.compat;
 
+import org.jetbrains.annotations.TestOnly;
 import org.neo4j.configuration.Config;
 import org.neo4j.dbms.api.DatabaseManagementService;
 import org.neo4j.graphdb.config.Setting;
@@ -168,6 +169,10 @@ public final class Neo4jProxy {
         return IMPL.allocateNodeLabelIndexCursor(cursorFactory, cursorTracer);
     }
 
+    public static long relationshipsReference(NodeCursor nodeCursor) {
+        return IMPL.relationshipsReference(nodeCursor);
+    }
+
     public static long[] getNodeLabelFields(NodeRecord node, NodeStore nodeStore, PageCursorTracer cursorTracer) {
         return IMPL.getNodeLabelFields(node, nodeStore, cursorTracer);
     }
@@ -190,6 +195,19 @@ public final class Neo4jProxy {
 
     public static MemoryTracker memoryTracker(KernelTransaction kernelTransaction) {
         return IMPL.memoryTracker(kernelTransaction);
+    }
+
+    public static MemoryTracker emptyMemoryTracker() {
+        return IMPL.emptyMemoryTracker();
+    }
+
+    @TestOnly
+    public static MemoryTracker limitedMemoryTracker(long limitInBytes, long grabSizeInBytes) {
+        return IMPL.limitedMemoryTracker(limitInBytes, grabSizeInBytes);
+    }
+
+    public static MemoryTrackerProxy memoryTrackerProxy(MemoryTracker memoryTracker) {
+        return IMPL.memoryTrackerProxy(memoryTracker);
     }
 
     public static LogService logProviderForStoreAndRegister(

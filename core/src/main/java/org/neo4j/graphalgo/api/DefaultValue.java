@@ -25,6 +25,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Objects;
 
 import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
+import static org.neo4j.graphalgo.utils.ValueConversion.exactDoubleToLong;
+import static org.neo4j.graphalgo.utils.ValueConversion.exactLongToDouble;
 
 public final class DefaultValue {
     public static final DefaultValue DEFAULT = new DefaultValue(null);
@@ -48,7 +50,7 @@ public final class DefaultValue {
         this.defaultValue = defaultValue;
     }
 
-    public long getLong() {
+    public long longValue() {
         if (defaultValue == null) {
             return LONG_DEFAULT_FALLBACK;
         } else if (defaultValue instanceof Double && Double.isNaN((double) defaultValue)) {
@@ -63,7 +65,7 @@ public final class DefaultValue {
         throw getInvalidTypeException(Long.class);
     }
 
-    public double getDouble() {
+    public double doubleValue() {
         if (defaultValue instanceof Long && defaultValue.equals(LONG_DEFAULT_FALLBACK)) {
             return DOUBLE_DEFAULT_FALLBACK;
         } else if (defaultValue instanceof Long || defaultValue instanceof Integer) {
@@ -74,6 +76,28 @@ public final class DefaultValue {
             return DOUBLE_DEFAULT_FALLBACK;
         }
         throw getInvalidTypeException(Double.class);
+    }
+
+    public long[] longArrayValue() {
+        return getArray(long[].class);
+    }
+
+    public double[] doubleArrayValue() {
+        return getArray(double[].class);
+    }
+
+    public float[] floatArrayValue() {
+        return getArray(float[].class);
+    }
+
+    private <T> T getArray(Class<T> arrayType) {
+        if (defaultValue == null) {
+            return null;
+        } else if (arrayType.isAssignableFrom(defaultValue.getClass())) {
+            return arrayType.cast(defaultValue);
+        } else {
+            throw getInvalidTypeException(arrayType);
+        }
     }
 
     public @Nullable Object getObject() {
@@ -100,23 +124,7 @@ public final class DefaultValue {
     }
 
     @NotNull
-    public ClassCastException getInvalidTypeException(Class<?> expectedClass) {
+    private ClassCastException getInvalidTypeException(Class<?> expectedClass) {
         return new ClassCastException(formatWithLocale("The default value %s cannot coerced into type %s.", defaultValue, expectedClass.getSimpleName()));
-    }
-
-    private long exactDoubleToLong(double d) {
-        if(d % 1 == 0) {
-            return (long) d;
-        } else {
-            throw new UnsupportedOperationException(formatWithLocale("Cannot safely convert %.2f into an long value", d));
-        }
-    }
-
-    private double exactLongToDouble(long l) {
-        if(l <= 1L << 53) {
-            return (double) l;
-        } else {
-            throw new UnsupportedOperationException(formatWithLocale("Cannot safely convert %d into an double value", l));
-        }
     }
 }

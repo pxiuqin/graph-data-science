@@ -7,17 +7,15 @@ import javax.annotation.processing.Generated;
 import org.neo4j.graphalgo.AlgoBaseProc;
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.BaseProc;
-import org.neo4j.graphalgo.WriteProc;
 import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.api.NodeProperties;
-import org.neo4j.graphalgo.api.nodeproperties.DoubleNodeProperties;
 import org.neo4j.graphalgo.beta.pregel.Pregel;
 import org.neo4j.graphalgo.beta.pregel.PregelConfig;
+import org.neo4j.graphalgo.beta.pregel.PregelWriteProc;
 import org.neo4j.graphalgo.beta.pregel.PregelWriteResult;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.logging.Log;
@@ -27,7 +25,7 @@ import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
 
 @Generated("org.neo4j.graphalgo.beta.pregel.PregelProcessor")
-public final class ComputationWriteProc extends WriteProc<ComputationAlgorithm, Pregel.PregelResult, PregelWriteResult, PregelConfig> {
+public final class ComputationWriteProc extends PregelWriteProc<ComputationAlgorithm, PregelConfig> {
     @Procedure(
             name = "gds.pregel.test.write",
             mode = Mode.WRITE
@@ -73,14 +71,9 @@ public final class ComputationWriteProc extends WriteProc<ComputationAlgorithm, 
 
             @Override
             public MemoryEstimation memoryEstimation(PregelConfig configuration) {
-                return Pregel.memoryEstimation();
+                var nodeSchema = new Computation().nodeSchema();
+                return Pregel.memoryEstimation(nodeSchema);
             }
         };
-    }
-
-    @Override
-    protected NodeProperties getNodeProperties(
-        AlgoBaseProc.ComputationResult<ComputationAlgorithm, Pregel.PregelResult, PregelConfig> computationResult) {
-        return (DoubleNodeProperties) computationResult.result().nodeValues()::get;
     }
 }

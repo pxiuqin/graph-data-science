@@ -23,6 +23,8 @@ import org.neo4j.gds.embeddings.graphsage.ddl4j.Variable;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.MatrixMultiplyWithTransposedSecondOperand;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.MultiMean;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.Weights;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Matrix;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Tensor;
 
 import java.util.List;
 import java.util.function.Function;
@@ -33,23 +35,23 @@ import java.util.function.Function;
 
 public class MeanAggregator implements Aggregator {
 
-    private final Weights weights;
-    private final Function<Variable, Variable> activationFunction;
+    private final Weights<Matrix> weights;
+    private final Function<Variable<Matrix>, Variable<Matrix>> activationFunction;
 
-    public MeanAggregator(Weights weights, Function<Variable, Variable> activationFunction) {
+    MeanAggregator(Weights<Matrix> weights, Function<Variable<Matrix>, Variable<Matrix>> activationFunction) {
         this.weights = weights;
         this.activationFunction = activationFunction;
     }
 
     @Override
-    public Variable aggregate(Variable previousLayerRepresentations, int[][] adjacencyMatrix, int[] selfAdjacency) {
-        MultiMean means = new MultiMean(previousLayerRepresentations, adjacencyMatrix, selfAdjacency);
-        Variable product = MatrixMultiplyWithTransposedSecondOperand.of(means, weights);
+    public Variable<Matrix> aggregate(Variable<Matrix> previousLayerRepresentations, int[][] adjacencyMatrix, int[] selfAdjacency) {
+        Variable<Matrix> means = new MultiMean(previousLayerRepresentations, adjacencyMatrix, selfAdjacency);
+        Variable<Matrix> product = MatrixMultiplyWithTransposedSecondOperand.of(means, weights);
         return activationFunction.apply(product);
     }
 
     @Override
-    public List<Weights> weights() {
+    public List<Weights<? extends Tensor<?>>> weights() {
         return List.of(weights);
     }
 }

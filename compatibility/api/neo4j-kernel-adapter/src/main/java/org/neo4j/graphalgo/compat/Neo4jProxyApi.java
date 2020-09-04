@@ -19,6 +19,7 @@
  */
 package org.neo4j.graphalgo.compat;
 
+import org.jetbrains.annotations.TestOnly;
 import org.neo4j.configuration.Config;
 import org.neo4j.dbms.api.DatabaseManagementService;
 import org.neo4j.graphdb.config.Setting;
@@ -127,6 +128,8 @@ public interface Neo4jProxyApi {
 
     NodeLabelIndexCursor allocateNodeLabelIndexCursor(CursorFactory cursorFactory, PageCursorTracer cursorTracer);
 
+    long relationshipsReference(NodeCursor nodeCursor);
+
     long[] getNodeLabelFields(NodeRecord node, NodeStore nodeStore, PageCursorTracer cursorTracer);
 
     void nodeLabelScan(Read dataRead, int label, NodeLabelIndexCursor cursor);
@@ -138,6 +141,13 @@ public interface Neo4jProxyApi {
     LongArray newChunkedLongArray(NumberArrayFactory numberArrayFactory, int size, long defaultValue);
 
     MemoryTracker memoryTracker(KernelTransaction kernelTransaction);
+
+    MemoryTracker emptyMemoryTracker();
+
+    @TestOnly
+    MemoryTracker limitedMemoryTracker(long limitInBytes, long grabSizeInBytes);
+
+    MemoryTrackerProxy memoryTrackerProxy(MemoryTracker memoryTracker);
 
     LogService logProviderForStoreAndRegister(
         Path storeLogPath,

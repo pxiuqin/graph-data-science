@@ -32,7 +32,7 @@ import org.neo4j.graphalgo.core.loading.IdMap;
 import org.neo4j.graphalgo.core.utils.BitUtil;
 import org.neo4j.graphalgo.core.utils.mem.MemoryRange;
 import org.neo4j.graphalgo.core.utils.mem.MemoryTree;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.PageUtil;
 
 import java.util.Arrays;
@@ -213,7 +213,11 @@ class TransientAdjacencyListTest {
 
     private TransientAdjacencyList.DecompressingCursor adjacencyCursorFromTargets(long[] targets) {
         long sourceNodeId = targets[0];
-        HugeGraphUtil.IdMapBuilder idMapBuilder = HugeGraphUtil.idMapBuilder(targets[targets.length - 1], Pools.DEFAULT, AllocationTracker.EMPTY);
+        HugeGraphUtil.IdMapBuilder idMapBuilder = HugeGraphUtil.idMapBuilder(
+            targets[targets.length - 1],
+            Pools.DEFAULT,
+            AllocationTracker.empty()
+        );
         for (long target : targets) {
             idMapBuilder.addNode(target);
         }
@@ -224,7 +228,7 @@ class TransientAdjacencyListTest {
             false,
             Aggregation.NONE,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
         for (long target : targets) {
             relationshipsBuilder.add(sourceNodeId, target);

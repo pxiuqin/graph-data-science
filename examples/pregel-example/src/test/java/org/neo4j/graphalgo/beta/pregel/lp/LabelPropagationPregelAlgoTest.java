@@ -25,8 +25,7 @@ import org.neo4j.graphalgo.beta.pregel.ImmutablePregelConfig;
 import org.neo4j.graphalgo.beta.pregel.Pregel;
 import org.neo4j.graphalgo.beta.pregel.PregelConfig;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
-import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.extension.GdlExtension;
 import org.neo4j.graphalgo.extension.GdlGraph;
 import org.neo4j.graphalgo.extension.Inject;
@@ -66,25 +65,25 @@ class LabelPropagationPregelAlgoTest {
 
     @Test
     void runLP() {
-        int batchSize = 10;
         int maxIterations = 10;
 
         var config = ImmutablePregelConfig.builder()
             .maxIterations(maxIterations)
             .build();
 
-        var pregelJob = Pregel.withDefaultNodeValues(
+        var pregelJob = Pregel.create(
             graph,
             config,
             new LabelPropagationPregel(),
-            batchSize,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
-        HugeDoubleArray nodeValues = pregelJob.run().nodeValues();
+        var nodeValues = pregelJob.run()
+            .nodeValues()
+            .longProperties(LabelPropagationPregel.LABEL_KEY);
 
-        assertLongValues(graph, (nodeId) -> (long) nodeValues.get(nodeId), Map.of(
+        assertLongValues(graph, nodeValues::get, Map.of(
             "nAlice", 0L,
             "nBridget", 0L,
             "nCharles", 0L,
@@ -96,7 +95,6 @@ class LabelPropagationPregelAlgoTest {
 
     @Test
     void runWeightedLP() {
-        int batchSize = 10;
         int maxIterations = 10;
 
         PregelConfig config = ImmutablePregelConfig.builder()
@@ -111,18 +109,19 @@ class LabelPropagationPregelAlgoTest {
             }
         };
 
-        Pregel pregelJob = Pregel.withDefaultNodeValues(
+        var pregelJob = Pregel.create(
             graph,
             config,
             weightedLabelPropagation,
-            batchSize,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
-        HugeDoubleArray nodeValues = pregelJob.run().nodeValues();
+        var nodeValues = pregelJob.run()
+            .nodeValues()
+            .longProperties(LabelPropagationPregel.LABEL_KEY);
 
-        assertLongValues(graph, (nodeId) -> (long) nodeValues.get(nodeId), Map.of(
+        assertLongValues(graph, nodeValues::get, Map.of(
             "nAlice", 0L,
             "nBridget", 0L,
             "nCharles", 0L,

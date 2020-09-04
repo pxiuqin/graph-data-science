@@ -180,6 +180,11 @@ public final class Neo4jProxy40 implements Neo4jProxyApi {
     }
 
     @Override
+    public long relationshipsReference(NodeCursor nodeCursor) {
+        return nodeCursor.allRelationshipsReference();
+    }
+
+    @Override
     public long[] getNodeLabelFields(NodeRecord node, NodeStore nodeStore, PageCursorTracer cursorTracer) {
         return NodeLabelsField.get(node, nodeStore);
     }
@@ -207,6 +212,21 @@ public final class Neo4jProxy40 implements Neo4jProxyApi {
     @Override
     public MemoryTracker memoryTracker(KernelTransaction kernelTransaction) {
         return MemoryTracker.NONE;
+    }
+
+    @Override
+    public MemoryTracker emptyMemoryTracker() {
+        return MemoryTracker.NONE;
+    }
+
+    @Override
+    public MemoryTracker limitedMemoryTracker(long limitInBytes, long grabSizeInBytes) {
+        return MemoryTracker.NONE;
+    }
+
+    @Override
+    public MemoryTrackerProxy memoryTrackerProxy(MemoryTracker memoryTracker) {
+        return MemoryTrackerProxy.UNSUPPORTED;
     }
 
     @Override

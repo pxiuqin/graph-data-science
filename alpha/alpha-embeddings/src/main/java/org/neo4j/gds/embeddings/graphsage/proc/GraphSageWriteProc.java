@@ -71,16 +71,11 @@ public class GraphSageWriteProc extends WriteProc<GraphSage, GraphSage.GraphSage
     }
 
     @Override
-    protected AbstractResultBuilder<GraphSageWriteResult> resultBuilder(ComputationResult<GraphSage,GraphSage.GraphSageResult, GraphSageWriteConfig> computeResult) {
-        return new GraphSageWriteResult.Builder()
-            .withStartLoss(computeResult.result().startLoss())
-            .withEpochLosses(computeResult.result().epochLosses());
+    protected AbstractResultBuilder<GraphSageWriteResult> resultBuilder(ComputationResult<GraphSage, GraphSage.GraphSageResult, GraphSageWriteConfig> computeResult) {
+        return new GraphSageWriteResult.Builder();
     }
 
     public static final class GraphSageWriteResult {
-
-        public final double startLoss;
-        public final Map<String, Double> epochLosses;
 
         public final long nodeCount;
         public final long nodePropertiesWritten;
@@ -90,8 +85,6 @@ public class GraphSageWriteProc extends WriteProc<GraphSage, GraphSage.GraphSage
         public final Map<String, Object> configuration;
 
         GraphSageWriteResult(
-            double startLoss,
-            Map<String, Double> epochLosses,
             long nodeCount,
             long nodePropertiesWritten,
             long createMillis,
@@ -99,8 +92,6 @@ public class GraphSageWriteProc extends WriteProc<GraphSage, GraphSage.GraphSage
             long writeMillis,
             Map<String, Object> configuration
         ) {
-            this.startLoss = startLoss;
-            this.epochLosses = epochLosses;
             this.nodeCount = nodeCount;
             this.nodePropertiesWritten = nodePropertiesWritten;
             this.createMillis = createMillis;
@@ -110,24 +101,10 @@ public class GraphSageWriteProc extends WriteProc<GraphSage, GraphSage.GraphSage
         }
 
         static class Builder extends AbstractResultBuilder<GraphSageWriteResult> {
-            private double startLoss;
-
-            public Builder withStartLoss(double startLoss) {
-                this.startLoss = startLoss;
-                return this;
-            }
-            private Map<String, Double> epochLosses;
-
-            public Builder withEpochLosses(Map<String, Double> epochLosses) {
-                this.epochLosses = epochLosses;
-                return this;
-            }
 
             @Override
             public GraphSageWriteResult build() {
                 return new GraphSageWriteResult(
-                    startLoss,
-                    epochLosses,
                     nodeCount,
                     nodePropertiesWritten,
                     createMillis,

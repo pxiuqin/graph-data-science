@@ -28,6 +28,8 @@ import org.neo4j.graphalgo.catalog.GraphCreateProc;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.neo4j.graphalgo.beta.pregel.pr.PageRankPregel.PAGE_RANK;
+
 class PageRankPregelProcTest extends BaseProcTest {
 
     private static final String TEST_GRAPH =
@@ -91,11 +93,14 @@ class PageRankPregelProcTest extends BaseProcTest {
             .algo("example", "pregel", "pr")
             .streamMode()
             .addParameter("maxIterations", 10)
-            .yields("nodeId", "value");
+            .yields("nodeId", "values");
 
         HashMap<Long, Double> actual = new HashMap<>();
         runQueryWithRowConsumer(query, r -> {
-            actual.put(r.getNumber("nodeId").longValue(), r.getNumber("value").doubleValue());
+            actual.put(
+                r.getNumber("nodeId").longValue(),
+                ((Map<String, Double>) r.get("values")).get(PAGE_RANK)
+            );
         });
 
         assertMapEqualsWithTolerance(EXPECTED_RANKS, actual, 0.001);
@@ -115,7 +120,7 @@ class PageRankPregelProcTest extends BaseProcTest {
             .algo("example", "pregel", "pr")
             .mutateMode()
             .addParameter("maxIterations", 5)
-            .addParameter("mutateProperty", "pageRank")
+            .addParameter("mutateProperty", "value_")
             .yields();
 
         runQuery(mutateQuery);
@@ -128,12 +133,15 @@ class PageRankPregelProcTest extends BaseProcTest {
             // as the above test since for the computation iteration 6
             // is the initial superstep where it doesn't receive messages
             .addParameter("maxIterations", 6)
-            .addParameter("seedProperty", "pageRank")
-            .yields("nodeId", "value");
+            .addParameter("seedProperty", "value_" + PAGE_RANK)
+            .yields("nodeId", "values");
 
         HashMap<Long, Double> actual = new HashMap<>();
         runQueryWithRowConsumer(query, r -> {
-            actual.put(r.getNumber("nodeId").longValue(), r.getNumber("value").doubleValue());
+            actual.put(
+                r.getNumber("nodeId").longValue(),
+                ((Map<String, Double>) r.get("values")).get(PAGE_RANK)
+            );
         });
 
         assertMapEqualsWithTolerance(EXPECTED_RANKS, actual, 0.001);

@@ -23,6 +23,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.gds.embeddings.graphsage.ActivationFunction;
 import org.neo4j.graphalgo.GdsCypher;
+import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
+import org.neo4j.graphdb.QueryExecutionException;
 
 import java.util.Collection;
 import java.util.List;
@@ -30,23 +32,23 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.neo4j.graphalgo.utils.ExceptionUtil.rootCause;
+import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 class GraphSageStreamProcTest extends GraphSageBaseProcTest {
 
     @ParameterizedTest
     @MethodSource("org.neo4j.gds.embeddings.graphsage.proc.GraphSageBaseProcTest#configVariations")
     void testStreaming(int embeddingSize, String aggregator, ActivationFunction activationFunction) {
+        train(embeddingSize, aggregator, activationFunction);
 
         String query = GdsCypher.call().explicitCreation("embeddingsGraph")
             .algo("gds.alpha.graphSage")
             .streamMode()
             .addParameter("concurrency", 1)
-            .addParameter("nodePropertyNames", List.of("age", "birth_year", "death_year"))
-            .addParameter("aggregator", aggregator)
-            .addParameter("activationFunction", activationFunction)
-            .addParameter("embeddingSize", embeddingSize)
-            .addParameter("degreeAsProperty", true)
+            .addParameter("modelName", modelName)
             .yields();
 
         runQueryWithRowConsumer(query, Map.of("embeddingSize", embeddingSize), row -> {
@@ -58,5 +60,23 @@ class GraphSageStreamProcTest extends GraphSageBaseProcTest {
             Collection<Double> nodeEmbeddings = (List<Double>) o;
             assertEquals(embeddingSize, nodeEmbeddings.size());
         });
+    }
+
+    @ParameterizedTest(name = "Graph Properties: {2} - Algo Properties: {1}")
+    @MethodSource("missingNodeProperties")
+    void shouldFailOnMissingNodeProperties(GraphCreateFromStoreConfig config, String nodeProperties, String graphProperties, String label) {
+        train(42, "mean", ActivationFunction.SIGMOID);
+
+        String query = GdsCypher.call().implicitCreation(config)
+            .algo("gds.alpha.graphSage")
+            .streamMode()
+            .addParameter("concurrency", 1)
+            .addParameter("modelName", modelName)
+            .yields();
+
+        String expectedFail = formatWithLocale("Node properties [%s] not found in graph with node properties: [%s] in all node labels: ['%s']", nodeProperties, graphProperties, label);
+        Throwable throwable = rootCause(assertThrows(QueryExecutionException.class, () -> runQuery(query)));
+        assertEquals(IllegalArgumentException.class, throwable.getClass());
+        assertEquals(expectedFail, throwable.getMessage());
     }
 }

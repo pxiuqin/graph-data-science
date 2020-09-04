@@ -20,11 +20,15 @@
 package org.neo4j.graphalgo.core.loading;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.core.loading.nodeproperties.NodePropertiesFromStoreBuilder;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
+import org.neo4j.values.storable.Value;
 import org.neo4j.values.storable.Values;
 
 import java.util.OptionalDouble;
@@ -33,9 +37,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.StringContains.containsString;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 final class NodePropertiesFromStoreBuilderTest {
 
@@ -43,34 +53,136 @@ final class NodePropertiesFromStoreBuilderTest {
     void testEmptyDoubleProperties() {
         var properties = NodePropertiesFromStoreBuilder.of(
             100_000,
-            AllocationTracker.EMPTY,
+            AllocationTracker.empty(),
             DefaultValue.of(42.0D)
         ).build();
 
         assertEquals(0L, properties.size());
         assertEquals(OptionalDouble.empty(), properties.getMaxDoublePropertyValue());
-        assertEquals(42.0, properties.getDouble(0));
+        assertEquals(42.0, properties.doubleValue(0));
     }
 
     @Test
     void testEmptyLongProperties() {
         var properties = NodePropertiesFromStoreBuilder.of(
             100_000,
-            AllocationTracker.EMPTY,
+            AllocationTracker.empty(),
             DefaultValue.of(42L)
         ).build();
 
         assertEquals(0L, properties.size());
         assertEquals(OptionalLong.empty(), properties.getMaxLongPropertyValue());
-        assertEquals(42, properties.getLong(0));
+        assertEquals(42, properties.longValue(0));
     }
 
     @Test
     void returnsValuesThatHaveBeenSet() {
         var properties = createNodeProperties(2L, 42.0, b -> b.set(1, Values.of(1.0)));
 
-        assertEquals(1.0, properties.getDouble(1));
-        assertEquals(1.0, properties.getDouble(1));
+        assertEquals(1.0, properties.doubleValue(1));
+        assertEquals(42.0, properties.doubleValue(0));
+    }
+
+    @Test
+    void shouldReturnLongArrays() {
+        long[] data = {42L, 1337L};
+        long[] defaultValue = new long[2];
+        NodeProperties properties = createNodeProperties(
+            2L,
+            defaultValue,
+            b -> b.set(1, Values.of(data))
+        );
+
+        assertArrayEquals(data, properties.longArrayValue(1));
+        assertArrayEquals(defaultValue, properties.longArrayValue(0));
+    }
+
+    @Test
+    void shouldReturnDoubleArrays() {
+        double[] data = {42.2D, 1337.1D};
+        double[] defaultValue = new double[2];
+        NodeProperties properties = createNodeProperties(
+            2L,
+            defaultValue,
+            b -> b.set(1, Values.of(data))
+        );
+
+        assertArrayEquals(data, properties.doubleArrayValue(1));
+        assertArrayEquals(defaultValue, properties.doubleArrayValue(0));
+    }
+
+    @Test
+    void shouldReturnFloatArrays() {
+        float[] data = {42.2F, 1337.1F};
+        float[] defaultValue = new float[2];
+        NodeProperties properties = createNodeProperties(
+            2L,
+            defaultValue,
+            b -> b.set(1, Values.of(data))
+        );
+
+        assertArrayEquals(data, properties.floatArrayValue(1));
+        assertArrayEquals(defaultValue, properties.floatArrayValue(0));
+    }
+
+    @Test
+    void shouldCastFromFloatArrayToDoubleArray() {
+        float[] floatData = {42.2F, 1337.1F};
+        double[] doubleData = {42.2D, 1337.1D};
+        float[] defaultValue = new float[2];
+        NodeProperties properties = createNodeProperties(
+            2L,
+            defaultValue,
+            b -> b.set(1, Values.of(floatData))
+        );
+
+        assertArrayEquals(floatData, properties.floatArrayValue(1));
+        double[] doubleArray = properties.doubleArrayValue(1);
+        for (int i = 0; i < floatData.length; i++) {
+            assertEquals(doubleData[i], doubleArray[i], 0.0001D);
+        }
+        assertArrayEquals(defaultValue, properties.floatArrayValue(0));
+    }
+
+    @Test
+    void shouldCastFromDoubleArrayToFloatArray() {
+        double[] doubleData = {42.2D, 1337.1D};
+        float[] floatData = {42.2F, 1337.1F};
+        double[] defaultValue = new double[2];
+        NodeProperties properties = createNodeProperties(
+            2L,
+            defaultValue,
+            b -> b.set(1, Values.of(doubleData))
+        );
+
+        assertArrayEquals(doubleData, properties.doubleArrayValue(1));
+        assertArrayEquals(floatData, properties.floatArrayValue(1));
+        assertArrayEquals(defaultValue, properties.doubleArrayValue(0));
+    }
+
+    static Stream<Arguments> unsupportedValues() {
+        return Stream.of(
+            arguments(Values.stringValue("42L")),
+            arguments(Values.shortArray(new short[]{(short) 42})),
+            arguments(Values.byteArray(new byte[]{(byte) 42})),
+            arguments(Values.booleanValue(true)),
+            arguments(Values.charValue('c'))
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("org.neo4j.graphalgo.core.loading.NodePropertiesFromStoreBuilderTest#unsupportedValues")
+    void shouldFailOnUnSupportedTypes(Value data) {
+        UnsupportedOperationException ex = assertThrows(
+            UnsupportedOperationException.class,
+            () -> createNodeProperties(
+                2L,
+                null,
+                b -> b.set(1, data)
+            )
+        );
+
+        assertThat(ex.getMessage(), containsString("Loading of values of type"));
     }
 
     @Test
@@ -78,15 +190,15 @@ final class NodePropertiesFromStoreBuilderTest {
         var expectedImplicitDefault = 42.0;
         var properties = createNodeProperties(2L, expectedImplicitDefault, b -> {});
 
-        assertEquals(expectedImplicitDefault, properties.getDouble(2));
+        assertEquals(expectedImplicitDefault, properties.doubleValue(2));
     }
 
     @Test
     void returnNaNIfItWasSet() {
         var properties = createNodeProperties(2L, 42.0, b -> b.set(1, Values.of(Double.NaN)));
 
-        assertEquals(42.0, properties.getDouble(0));
-        assertEquals(Double.NaN, properties.getDouble(1));
+        assertEquals(42.0, properties.doubleValue(0));
+        assertEquals(Double.NaN, properties.doubleValue(1));
     }
 
     @Test
@@ -113,7 +225,7 @@ final class NodePropertiesFromStoreBuilderTest {
     void shouldHandleNullValues() {
         var builder = NodePropertiesFromStoreBuilder.of(
             100,
-            AllocationTracker.EMPTY,
+            AllocationTracker.empty(),
             DefaultValue.DEFAULT
         );
 
@@ -122,16 +234,16 @@ final class NodePropertiesFromStoreBuilderTest {
 
         var properties = builder.build();
 
-        assertEquals(ValueType.LONG, properties.getType());
-        assertEquals(DefaultValue.LONG_DEFAULT_FALLBACK, properties.getLong(0L));
-        assertEquals(42L, properties.getLong(1L));
+        assertEquals(ValueType.LONG, properties.valueType());
+        assertEquals(DefaultValue.LONG_DEFAULT_FALLBACK, properties.longValue(0L));
+        assertEquals(42L, properties.longValue(1L));
     }
 
     @Test
     void threadSafety() throws InterruptedException {
         var pool = Executors.newFixedThreadPool(2);
         var nodeSize = 100_000;
-        var builder = NodePropertiesFromStoreBuilder.of(nodeSize, AllocationTracker.EMPTY, DefaultValue.of(Double.NaN));
+        var builder = NodePropertiesFromStoreBuilder.of(nodeSize, AllocationTracker.empty(), DefaultValue.of(Double.NaN));
 
         var phaser = new Phaser(3);
         pool.execute(() -> {
@@ -163,7 +275,7 @@ final class NodePropertiesFromStoreBuilderTest {
         var properties = builder.build();
         for (int i = 0; i < nodeSize; i++) {
             var expected = i == 1338 ? 0x1p41 : i == 1337 ? 0x1p42 : i % 2 == 0 ? 2.0 : 1.0;
-            assertEquals(expected, properties.getDouble(i), "" + i);
+            assertEquals(expected, properties.doubleValue(i), "" + i);
         }
         assertEquals(nodeSize, properties.size());
         var maxPropertyValue = properties.getMaxDoublePropertyValue();
@@ -177,7 +289,7 @@ final class NodePropertiesFromStoreBuilderTest {
     }
 
     static NodeProperties createNodeProperties(long size, Object defaultValue, Consumer<NodePropertiesFromStoreBuilder> buildBlock) {
-        var builder = NodePropertiesFromStoreBuilder.of(size, AllocationTracker.EMPTY, DefaultValue.of(defaultValue));
+        var builder = NodePropertiesFromStoreBuilder.of(size, AllocationTracker.empty(), DefaultValue.of(defaultValue));
         buildBlock.accept(builder);
         return builder.build();
     }

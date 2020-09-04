@@ -21,7 +21,7 @@ package org.neo4j.graphalgo.triangle;
 
 import org.neo4j.graphalgo.AlgoBaseProc;
 import org.neo4j.graphalgo.api.NodeProperties;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeAtomicLongArray;
 import org.neo4j.graphalgo.result.AbstractResultBuilder;
 
@@ -67,7 +67,7 @@ final class TriangleCountCompanion {
 
         @Override
         public HugeAtomicLongArray localTriangles() {
-            return HugeAtomicLongArray.newArray(0, AllocationTracker.EMPTY);
+            return HugeAtomicLongArray.newArray(0, AllocationTracker.empty());
         }
 
         @Override

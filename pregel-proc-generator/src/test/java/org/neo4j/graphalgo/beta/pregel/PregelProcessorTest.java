@@ -85,6 +85,18 @@ class PregelProcessorTest {
     }
 
     @Test
+    void baseClassMustHaveEmptyConstructor() {
+        runNegativeTest(
+            "BaseClassHasNoEmptyConstructor",
+            e(
+                "The annotated Pregel computation must have an empty constructor.",
+                34,
+                8
+            )
+        );
+    }
+
+    @Test
     void baseClassMustImplementPregelComputation() {
         runNegativeTest(
             "BaseClassIsNotAPregelComputation",
@@ -111,7 +123,7 @@ class PregelProcessorTest {
                 "org.neo4j.graphalgo.core.CypherMapWrapper userConfig" +
                 ")' " +
                 "in ConfigurationHasNoFactoryMethod.ComputationConfig.",
-                31,
+                33,
                 8
             )
         );

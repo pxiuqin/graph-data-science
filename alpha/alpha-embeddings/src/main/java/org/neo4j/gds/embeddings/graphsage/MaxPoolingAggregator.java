@@ -19,31 +19,35 @@
  */
 package org.neo4j.gds.embeddings.graphsage;
 
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Matrix;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.Variable;
-import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.MatrixVectorSum;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.ElementwiseMax;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.MatrixMultiplyWithTransposedSecondOperand;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.MatrixVectorSum;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.Slice;
-import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.TensorAdd;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.MatrixSum;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.Weights;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Tensor;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Vector;
 
 import java.util.List;
 import java.util.function.Function;
 
 public class MaxPoolingAggregator implements Aggregator {
 
-    private final Weights poolWeights;
-    private final Weights selfWeights;
-    private final Weights neighborsWeights;
-    private final Weights bias;
-    private final Function<Variable, Variable> activationFunction;
+    private final Weights<Matrix> poolWeights;
+    private final Weights<Matrix> selfWeights;
+    private final Weights<Matrix> neighborsWeights;
+    private final Weights<Vector> bias;
+    private final Function<Variable<Matrix>, Variable<Matrix>> activationFunction;
 
-    public MaxPoolingAggregator(
-        Weights poolWeights,
-        Weights selfWeights,
-        Weights neighborsWeights,
-        Weights bias,
-        Function<Variable, Variable> activationFunction) {
+    MaxPoolingAggregator(
+        Weights<Matrix> poolWeights,
+        Weights<Matrix> selfWeights,
+        Weights<Matrix> neighborsWeights,
+        Weights<Vector> bias,
+        Function<Variable<Matrix>, Variable<Matrix>> activationFunction
+    ) {
 
         this.poolWeights = poolWeights;
         this.selfWeights = selfWeights;
@@ -54,29 +58,29 @@ public class MaxPoolingAggregator implements Aggregator {
     }
 
     @Override
-    public Variable aggregate(
-        Variable previousLayerRepresentations,
+    public Variable<Matrix> aggregate(
+        Variable<Matrix> previousLayerRepresentations,
         int[][] adjacencyMatrix,
         int[] selfAdjacencyMatrix
     ) {
-        Variable weightedPreviousLayer = MatrixMultiplyWithTransposedSecondOperand.of(
+        Variable<Matrix> weightedPreviousLayer = MatrixMultiplyWithTransposedSecondOperand.of(
             previousLayerRepresentations,
             poolWeights
         );
-        Variable biasedWeightedPreviousLayer = new MatrixVectorSum(weightedPreviousLayer, bias);
-        Variable neighborhoodActivations = activationFunction.apply(biasedWeightedPreviousLayer);
-        Variable elementwiseMax = new ElementwiseMax(neighborhoodActivations, adjacencyMatrix);
+        Variable<Matrix> biasedWeightedPreviousLayer = new MatrixVectorSum(weightedPreviousLayer, bias);
+        Variable<Matrix> neighborhoodActivations = activationFunction.apply(biasedWeightedPreviousLayer);
+        Variable<Matrix> elementwiseMax = new ElementwiseMax(neighborhoodActivations, adjacencyMatrix);
 
-        Variable selfPreviousLayer =  new Slice(previousLayerRepresentations, selfAdjacencyMatrix);
-        Variable self = MatrixMultiplyWithTransposedSecondOperand.of(selfPreviousLayer, selfWeights);
-        Variable neighbors = MatrixMultiplyWithTransposedSecondOperand.of(elementwiseMax, neighborsWeights);
-        TensorAdd tensorAdd = new TensorAdd(List.of(self, neighbors), self.dimensions());
+        Variable<Matrix> selfPreviousLayer =  new Slice(previousLayerRepresentations, selfAdjacencyMatrix);
+        Variable<Matrix> self = MatrixMultiplyWithTransposedSecondOperand.of(selfPreviousLayer, selfWeights);
+        Variable<Matrix> neighbors = MatrixMultiplyWithTransposedSecondOperand.of(elementwiseMax, neighborsWeights);
+        Variable<Matrix> sum = new MatrixSum(List.of(self, neighbors));
 
-        return activationFunction.apply(tensorAdd);
+        return activationFunction.apply(sum);
     }
 
     @Override
-    public List<Weights> weights() {
+    public List<Weights<? extends Tensor<?>>> weights() {
         return List.of(
             poolWeights,
             selfWeights,

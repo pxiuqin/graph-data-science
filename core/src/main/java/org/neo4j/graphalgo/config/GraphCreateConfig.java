@@ -35,8 +35,8 @@ import static org.neo4j.graphalgo.config.GraphCreateFromStoreConfig.RELATIONSHIP
 public interface GraphCreateConfig extends BaseConfig {
 
     String IMPLICIT_GRAPH_NAME = "";
-    String NODECOUNT_KEY = "nodeCount";
-    String RELCOUNT_KEY = "relationshipCount";
+    String NODE_COUNT_KEY = "nodeCount";
+    String RELATIONSHIP_COUNT_KEY = "relationshipCount";
     String READ_CONCURRENCY_KEY = "readConcurrency";
 
     @Configuration.Parameter
@@ -51,16 +51,22 @@ public interface GraphCreateConfig extends BaseConfig {
 
     @Value.Default
     @Value.Parameter(false)
-    @Configuration.Key(NODECOUNT_KEY)
+    @Configuration.Key(NODE_COUNT_KEY)
     default long nodeCount() {
         return -1;
     }
 
     @Value.Default
     @Value.Parameter(false)
-    @Configuration.Key(RELCOUNT_KEY)
+    @Configuration.Key(RELATIONSHIP_COUNT_KEY)
     default long relationshipCount() {
         return -1;
+    }
+
+    @Value.Parameter(false)
+    @Configuration.Ignore
+    default boolean isFictitiousLoading() {
+        return nodeCount() > -1 || relationshipCount() > -1;
     }
 
     @Value.Derived

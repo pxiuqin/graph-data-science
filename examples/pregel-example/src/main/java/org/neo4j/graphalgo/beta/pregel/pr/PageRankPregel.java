@@ -22,57 +22,67 @@ package org.neo4j.graphalgo.beta.pregel.pr;
 import org.immutables.value.Value;
 import org.neo4j.graphalgo.annotation.Configuration;
 import org.neo4j.graphalgo.annotation.ValueClass;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
+import org.neo4j.graphalgo.beta.pregel.NodeSchemaBuilder;
+import org.neo4j.graphalgo.beta.pregel.Pregel;
 import org.neo4j.graphalgo.beta.pregel.PregelComputation;
 import org.neo4j.graphalgo.beta.pregel.PregelConfig;
 import org.neo4j.graphalgo.beta.pregel.PregelContext;
 import org.neo4j.graphalgo.beta.pregel.annotation.GDSMode;
 import org.neo4j.graphalgo.beta.pregel.annotation.PregelProcedure;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
+import org.neo4j.graphalgo.config.SeedConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 
 import java.util.Optional;
-import java.util.Queue;
 
 @PregelProcedure(name = "example.pregel.pr", modes = {GDSMode.STREAM, GDSMode.MUTATE})
 public class PageRankPregel implements PregelComputation<PageRankPregel.PageRankPregelConfig> {
 
-    @Override
-    public void compute(PregelContext<PageRankPregel.PageRankPregelConfig> pregel, long nodeId, Queue<Double> messages) {
-        if (pregel.isInitialSuperstep()) {
-            var initialValue = pregel.isSeeded()
-                ? pregel.getNodeValue(nodeId)
-                : 1.0 / pregel.getNodeCount();
-            pregel.setNodeValue(nodeId, initialValue);
-        }
+    static final String PAGE_RANK = "pagerank";
 
-        double newRank = pregel.getNodeValue(nodeId);
+    @Override
+    public Pregel.NodeSchema nodeSchema() {
+        return new NodeSchemaBuilder()
+            .putElement(PAGE_RANK, ValueType.DOUBLE)
+            .build();
+    }
+
+    @Override
+    public void init(PregelContext.InitContext<PageRankPregelConfig> context) {
+        var initialValue = context.config().seedProperty() != null
+            ? context.nodeProperties(context.config().seedProperty()).doubleValue(context.nodeId())
+            : 1.0 / context.nodeCount();
+        context.setNodeValue(PAGE_RANK, initialValue);
+    }
+
+    @Override
+    public void compute(PregelContext.ComputeContext<PageRankPregelConfig> context, Pregel.Messages messages) {
+        double newRank = context.doubleNodeValue(PAGE_RANK);
 
         // compute new rank based on neighbor ranks
-        if (!pregel.isInitialSuperstep()) {
+        if (!context.isInitialSuperstep()) {
             double sum = 0;
-            if (messages != null) {
-                Double nextMessage;
-                while (!(nextMessage = messages.poll()).isNaN()) {
-                    sum += nextMessage;
-                }
+            for (var message : messages) {
+                sum += message;
             }
 
-            var dampingFactor = pregel.getConfig().dampingFactor();
+            var dampingFactor = context.config().dampingFactor();
             var jumpProbability = 1 - dampingFactor;
 
-            newRank = (jumpProbability / pregel.getNodeCount()) + dampingFactor * sum;
+            newRank = (jumpProbability / context.nodeCount()) + dampingFactor * sum;
 
-            pregel.setNodeValue(nodeId, newRank);
+            context.setNodeValue(PAGE_RANK, newRank);
         }
 
         // send new rank to neighbors
-        pregel.sendMessages(nodeId, newRank / pregel.getDegree(nodeId));
+        context.sendToNeighbors(newRank / context.degree());
     }
 
     @ValueClass
     @Configuration("PageRankPregelConfigImpl")
     @SuppressWarnings("immutables:subtype")
-    interface PageRankPregelConfig extends PregelConfig {
+    public interface PageRankPregelConfig extends PregelConfig, SeedConfig {
         @Value.Default
         default double dampingFactor() {
             return 0.85;

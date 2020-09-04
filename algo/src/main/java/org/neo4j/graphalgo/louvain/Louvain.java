@@ -33,7 +33,7 @@ import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
 import org.neo4j.graphalgo.core.loading.HugeGraphUtil;
 import org.neo4j.graphalgo.core.loading.IdMap;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.values.storable.Value;
 import org.neo4j.values.storable.Values;
@@ -278,13 +278,13 @@ public final class Louvain extends Algorithm<Louvain, Louvain> {
         }
 
         @Override
-        public long getLong(long nodeId) {
+        public long longValue(long nodeId) {
             return graph.toOriginalNodeId(nodeId);
         }
 
         @Override
-        public Value getValue(long nodeId) {
-            return Values.longValue(getLong(nodeId));
+        public Value value(long nodeId) {
+            return Values.longValue(longValue(nodeId));
         }
 
         @Override

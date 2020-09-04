@@ -19,7 +19,6 @@
  */
 package org.neo4j.graphalgo.betweenness;
 
-import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.neo4j.graphalgo.AlgoBaseProcTest;
 import org.neo4j.graphalgo.BaseProcTest;
@@ -49,24 +48,26 @@ abstract class BetweennessCentralityProcTest<CONFIG extends BetweennessCentralit
     static Map<Long, Double> EXPECTED = new HashMap<>();
 
     @Override
+    public String createQuery() {
+        return "CREATE" +
+               "  (a:Node {name: 'a'})" +
+               ", (b:Node {name: 'b'})" +
+               ", (c:Node {name: 'c'})" +
+               ", (d:Node {name: 'd'})" +
+               ", (e:Node {name: 'e'})" +
+               ", (a)-[:REL]->(b)" +
+               ", (b)-[:REL]->(c)" +
+               ", (c)-[:REL]->(d)" +
+               ", (d)-[:REL]->(e)";
+    }
+
+    @Override
     public GraphDatabaseAPI graphDb() {
         return db;
     }
 
     @BeforeEach
     void setupGraph() throws Exception {
-        @Language("Cypher") var cypher =
-            "CREATE" +
-            "  (a:Node {name: 'a'})" +
-            ", (b:Node {name: 'b'})" +
-            ", (c:Node {name: 'c'})" +
-            ", (d:Node {name: 'd'})" +
-            ", (e:Node {name: 'e'})" +
-            ", (a)-[:REL]->(b)" +
-            ", (b)-[:REL]->(c)" +
-            ", (c)-[:REL]->(d)" +
-            ", (d)-[:REL]->(e)";
-
         registerProcedures(
             BetweennessCentralityStreamProc.class,
             BetweennessCentralityWriteProc.class,
@@ -76,7 +77,7 @@ abstract class BetweennessCentralityProcTest<CONFIG extends BetweennessCentralit
             GraphCreateProc.class
         );
 
-        runQuery(cypher);
+        runQuery(createQuery());
 
         runInTransaction(db, tx -> {
             var label = Label.label("Node");
@@ -96,4 +97,5 @@ abstract class BetweennessCentralityProcTest<CONFIG extends BetweennessCentralit
             assertEquals(result1.get(nodeId), result2.get(nodeId));
         }
     }
+
 }

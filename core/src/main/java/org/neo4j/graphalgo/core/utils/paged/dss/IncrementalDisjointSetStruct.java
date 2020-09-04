@@ -20,10 +20,11 @@
 package org.neo4j.graphalgo.core.utils.paged.dss;
 
 
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimations;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongLongMap;
 
@@ -84,9 +85,9 @@ public final class IncrementalDisjointSetStruct extends SequentialDisjointSetStr
 
         this.parent.setAll(nodeId -> {
             long parentValue = -1;
-            long communityId = communityMapping.getLong(nodeId);
+            long communityId = communityMapping.longValue(nodeId);
 
-            if (!(communityId == Long.MIN_VALUE)) {
+            if (!(communityId == DefaultValue.LONG_DEFAULT_FALLBACK)) {
                 long internalCommunityId = internalMapping.getOrDefault(communityId, -1);
                 if (internalCommunityId != -1) {
                     parentValue = internalCommunityId;

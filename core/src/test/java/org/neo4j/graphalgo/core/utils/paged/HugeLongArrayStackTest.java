@@ -20,6 +20,7 @@
 package org.neo4j.graphalgo.core.utils.paged;
 
 import org.junit.jupiter.api.Test;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,7 +32,7 @@ class HugeLongArrayStackTest {
 
     @Test
     void testPush() {
-        var q = HugeLongArrayStack.newStack(10, AllocationTracker.EMPTY);
+        var q = HugeLongArrayStack.newStack(10, AllocationTracker.empty());
         q.push(42);
         q.push(1337);
         assertEquals(2, q.size());
@@ -39,7 +40,7 @@ class HugeLongArrayStackTest {
 
     @Test
     void testPop() {
-        var q = HugeLongArrayStack.newStack(10, AllocationTracker.EMPTY);
+        var q = HugeLongArrayStack.newStack(10, AllocationTracker.empty());
         q.push(42);
         q.push(1337);
         assertEquals(1337, q.pop());
@@ -50,7 +51,7 @@ class HugeLongArrayStackTest {
     @Test
     void testPopFromFullStack() {
         var capacity = 10;
-        var q = HugeLongArrayStack.newStack(capacity, AllocationTracker.EMPTY);
+        var q = HugeLongArrayStack.newStack(capacity, AllocationTracker.empty());
         // fill up stack
         for (int i = 0; i < capacity; i++) {
             q.push(i);
@@ -64,7 +65,7 @@ class HugeLongArrayStackTest {
 
     @Test
     void testIsEmpty() {
-        var q = HugeLongArrayStack.newStack(10, AllocationTracker.EMPTY);
+        var q = HugeLongArrayStack.newStack(10, AllocationTracker.empty());
         assertTrue(q.isEmpty());
         q.push(42);
         assertFalse(q.isEmpty());
@@ -74,14 +75,14 @@ class HugeLongArrayStackTest {
 
     @Test
     void throwWhenEmpty() {
-        var q = HugeLongArrayStack.newStack(10, AllocationTracker.EMPTY);
+        var q = HugeLongArrayStack.newStack(10, AllocationTracker.empty());
         var ex = assertThrows(IndexOutOfBoundsException.class, q::pop);
         assertEquals("Stack is empty.", rootCause(ex).getMessage());
     }
 
     @Test
     void throwWhenFull() {
-        var q = HugeLongArrayStack.newStack(0, AllocationTracker.EMPTY);
+        var q = HugeLongArrayStack.newStack(0, AllocationTracker.empty());
         var ex = assertThrows(IndexOutOfBoundsException.class, () -> q.push(42));
         assertEquals("Stack is full.", rootCause(ex).getMessage());
     }

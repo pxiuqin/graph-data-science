@@ -24,6 +24,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.neo4j.graphalgo.PrivateLookup;
 import org.neo4j.graphalgo.core.utils.BitUtil;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.mem.MemoryRange;
 
 import java.lang.invoke.MethodHandle;
@@ -47,7 +48,7 @@ final class HugeSparseLongArrayTest {
 
     @Test
     void shouldSetAndGet() {
-        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.EMPTY);
+        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.empty());
         int index = integer(2, 8);
         int value = integer(42, 1337);
         array.set(index, value);
@@ -56,7 +57,7 @@ final class HugeSparseLongArrayTest {
 
     @Test
     void shouldSetIfAbsent() {
-        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.EMPTY);
+        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.empty());
         int index = integer(2, 8);
         int value = integer(42, 1337);
         assertTrue(array.setIfAbsent(index, value));
@@ -65,7 +66,9 @@ final class HugeSparseLongArrayTest {
 
     @Test
     void shouldAddAndGet() {
-        HugeSparseLongArray.GrowingBuilder array = HugeSparseLongArray.GrowingBuilder.create(0L, AllocationTracker.EMPTY);
+        HugeSparseLongArray.GrowingBuilder array = HugeSparseLongArray.GrowingBuilder.create(0L,
+            AllocationTracker.empty()
+        );
         int index = integer(2, 8);
         int value = integer(42, 1337);
         array.addTo(index, value);
@@ -74,7 +77,7 @@ final class HugeSparseLongArrayTest {
 
     @Test
     void shouldSetValuesInPageSizedChunks() {
-        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.EMPTY);
+        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.empty());
         // larger than the desired size, but still within a single page
         array.set(integer(11, PS - 1), 1337);
         // doesn't fail - good
@@ -82,7 +85,7 @@ final class HugeSparseLongArrayTest {
 
     @Test
     void shouldAddValuesInPageSizedChunks() {
-        HugeSparseLongArray.GrowingBuilder array = HugeSparseLongArray.GrowingBuilder.create(AllocationTracker.EMPTY);
+        HugeSparseLongArray.GrowingBuilder array = HugeSparseLongArray.GrowingBuilder.create(AllocationTracker.empty());
         // larger than the desired size, but still within a single page
         array.addTo(integer(11, PS - 1), 1337);
         // doesn't fail - good
@@ -91,7 +94,7 @@ final class HugeSparseLongArrayTest {
     // capacity check is only an assert
     @Test
     void shouldUseCapacityInPageSizedChunks() {
-        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.EMPTY);
+        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.empty());
         // larger than the desired size, but still within a single page
         try {
             array.set(integer(PS, 2 * PS - 1), 1337);
@@ -102,7 +105,7 @@ final class HugeSparseLongArrayTest {
 
     @Test
     void shouldHaveContains() {
-        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.EMPTY);
+        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.empty());
         int index = integer(2, 8);
         int value = integer(42, 1337);
         array.set(index, value);
@@ -119,7 +122,9 @@ final class HugeSparseLongArrayTest {
     @ParameterizedTest
     @ValueSource(longs = {-1, Long.MIN_VALUE})
     void shouldReturnDefaultValueForMissingValues(long defaultValue) {
-        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, defaultValue, AllocationTracker.EMPTY);
+        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, defaultValue,
+            AllocationTracker.empty()
+        );
         int index = integer(2, 8);
         int value = integer(42, 1337);
         array.set(index, value);
@@ -136,21 +141,21 @@ final class HugeSparseLongArrayTest {
 
     @Test
     void shouldReturnNegativeOneForOutOfRangeValues() {
-        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.EMPTY);
+        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.empty());
         array.set(integer(2, 8), integer(42, 1337));
         assertEquals(-1L, array.build().get(integer(100, 200)));
     }
 
     @Test
     void shouldReturnNegativeOneForUnsetPages() {
-        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(PS + 10, AllocationTracker.EMPTY);
+        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(PS + 10, AllocationTracker.empty());
         array.set(5000, integer(42, 1337));
         assertEquals(-1L, array.build().get(integer(100, 200)));
     }
 
     @Test
     void shouldNotFailOnGetsThatAreoutOfBounds() {
-        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.EMPTY);
+        HugeSparseLongArray.Builder array = HugeSparseLongArray.Builder.create(10, AllocationTracker.empty());
         array.set(integer(2, 8), integer(42, 1337));
         assertEquals(-1L, array.build().get(integer(100_000_000, 200_000_000)));
         // doesn't fail - good
@@ -167,7 +172,7 @@ final class HugeSparseLongArrayTest {
             assertNull(page);
         }
 
-        long tracked = tracker.tracked();
+        long tracked = tracker.trackedBytes();
         // allow some bytes for the container type and
         assertEquals(sizeOfObjectArray(2), tracked);
     }
@@ -190,7 +195,7 @@ final class HugeSparseLongArrayTest {
             }
         }
 
-        long tracked = tracker.tracked();
+        long tracked = tracker.trackedBytes();
         assertEquals(sizeOfObjectArray(2) + sizeOfLongArray(PS), tracked);
     }
 

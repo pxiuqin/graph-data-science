@@ -25,7 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.neo4j.graphalgo.beta.generator.RandomGraphGenerator;
 import org.neo4j.graphalgo.beta.generator.RelationshipDistribution;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.extension.GdlExtension;
 import org.neo4j.graphalgo.extension.GdlGraph;
 import org.neo4j.graphalgo.extension.Inject;
@@ -80,7 +80,7 @@ class SelectionStrategyTest {
             .nodeCount(100_000)
             .averageDegree(10)
             .relationshipDistribution(RelationshipDistribution.RANDOM)
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .build()
             .generate();
         SelectionStrategy selectionStrategy = new SelectionStrategy.RandomDegree(samplingSize, Optional.of(42L));

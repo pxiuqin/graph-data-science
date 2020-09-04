@@ -21,9 +21,9 @@ package org.neo4j.graphalgo.core.loading.nodeproperties;
 
 import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.nodeproperties.DoubleNodeProperties;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeSparseLongArray;
-import org.neo4j.values.storable.NumberValue;
+import org.neo4j.graphalgo.utils.ValueConversion;
 import org.neo4j.values.storable.Value;
 
 import java.lang.invoke.MethodHandles;
@@ -55,12 +55,12 @@ public class DoubleNodePropertiesBuilder extends InnerNodePropertiesBuilder {
 
     public DoubleNodePropertiesBuilder(long nodeCount, DefaultValue defaultValue, AllocationTracker tracker) {
         this.maxValue = Double.NEGATIVE_INFINITY;
-        this.valuesBuilder = HugeSparseLongArray.Builder.create(nodeCount, Double.doubleToLongBits(defaultValue.getDouble()), tracker);
+        this.valuesBuilder = HugeSparseLongArray.Builder.create(nodeCount, Double.doubleToLongBits(defaultValue.doubleValue()), tracker);
     }
 
     @Override
     void setValue(long nodeId, Value value) {
-        double doubleValue = ((NumberValue) value).doubleValue();
+        double doubleValue = ValueConversion.getDoubleValue(value);
         valuesBuilder.set(nodeId, Double.doubleToLongBits(doubleValue));
         updateMaxValue(doubleValue);
     }
@@ -121,7 +121,7 @@ public class DoubleNodePropertiesBuilder extends InnerNodePropertiesBuilder {
         }
 
         @Override
-        public double getDouble(long nodeId) {
+        public double doubleValue(long nodeId) {
             return Double.longBitsToDouble(propertyValues.get(nodeId));
         }
 

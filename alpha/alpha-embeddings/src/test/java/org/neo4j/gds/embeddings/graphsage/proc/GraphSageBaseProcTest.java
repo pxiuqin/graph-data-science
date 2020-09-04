@@ -25,14 +25,25 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.neo4j.gds.embeddings.graphsage.ActivationFunction;
 import org.neo4j.graphalgo.BaseProcTest;
 import org.neo4j.graphalgo.GdsCypher;
+import org.neo4j.graphalgo.NodeLabel;
+import org.neo4j.graphalgo.NodeProjection;
+import org.neo4j.graphalgo.NodeProjections;
 import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.PropertyMapping;
+import org.neo4j.graphalgo.PropertyMappings;
 import org.neo4j.graphalgo.RelationshipProjection;
+import org.neo4j.graphalgo.RelationshipProjections;
 import org.neo4j.graphalgo.catalog.GraphCreateProc;
+import org.neo4j.graphalgo.config.ImmutableGraphCreateFromStoreConfig;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
+import org.neo4j.graphalgo.core.model.ModelCatalog;
+import org.neo4j.graphalgo.model.catalog.ModelDropProc;
+import org.neo4j.graphalgo.model.catalog.ModelExistsProc;
 
+import java.util.List;
 import java.util.stream.Stream;
 
+import static org.neo4j.graphalgo.ElementProjection.PROJECT_ALL;
 import static org.neo4j.graphalgo.TestSupport.crossArguments;
 
 class GraphSageBaseProcTest extends BaseProcTest {
@@ -69,13 +80,19 @@ class GraphSageBaseProcTest extends BaseProcTest {
         ", (j)-[:REL]->(l)" +
         ", (k)-[:REL]->(l)";
 
+    static String graphName = "embeddingsGraph";
+
+    static String modelName = "graphSageModel";
 
     @BeforeEach
     void setup() throws Exception {
         registerProcedures(
             GraphCreateProc.class,
             GraphSageStreamProc.class,
-            GraphSageWriteProc.class
+            GraphSageWriteProc.class,
+            GraphSageTrainProc.class,
+            ModelExistsProc.class,
+            ModelDropProc.class
         );
 
         runQuery(DB_CYPHER);
@@ -92,7 +109,7 @@ class GraphSageBaseProcTest extends BaseProcTest {
                     Orientation.UNDIRECTED
                 )
             )
-            .graphCreate("embeddingsGraph")
+            .graphCreate(graphName)
             .yields();
 
         runQuery(query);
@@ -101,10 +118,10 @@ class GraphSageBaseProcTest extends BaseProcTest {
     @AfterEach
     void tearDown() {
         GraphStoreCatalog.removeAllLoadedGraphs();
+        ModelCatalog.removeAllLoadedModels();
     }
 
-
-    protected static Stream<Arguments> configVariations() {
+    static Stream<Arguments> configVariations() {
         return crossArguments(
             () -> Stream.of(
                 Arguments.of(16),
@@ -118,6 +135,81 @@ class GraphSageBaseProcTest extends BaseProcTest {
             () -> Stream.of(
                 Arguments.of(ActivationFunction.SIGMOID),
                 Arguments.of(ActivationFunction.RELU)
+            )
+        );
+    }
+
+    void train(int embeddingSize, String aggregator, ActivationFunction activationFunction) {
+        String trainQuery = GdsCypher.call()
+            .explicitCreation(graphName)
+            .algo("gds.alpha.graphSage")
+            .trainMode()
+            .addParameter("nodePropertyNames", List.of("age", "birth_year", "death_year"))
+            .addParameter("embeddingSize", embeddingSize)
+            .addParameter("activationFunction", activationFunction)
+            .addParameter("degreeAsProperty", true)
+            .addParameter("aggregator", aggregator)
+            .addParameter("modelName", modelName)
+            .yields();
+
+        runQuery(trainQuery);
+    }
+
+    static Stream<Arguments> missingNodeProperties() {
+        return Stream.of(
+            Arguments.of(
+                ImmutableGraphCreateFromStoreConfig.builder()
+                    .graphName("implicitWeightedGraph")
+                    .nodeProjections(NodeProjections
+                        .builder()
+                        .putProjection(
+                            NodeLabel.of("King"),
+                            NodeProjection.of(
+                                "King",
+                                PropertyMappings.of(
+                                    PropertyMapping.of("age")
+                                )
+                            )
+                        )
+                        .build())
+                    .relationshipProjections(RelationshipProjections.fromString("REL")
+                    ).build(),
+                "birth_year, death_year",
+                "age",
+                "King"
+            ),
+            Arguments.of(
+                ImmutableGraphCreateFromStoreConfig.builder()
+                    .graphName("implicitWeightedGraph")
+                    .nodeProjections(NodeProjections
+                        .builder()
+                        .putProjection(
+                            NodeLabel.of("King"),
+                            NodeProjection.of(
+                                "King",
+                                PropertyMappings.of(
+                                    PropertyMapping.of("age"),
+                                    PropertyMapping.of("birth_year")
+                                )
+                            )
+                        )
+                        .build())
+                    .relationshipProjections(RelationshipProjections.fromString("REL")
+                    ).build(),
+                "death_year",
+                "age, birth_year",
+                "King"
+            ),
+            Arguments.of(
+                ImmutableGraphCreateFromStoreConfig.of(
+                    "",
+                    "",
+                    NodeProjections.fromString(PROJECT_ALL),
+                    RelationshipProjections.fromString(PROJECT_ALL)
+                ),
+                "age, birth_year, death_year",
+                "",
+                "__ALL__"
             )
         );
     }

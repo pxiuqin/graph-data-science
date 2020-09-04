@@ -61,6 +61,8 @@ abstract class ModularityOptimizationProcTest extends BaseProcTest {
         runQuery(DB_CYPHER);
     }
 
+
+
     @AfterEach
     void tearDown() {
         GraphStoreCatalog.removeAllLoadedGraphs();

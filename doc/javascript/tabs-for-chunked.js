@@ -1,10 +1,11 @@
 function tabTheSource($content) {
     var SESSION_STORAGE_KEY = 'active_procedure_mode';
     var MODES = {
+        'stream': 'Stream mode',
         'mutate': 'Mutate mode',
         'stats': 'Stats mode',
-        'stream': 'Stream mode',
-        'write': 'Write mode'
+        'write': 'Write mode',
+        'train': 'Train mode'
     };
     updateSelectedModeFromQueryParams(MODES, SESSION_STORAGE_KEY);
 

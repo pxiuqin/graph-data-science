@@ -23,7 +23,7 @@ import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.compat.Neo4jProxy;
 import org.neo4j.graphalgo.core.Aggregation;
 import org.neo4j.graphalgo.core.utils.RawValues;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.internal.kernel.api.CursorFactory;
 import org.neo4j.internal.kernel.api.PropertyCursor;
 import org.neo4j.internal.kernel.api.Read;
@@ -89,8 +89,8 @@ class RelationshipImporter {
             adjacencyBuilder.atLeastOnePropertyToLoad()
         );
         int importedOut = importRelationships(buffer, batch, outProperties, adjacencyBuilder, tracker);
-        batch = buffer.sortByTarget();
 
+        batch = buffer.sortByTarget();
         long[][] inProperties = reader.readProperty(
             batch,
             batchLength,
@@ -100,6 +100,7 @@ class RelationshipImporter {
             adjacencyBuilder.atLeastOnePropertyToLoad()
         );
         int importedIn = importRelationships(buffer, batch, inProperties, adjacencyBuilder, tracker);
+
         return RawValues.combineIntInt(importedOut + importedIn, importedOut + importedIn);
     }
 
@@ -154,7 +155,7 @@ class RelationshipImporter {
          * @param defaultValues            default weight for each property key
          * @param aggregations             the aggregation for each property
          * @param atLeastOnePropertyToLoad true iff there is at least one value in {@code propertyKeyIds} that is not {@link org.neo4j.kernel.api.StatementConstants#NO_SUCH_PROPERTY_KEY} (-1).
-         * @return list of property values per per relationship property id
+         * @return list of property values per relationship property id
          */
         long[][] readProperty(
             long[] batch,

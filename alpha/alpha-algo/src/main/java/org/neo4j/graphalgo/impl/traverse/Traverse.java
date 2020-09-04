@@ -104,16 +104,15 @@ public final class Traverse extends Algorithm<Traverse, Traverse> {
 
     @Override
     public Traverse compute() {
-        long sourceNode = graph.toMappedNodeId(startNodeId);
         LongArrayList result = new LongArrayList(nodeCount);
         BitSet inResult = new BitSet(nodeCount);
         nodes.clear();
         sources.clear();
         visited.clear();
-        nodeFunc.accept(nodes, sourceNode);
-        nodeFunc.accept(sources, sourceNode);
+        nodeFunc.accept(nodes, startNodeId);
+        nodeFunc.accept(sources, startNodeId);
         weightFunc.accept(weights, .0);
-        visited.set(sourceNode);
+        visited.set(startNodeId);
 
         loop:
         while (!nodes.isEmpty() && running()) {
@@ -138,19 +137,11 @@ public final class Traverse extends Algorithm<Traverse, Traverse> {
             graph.forEachRelationship(
                 node,
                 longToIntConsumer((s, t) -> {
-                    // remove from the visited nodes to allow revisiting in case the node is accessible via more than one path.
-                    double aggregatedWeight = aggregatorFunction.apply(s, t, weight);
-                    final ExitPredicate.Result test = exitPredicate.test(s, t, aggregatedWeight);
-                    if (test == ExitPredicate.Result.FOLLOW && visited.get(t)) {
-                        visited.clear(t);
-                    }
-
                     if (!visited.get(t)) {
                         visited.set(t);
-
                         nodeFunc.accept(sources, s);
                         nodeFunc.accept(nodes, t);
-                        weightFunc.accept(weights, aggregatedWeight);
+                        weightFunc.accept(weights, aggregatorFunction.apply(s, t, weight));
                     }
                     return running();
                 })

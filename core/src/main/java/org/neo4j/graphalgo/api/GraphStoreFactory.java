@@ -32,7 +32,7 @@ import org.neo4j.graphalgo.core.loading.RelationshipsBuilder;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.mem.Assessable;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -45,6 +45,10 @@ public abstract class GraphStoreFactory<STORE extends GraphStore, CONFIG extends
 
     public interface Supplier {
         GraphStoreFactory<? extends GraphStore, ? extends GraphCreateConfig> get(GraphLoaderContext loaderContext);
+
+        default GraphStoreFactory<? extends GraphStore, ? extends GraphCreateConfig> getWithDimension(GraphLoaderContext loaderContext, GraphDimensions graphDimensions) {
+            return get(loaderContext);
+        }
     }
 
     public static final String TASK_LOADING = "LOADING";
@@ -119,7 +123,7 @@ public abstract class GraphStoreFactory<STORE extends GraphStore, CONFIG extends
                             relationshipCount,
                             projection.orientation(),
                             projection.isMultiGraph(),
-                            propertyIndexAndMapping.getTwo().defaultValue().getDouble() // This is fine because relationships currently only support doubles
+                            propertyIndexAndMapping.getTwo().defaultValue().doubleValue() // This is fine because relationships currently only support doubles
                         )
                     ));
                 relationshipProperties.put(relationshipType, propertyMap);

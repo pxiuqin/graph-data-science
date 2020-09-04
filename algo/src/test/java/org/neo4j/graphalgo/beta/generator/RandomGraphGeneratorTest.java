@@ -27,7 +27,7 @@ import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.RandomGraphGeneratorConfig.AllowSelfLoops;
 import org.neo4j.graphalgo.core.Aggregation;
 import org.neo4j.graphalgo.core.huge.HugeGraph;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +45,7 @@ class RandomGraphGeneratorTest {
             .nodeCount(nbrNodes)
             .averageDegree(avgDeg)
             .relationshipDistribution(RelationshipDistribution.UNIFORM)
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .build();
         HugeGraph graph = randomGraphGenerator.generate();
 
@@ -74,7 +74,7 @@ class RandomGraphGeneratorTest {
             .nodeCount(nbrNodes)
             .averageDegree(avgDeg)
             .relationshipDistribution(RelationshipDistribution.POWER_LAW)
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .build();
         HugeGraph graph = randomGraphGenerator.generate();
 
@@ -95,7 +95,7 @@ class RandomGraphGeneratorTest {
             .aggregation(Aggregation.NONE)
             .orientation(Orientation.UNDIRECTED)
             .allowSelfLoops(allowSelfLoops)
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .build();
         HugeGraph graph = randomGraphGenerator.generate();
 
@@ -116,7 +116,7 @@ class RandomGraphGeneratorTest {
             .nodeCount(nbrNodes)
             .averageDegree(avgDeg)
             .relationshipDistribution(RelationshipDistribution.RANDOM)
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .build();
         HugeGraph graph = randomGraphGenerator.generate();
 
@@ -149,7 +149,7 @@ class RandomGraphGeneratorTest {
             .averageDegree(avgDeg)
             .relationshipDistribution(RelationshipDistribution.UNIFORM)
             .relationshipPropertyProducer(PropertyProducer.fixed("property", 42D))
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .build();
         HugeGraph graph = randomGraphGenerator.generate();
 
@@ -172,7 +172,7 @@ class RandomGraphGeneratorTest {
             .averageDegree(avgDeg)
             .relationshipDistribution(RelationshipDistribution.UNIFORM)
             .relationshipPropertyProducer(PropertyProducer.random("prop", -10, 10))
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .build();
         HugeGraph graph = randomGraphGenerator.generate();
 
@@ -192,14 +192,14 @@ class RandomGraphGeneratorTest {
             .nodeCount(10)
             .averageDegree(2)
             .relationshipDistribution(RelationshipDistribution.UNIFORM)
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .nodePropertyProducer(PropertyProducer.random("foo", 0, 1))
             .build()
             .generate();
 
         NodeProperties nodeProperties = graph.nodeProperties("foo");
         for (int nodeId = 0; nodeId < 10; nodeId++) {
-            double value = nodeProperties.getDouble(nodeId);
+            double value = nodeProperties.doubleValue(nodeId);
             assertTrue(0 <= value && value <= 1);
         }
     }
@@ -215,7 +215,7 @@ class RandomGraphGeneratorTest {
             .averageDegree(avgDeg)
             .relationshipDistribution(RelationshipDistribution.UNIFORM)
             .seed(seed)
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .build();
 
         RandomGraphGenerator otherRandomGenerator = RandomGraphGenerator.builder()
@@ -223,7 +223,7 @@ class RandomGraphGeneratorTest {
             .averageDegree(avgDeg)
             .relationshipDistribution(RelationshipDistribution.UNIFORM)
             .seed(seed)
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .build();
 
         HugeGraph graph1 = randomGraphGenerator.generate();

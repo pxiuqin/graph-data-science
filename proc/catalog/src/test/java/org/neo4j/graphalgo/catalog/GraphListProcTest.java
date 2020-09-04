@@ -110,6 +110,7 @@ class GraphListProcTest extends BaseProcTest {
                 "relationshipQuery", null,
                 "nodeCount", 2L,
                 "relationshipCount", 1L,
+                "density", 0.5D,
                 "degreeDistribution", map(
                     "min", 0L,
                     "mean", 0.5D,

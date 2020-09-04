@@ -70,6 +70,11 @@ class ModularityOptimizationMutateProcTest extends ModularityOptimizationProcTes
         runQuery(graphCreateQuery());
     }
 
+    @Override
+    public String createQuery() {
+        return DB_CYPHER;
+    }
+
     @Test
     void testMutate() {
         String query = explicitAlgoBuildStage()
@@ -115,7 +120,7 @@ class ModularityOptimizationMutateProcTest extends ModularityOptimizationProcTes
         NodeProperties communities = mutatedGraph.nodePropertyValues(mutateProperty());
         NodeProperties seeds = mutatedGraph.nodePropertyValues("seed1");
         for (int i = 0; i < mutatedGraph.nodeCount(); i++) {
-            assertEquals(communities.getLong(i), seeds.getLong(i));
+            assertEquals(communities.longValue(i), seeds.longValue(i));
         }
     }
 

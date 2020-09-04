@@ -21,24 +21,27 @@ package org.neo4j.gds.embeddings.graphsage.ddl4j.functions;
 
 import org.neo4j.gds.embeddings.graphsage.ddl4j.ComputationContext;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.Dimensions;
-import org.neo4j.gds.embeddings.graphsage.ddl4j.Tensor;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.Variable;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Matrix;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Tensor;
 
-public class ElementwiseMax extends SingleParentVariable {
+public class ElementwiseMax extends SingleParentVariable<Matrix> {
     private final int[][] adjacencyMatrix;
+    private final int rows;
+    private final int cols;
 
-    public ElementwiseMax(Variable parent, int[][] adjacencyMatrix) {
+    public ElementwiseMax(Variable<?> parent, int[][] adjacencyMatrix) {
         super(parent, Dimensions.matrix(adjacencyMatrix.length, parent.dimension(1)));
         this.adjacencyMatrix = adjacencyMatrix;
+        this.rows = adjacencyMatrix.length;
+        this.cols = parent.dimension(1);
     }
 
     @Override
-    protected Tensor apply(ComputationContext ctx) {
-        Tensor max = Tensor.constant(Double.NEGATIVE_INFINITY, dimensions());
+    public Matrix apply(ComputationContext ctx) {
+        Matrix max = Matrix.fill(Double.NEGATIVE_INFINITY, rows, cols);
 
-        int rows = dimension(0);
-        int cols = dimension(1);
-        double[] parentData = ctx.data(parent).data;
+        double[] parentData = ctx.data(parent()).data();
         for (int row = 0; row < rows; row++) {
             int[] neighbors = this.adjacencyMatrix[row];
             for(int col = 0; col < cols; col++) {
@@ -46,10 +49,13 @@ public class ElementwiseMax extends SingleParentVariable {
                 if (neighbors.length > 0) {
                     for (int neighbor : neighbors) {
                         int neighborElementIndex = neighbor * cols + col;
-                        max.data[resultElementIndex] = Math.max(parentData[neighborElementIndex], max.data[resultElementIndex]);
+                        max.setDataAt(
+                            resultElementIndex,
+                            Math.max(parentData[neighborElementIndex], max.dataAt(resultElementIndex))
+                        );
                     }
                 } else {
-                    max.data[resultElementIndex] = 0;
+                    max.setDataAt(resultElementIndex, 0);
                 }
             }
         }
@@ -58,14 +64,12 @@ public class ElementwiseMax extends SingleParentVariable {
     }
 
     @Override
-    protected Tensor gradient(ComputationContext ctx) {
-        Tensor result = ctx.data(parent).zeros();
+    public Tensor<?> gradient(Variable<?> parent, ComputationContext ctx) {
+        Tensor<?> result = ctx.data(parent).zeros();
 
-        int cols = parent.dimension(1);
-
-        double[] parentData = ctx.data(parent).data;
-        double[] thisGradient = ctx.gradient(this).data;
-        double[] thisData = ctx.data(this).data;
+        double[] parentData = ctx.data(parent).data();
+        double[] thisGradient = ctx.gradient(this).data();
+        double[] thisData = ctx.data(this).data();
 
         for (int row = 0; row < this.adjacencyMatrix.length; row++) {
             int[] neighbors = this.adjacencyMatrix[row];
@@ -74,7 +78,7 @@ public class ElementwiseMax extends SingleParentVariable {
                     int thisElementIndex = row * cols + col;
                     int neighborElementIndex = neighbor * cols + col;
                     if (parentData[neighborElementIndex] == thisData[thisElementIndex]) {
-                        result.data[neighborElementIndex] += thisGradient[thisElementIndex];
+                        result.addDataAt(neighborElementIndex, thisGradient[thisElementIndex]);
                     }
                 }
             }

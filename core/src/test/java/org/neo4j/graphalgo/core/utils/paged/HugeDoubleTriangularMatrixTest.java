@@ -23,6 +23,7 @@ import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.constraints.DoubleRange;
 import net.jqwik.api.constraints.LongRange;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -34,7 +35,7 @@ class HugeDoubleTriangularMatrixTest {
             @ForAll @LongRange(min = 0, max = 999) long y,
             @ForAll @DoubleRange(min = 0, max = 10000) double v) {
         if (x <= y) {
-            HugeDoubleTriangularMatrix array = new HugeDoubleTriangularMatrix(1000, AllocationTracker.EMPTY);
+            HugeDoubleTriangularMatrix array = new HugeDoubleTriangularMatrix(1000, AllocationTracker.empty());
             array.set(x, y, v);
             assertEquals(v, array.get(x, y));
         }

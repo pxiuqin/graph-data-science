@@ -23,29 +23,24 @@ import org.jetbrains.annotations.Nullable;
 import org.neo4j.graphalgo.NodeProjections;
 import org.neo4j.graphalgo.RelationshipProjections;
 import org.neo4j.graphalgo.api.GraphStore;
-import org.neo4j.graphalgo.api.GraphStoreFactory;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.config.GraphCreateFromCypherConfig;
 import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
-import org.neo4j.graphalgo.core.GraphDimensions;
 import org.neo4j.graphalgo.core.GraphLoader;
-import org.neo4j.graphalgo.core.ImmutableGraphDimensions;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
 import org.neo4j.graphalgo.core.utils.ProgressTimer;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.mem.MemoryTree;
 import org.neo4j.graphalgo.core.utils.mem.MemoryTreeWithDimensions;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.Procedure;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Stream;
 
-import static org.neo4j.graphalgo.RelationshipType.ALL_RELATIONSHIPS;
 import static org.neo4j.procedure.Mode.READ;
 
 public class GraphCreateProc extends CatalogProc {
@@ -160,8 +155,8 @@ public class GraphCreateProc extends CatalogProc {
             : new GraphCreateNativeResult.Builder((GraphCreateFromStoreConfig) config);
 
         try (ProgressTimer ignored = ProgressTimer.start(builder::withCreateMillis)) {
-            GraphLoader loader = newLoader(config, AllocationTracker.EMPTY);
-            GraphStore graphStore =  loader.graphStore();
+            GraphLoader loader = newLoader(config, AllocationTracker.empty());
+            GraphStore graphStore = loader.graphStore();
 
             builder
                 .withNodeCount(graphStore.nodeCount())
@@ -177,34 +172,10 @@ public class GraphCreateProc extends CatalogProc {
         return Stream.of(new MemoryEstimateResult(memoryTreeWithDimensions(config)));
     }
 
-    public MemoryTreeWithDimensions memoryTreeWithDimensions(GraphCreateConfig config) {
-        GraphLoader loader = newLoader(config, AllocationTracker.EMPTY);
-        GraphStoreFactory<?, ?> graphStoreFactory = loader.graphStoreFactory();
-        GraphDimensions dimensions = updateDimensions(config, graphStoreFactory, graphStoreFactory.estimationDimensions());
-
-        MemoryTree memoryTree = estimate(graphStoreFactory, dimensions, config);
-        return new MemoryTreeWithDimensions(memoryTree, dimensions);
-    }
-
-    private GraphDimensions updateDimensions(
-        GraphCreateConfig config,
-        GraphStoreFactory<?, ?> graphStoreFactory,
-        GraphDimensions dimensions
-    ) {
-        if (config.nodeCount() > -1) {
-            dimensions = ImmutableGraphDimensions.builder()
-                .from(graphStoreFactory.dimensions())
-                .nodeCount(config.nodeCount())
-                .highestNeoId(config.nodeCount())
-                .relationshipCounts(Collections.singletonMap(ALL_RELATIONSHIPS, config.relationshipCount()))
-                .maxRelCount(Math.max(config.relationshipCount(), 0))
-                .build();
-        }
-        return dimensions;
-    }
-
-    public MemoryTree estimate(GraphStoreFactory<?, ?> factory, GraphDimensions dimensions, GraphCreateConfig config) {
-        return factory.memoryEstimation().estimate(dimensions, config.readConcurrency());
+    MemoryTreeWithDimensions memoryTreeWithDimensions(GraphCreateConfig config) {
+        var memoryEstimationAndDimensions = estimateGraphCreate(config);
+        MemoryTree memoryTree = memoryEstimationAndDimensions.memoryEstimation().estimate(memoryEstimationAndDimensions.graphDimensions(), config.readConcurrency());
+        return new MemoryTreeWithDimensions(memoryTree, memoryEstimationAndDimensions.graphDimensions());
     }
 
     public static class GraphCreateResult {

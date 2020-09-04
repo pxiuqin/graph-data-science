@@ -24,7 +24,7 @@ import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.TestSupport;
 import org.neo4j.graphalgo.beta.pregel.Pregel;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.extension.GdlExtension;
 import org.neo4j.graphalgo.extension.GdlGraph;
 import org.neo4j.graphalgo.extension.Inject;
@@ -36,6 +36,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.neo4j.graphalgo.beta.pregel.cc.ConnectedComponentsPregel.COMPONENT;
 import static org.neo4j.graphalgo.core.ExceptionMessageMatcher.containsMessage;
 
 @GdlExtension
@@ -79,20 +80,18 @@ class ConnectedComponentsPregelAlgoTest {
 
     @Test
     void directedSCC() {
-        int batchSize = 10;
         int maxIterations = 10;
 
         var config = ImmutableConnectedComponentsConfig.builder()
             .maxIterations(maxIterations)
             .build();
 
-        var pregelJob = Pregel.withDefaultNodeValues(
+        var pregelJob = Pregel.create(
             directedGraph,
             config,
             new ConnectedComponentsPregel(),
-            batchSize,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         var result = pregelJob.run();
@@ -112,12 +111,11 @@ class ConnectedComponentsPregelAlgoTest {
         expected.put("i", 7L);
         expected.put("j", 9L);
 
-        TestSupport.assertLongValues(directedGraph, (nodeId) -> (long) result.nodeValues().get(nodeId), expected);
+        TestSupport.assertLongValues(directedGraph, (nodeId) -> result.nodeValues().longValue(COMPONENT, nodeId), expected);
     }
 
     @Test
     void undirectedWCC() {
-        int batchSize = 10;
         int maxIterations = 10;
 
         var config = ImmutableConnectedComponentsConfig.builder()
@@ -125,13 +123,12 @@ class ConnectedComponentsPregelAlgoTest {
             .maxIterations(maxIterations)
             .build();
 
-        var pregelJob = Pregel.withDefaultNodeValues(
+        var pregelJob = Pregel.create(
             undirectedGraph,
             config,
             new ConnectedComponentsPregel(),
-            batchSize,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         var result = pregelJob.run();
@@ -151,7 +148,7 @@ class ConnectedComponentsPregelAlgoTest {
         expected.put("i", 7L);
         expected.put("j", 9L);
 
-        TestSupport.assertLongValues(undirectedGraph, (nodeId) -> (long) result.nodeValues().get(nodeId), expected);
+        TestSupport.assertLongValues(undirectedGraph, (nodeId) -> result.nodeValues().longValue(COMPONENT, nodeId), expected);
     }
 
     @Test

@@ -26,13 +26,14 @@ import org.neo4j.graphalgo.beta.pregel.Pregel;
 import org.neo4j.graphalgo.beta.pregel.cc.ConnectedComponentsPregel;
 import org.neo4j.graphalgo.beta.pregel.cc.ImmutableConnectedComponentsConfig;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
-import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
+
+import static org.neo4j.graphalgo.beta.pregel.cc.ConnectedComponentsPregel.COMPONENT;
 
 class PregelConnectedComponentsDocExample {
     @Test
     void testDoc() {
-        int batchSize = 10;
         int maxIterations = 10;
 
         var config = ImmutableConnectedComponentsConfig.builder()
@@ -45,20 +46,19 @@ class PregelConnectedComponentsDocExample {
             .nodeCount(100)
             .averageDegree(10)
             .relationshipDistribution(RelationshipDistribution.POWER_LAW)
-            .allocationTracker(AllocationTracker.EMPTY)
+            .allocationTracker(AllocationTracker.empty())
             .build()
             .generate();
 
-        var pregelJob = Pregel.withDefaultNodeValues(
+        var pregelJob = Pregel.create(
             randomGraph,
             config,
             new ConnectedComponentsPregel(),
-            batchSize,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
-        HugeDoubleArray nodeValues = pregelJob.run().nodeValues();
+        HugeLongArray nodeValues = pregelJob.run().nodeValues().longProperties(COMPONENT);
         System.out.println(nodeValues.toString());
     }
 }

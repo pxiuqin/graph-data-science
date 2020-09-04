@@ -26,26 +26,41 @@ import org.neo4j.values.storable.Values;
 public interface DoubleArrayNodeProperties extends NodeProperties {
 
     @Override
-    double[] getDoubleArray(long nodeId);
+    double[] doubleArrayValue(long nodeId);
 
     @Override
-    default Object getObject(long nodeId) {
-        return getDoubleArray(nodeId);
+    default float[] floatArrayValue(long nodeId) {
+        double[] doubleArray = doubleArrayValue(nodeId);
+
+        if (doubleArray == null) {
+            return null;
+        } else {
+            float[] floatArray = new float[doubleArray.length];
+            for (int i = 0; i < doubleArray.length; i++) {
+                floatArray[i] = (float) doubleArray[i];
+            }
+            return floatArray;
+        }
     }
 
     @Override
-    default Value getValue(long nodeId) {
-        var value = getDoubleArray(nodeId);
+    default Object getObject(long nodeId) {
+        return doubleArrayValue(nodeId);
+    }
+
+    @Override
+    default Value value(long nodeId) {
+        var value = doubleArrayValue(nodeId);
         return value == null ? null : Values.doubleArray(value);
     };
 
     @Override
-    default ValueType getType() {
+    default ValueType valueType() {
         return ValueType.DOUBLE_ARRAY;
     };
 
     @Override
-    default double getDouble(long nodeId) {
+    default double doubleValue(long nodeId) {
         throw new UnsupportedOperationException("double is not supported");
     };
 }

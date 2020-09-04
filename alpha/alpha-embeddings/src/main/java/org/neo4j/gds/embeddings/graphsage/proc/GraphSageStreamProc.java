@@ -26,7 +26,6 @@ import org.neo4j.graphalgo.StreamProc;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
-import org.neo4j.graphalgo.core.utils.paged.HugeObjectArray;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Mode;
 import org.neo4j.procedure.Name;
@@ -55,19 +54,20 @@ public class GraphSageStreamProc extends StreamProc<GraphSage, GraphSage.GraphSa
 
     @Override
     protected Stream<GraphSageStreamResult> stream(ComputationResult<GraphSage, GraphSage.GraphSageResult, GraphSageStreamConfig> computationResult) {
-        var graph = computationResult.graph();
-        var result = computationResult.result();
+        return runWithExceptionLogging("GraphSage streaming failed", () -> {
+            var graph = computationResult.graph();
+            var result = computationResult.result();
 
-        if (result == null) {
-            return Stream.empty();
-        }
+            if (result == null) {
+                return Stream.empty();
+            }
 
-        HugeObjectArray<double[]> embeddings = result.embeddings();
-        return LongStream.range(0, graph.nodeCount())
-            .mapToObj(i -> new GraphSageStreamResult(
-                graph.toOriginalNodeId(i),
-                embeddings.get(i)
-            ));
+            return LongStream.range(0, graph.nodeCount())
+                .mapToObj(i -> new GraphSageStreamResult(
+                    graph.toOriginalNodeId(i),
+                    result.embeddings().get(i)
+                ));
+        });
     }
 
 

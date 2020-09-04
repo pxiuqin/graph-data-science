@@ -19,71 +19,256 @@
  */
 package org.neo4j.graphalgo.beta.pregel;
 
-public final class PregelContext<CONFIG extends PregelConfig> {
+import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.api.NodePropertyContainer;
 
-    private final Pregel.ComputeStep<CONFIG> computeStep;
+import java.util.Set;
+
+public abstract class PregelContext<CONFIG extends PregelConfig> {
+
     private final CONFIG config;
-    private final SendMessageFunction sendMessageFunction;
+
+    final Pregel.ComputeStep<CONFIG> computeStep;
+
+    long nodeId;
+
+    static <CONFIG extends PregelConfig> InitContext<CONFIG> initContext(
+        Pregel.ComputeStep<CONFIG> computeStep,
+        CONFIG config,
+        NodePropertyContainer nodePropertyContainer
+    ) {
+        return new InitContext<>(computeStep, config, nodePropertyContainer);
+    }
+
+    static <CONFIG extends PregelConfig> ComputeContext<CONFIG> computeContext(
+        Pregel.ComputeStep<CONFIG> computeStep,
+        CONFIG config
+    ) {
+        return new ComputeContext<>(computeStep, config);
+    }
 
     PregelContext(Pregel.ComputeStep<CONFIG> computeStep, CONFIG config) {
         this.computeStep = computeStep;
         this.config = config;
-        this.sendMessageFunction = config.relationshipWeightProperty() == null
-            ? computeStep::sendMessages
-            : computeStep::sendWeightedMessages;
     }
 
-    public CONFIG getConfig() {
+    /**
+     * Used internally by the framework to set the currently processed node.
+     */
+    void setNodeId(long nodeId) {
+        this.nodeId = nodeId;
+    }
+
+    /**
+     * The identifier of the node that is currently processed.
+     */
+    public long nodeId() {
+        return nodeId;
+    }
+
+    /**
+     * Allows access to the user-defined Pregel configuration.
+     */
+    public CONFIG config() {
         return config;
     }
 
-    public void voteToHalt(long nodeId) {
-        computeStep.voteToHalt(nodeId);
+    /**
+     * Sets a node double value for given the node schema key.
+     *
+     * @param key node schema key
+     * @param value property value
+     */
+    public void setNodeValue(String key, double value) {
+        computeStep.setNodeValue(key, nodeId, value);
     }
 
-    public boolean isSeeded() {
-        return config.isIncremental();
+    /**
+     * Sets a node long value for given the node schema key.
+     *
+     * @param key node schema key
+     * @param value property value
+     */
+    public void setNodeValue(String key, long value) {
+        computeStep.setNodeValue(key, nodeId, value);
     }
 
-    public boolean isInitialSuperstep() {
-        return getSuperstep() == 0;
+    /**
+     * Sets a node long value for given the node schema key.
+     *
+     * @param key node schema key
+     * @param value property value
+     */
+    public void setNodeValue(String key, long[] value) {
+        computeStep.setNodeValue(key, nodeId, value);
     }
 
-    public int getSuperstep() {
-        return computeStep.getIteration();
+    /**
+     * Sets a node long value for given the node schema key.
+     *
+     * @param key node schema key
+     * @param value property value
+     */
+    public void setNodeValue(String key, double[] value) {
+        computeStep.setNodeValue(key, nodeId, value);
     }
 
-    public double getNodeValue(long nodeId) {
-        return computeStep.getNodeValue(nodeId);
+    /**
+     * Number of nodes in the input graph.
+     */
+    public long nodeCount() {
+        return computeStep.nodeCount();
     }
 
-    public void setNodeValue(long nodeId, double value) {
-        computeStep.setNodeValue(nodeId, value);
+    /**
+     * Number of relationships in the input graph.
+     */
+    public long relationshipCount() {
+        return computeStep.relationshipCount();
     }
 
-    public void sendMessages(long nodeId, double message) {
-        sendMessageFunction.sendMessage(nodeId, message);
+    /**
+     * Returns the degree (number of relationships) of the currently processed node.
+     */
+    public int degree() {
+        return computeStep.degree(nodeId);
     }
 
-    public long getNodeCount() {
-        return computeStep.getNodeCount();
+    /**
+     * A context that is used during the initialization phase, which is before the
+     * first superstep is being executed. The init context allows accessing node
+     * properties from the input graph which can be used to set initial node values
+     * for the Pregel computation.
+     */
+    public static final class InitContext<CONFIG extends PregelConfig> extends PregelContext<CONFIG> {
+        private final NodePropertyContainer nodePropertyContainer;
+
+        InitContext(
+            Pregel.ComputeStep<CONFIG> computeStep,
+            CONFIG config,
+            NodePropertyContainer nodePropertyContainer
+        ) {
+            super(computeStep, config);
+            this.nodePropertyContainer = nodePropertyContainer;
+        }
+
+        /**
+         * Returns the node property keys stored in the input graph.
+         * These properties can be the result of previous computations
+         * or part of node projections when creating the graph.
+         */
+        public Set<String> nodePropertyKeys() {
+            return this.nodePropertyContainer.availableNodeProperties();
+        }
+
+        /**
+         * Returns the property values for the given property key.
+         * Property values can be used to access individual node
+         * property values by using their node identifier.
+         */
+        public NodeProperties nodeProperties(String key) {
+            return this.nodePropertyContainer.nodeProperties(key);
+        }
     }
 
-    public long getRelationshipCount() {
-        return computeStep.getRelationshipCount();
-    }
+    /**
+     * A context that is used during the computation. It allows an implementation
+     * to send messages to other nodes and change the state of the currently
+     * processed node.
+     */
+    public static final class ComputeContext<CONFIG extends PregelConfig> extends PregelContext<CONFIG> {
 
-    public int getDegree(long nodeId) {
-        return computeStep.getDegree(nodeId);
-    }
+        ComputeContext(Pregel.ComputeStep<CONFIG> computeStep, CONFIG config) {
+            super(computeStep, config);
+            this.sendMessagesFunction = config.relationshipWeightProperty() == null
+                ? computeStep::sendToNeighbors
+                : computeStep::sendToNeighborsWeighted;
+        }
 
-    public double getInitialNodeValue() {
-        return config.initialNodeValue();
-    }
+        private final SendMessagesFunction sendMessagesFunction;
 
-    @FunctionalInterface
-    interface SendMessageFunction {
+        /**
+         * Returns the node value for the given node schema key.
+         *
+         * @throws java.lang.IllegalArgumentException if the key does not exist or the value is not a double
+         */
+        public double doubleNodeValue(String key) {
+            return computeStep.doubleNodeValue(key, nodeId);
+        }
 
-        void sendMessage(long nodeId, double message);
+        /**
+         * Returns the node value for the given node schema key.
+         *
+         * @throws java.lang.IllegalArgumentException if the key does not exist or the value is not a long
+         */
+        public long longNodeValue(String key) {
+            return computeStep.longNodeValue(key, nodeId);
+        }
+
+        /**
+         * Returns the node value for the given node schema key.
+         *
+         * @throws java.lang.IllegalArgumentException if the key does not exist or the value is not a long array
+         */
+        public long[] longArrayNodeValue(String key) {
+            return computeStep.longArrayNodeValue(key, nodeId);
+        }
+
+        /**
+         * Returns the node value for the given node schema key.
+         *
+         * @throws java.lang.IllegalArgumentException if the key does not exist or the value is not a double array
+         */
+        public double[] doubleArrayNodeValue(String key) {
+            return computeStep.doubleArrayNodeValue(key, nodeId);
+        }
+
+        /**
+         * Notify the execution framework that this node intends
+         * to stop the computation. If the node voted to halt
+         * and has not received new messages in the next superstep,
+         * the compute method will not be called for that node.
+         * If a node receives messages, the vote to halt flag will
+         * be ignored.
+         */
+        public void voteToHalt() {
+            computeStep.voteToHalt(nodeId);
+        }
+
+        /**
+         * Indicates if the current superstep is the first superstep.
+         */
+        public boolean isInitialSuperstep() {
+            return superstep() == 0;
+        }
+
+        /**
+         * Returns the current superstep (0-based).
+         */
+        public int superstep() {
+            return computeStep.iteration();
+        }
+
+        /**
+         * Sends the given message to all neighbors of the node.
+         */
+        public void sendToNeighbors(double message) {
+            sendMessagesFunction.sendToNeighbors(nodeId, message);
+        }
+
+        /**
+         * Sends the given message to the target node. The target
+         * node can be any existing node id in the graph.
+         *
+         * @throws ArrayIndexOutOfBoundsException if the node is in the not in id space
+         */
+        public void sendTo(long targetNodeId, double message) {
+            computeStep.sendTo(targetNodeId, message);
+        }
+
+        @FunctionalInterface
+        interface SendMessagesFunction {
+            void sendToNeighbors(long sourceNodeId, double message);
+        }
     }
 }

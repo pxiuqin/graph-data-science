@@ -22,7 +22,7 @@ package org.neo4j.graphalgo.core.utils.paged.dss;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimations;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeAtomicLongArray;
 import org.neo4j.graphalgo.core.utils.paged.LongPageCreator;
 
@@ -98,7 +98,7 @@ public final class HugeAtomicDisjointSetStruct implements DisjointSetStruct {
         this.communities = HugeAtomicLongArray.newArray(
             capacity,
             LongPageCreator.of(concurrency, nodeId -> {
-                var seedCommunity = communityMapping.getLong(nodeId);
+                var seedCommunity = communityMapping.longValue(nodeId);
                 return seedCommunity < 0 ? -1 : seedCommunity;
             }),
             tracker

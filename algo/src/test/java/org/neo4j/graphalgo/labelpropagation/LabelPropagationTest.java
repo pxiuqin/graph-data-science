@@ -35,7 +35,7 @@ import org.neo4j.graphalgo.core.GraphDimensions;
 import org.neo4j.graphalgo.core.ImmutableGraphDimensions;
 import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.graphalgo.extension.GdlExtension;
 import org.neo4j.graphalgo.extension.GdlGraph;
@@ -96,7 +96,7 @@ class LabelPropagationTest {
             ImmutableLabelPropagationStreamConfig.builder().maxIterations(1).build(),
             Pools.DEFAULT,
             ProgressLogger.NULL_LOGGER,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
         assertArrayEquals(
             new long[]{
@@ -123,7 +123,7 @@ class LabelPropagationTest {
                 .build(),
             Pools.DEFAULT,
             ProgressLogger.NULL_LOGGER,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         assertArrayEquals(
@@ -161,7 +161,7 @@ class LabelPropagationTest {
             DEFAULT_CONFIG,
             Pools.DEFAULT,
             ProgressLogger.NULL_LOGGER,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
         lp.withBatchSize(batchSize);
         lp.compute();
@@ -249,7 +249,7 @@ class LabelPropagationTest {
             DEFAULT_CONFIG,
             Pools.DEFAULT,
             testLogger,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         lp.compute();

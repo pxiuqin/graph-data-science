@@ -26,7 +26,7 @@ import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.Aggregation;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import java.util.stream.Stream;
 
@@ -75,7 +75,7 @@ class HugeGraphUtilTest {
         HugeGraphUtil.IdMapBuilder idMapBuilder = HugeGraphUtil.idMapBuilder(
             nodeCount,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         for (int i = 0; i < nodeCount; i++) {
@@ -89,7 +89,7 @@ class HugeGraphUtilTest {
             false,
             Aggregation.SUM,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         for (int i = 0; i < nodeCount; i++) {
@@ -97,7 +97,7 @@ class HugeGraphUtilTest {
         }
         Graph graph = HugeGraphUtil.create(
             idMap,
-            relationshipsBuilder.build(), AllocationTracker.EMPTY
+            relationshipsBuilder.build(), AllocationTracker.empty()
         );
         assertGraphEquals(expectedUnweighted(orientation), graph);
         assertEquals(nodeCount, graph.relationshipCount());
@@ -106,8 +106,10 @@ class HugeGraphUtilTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("validProjections")
     void weightedWithAggregation(Orientation orientation) {
+        var expected = expectedWithAggregation(orientation);
+
         Graph graph = generateGraph(orientation, Aggregation.SUM);
-        assertGraphEquals(expectedWithAggregation(orientation), graph);
+        assertGraphEquals(expected, graph);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -135,7 +137,7 @@ class HugeGraphUtilTest {
         HugeGraphUtil.IdMapBuilder idMapBuilder = HugeGraphUtil.idMapBuilder(
             nodeCount,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         for (int i = 0; i < nodeCount; i++) {
@@ -149,13 +151,13 @@ class HugeGraphUtilTest {
             true,
             aggregation,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         for (int i = 0; i < nodeCount; i++) {
             relationshipsBuilder.add(i, (i + 1) % nodeCount, i);
             relationshipsBuilder.add(i, (i + 1) % nodeCount, i);
         }
-        return HugeGraphUtil.create(idMap, relationshipsBuilder.build(), AllocationTracker.EMPTY);
+        return HugeGraphUtil.create(idMap, relationshipsBuilder.build(), AllocationTracker.empty());
     }
 }

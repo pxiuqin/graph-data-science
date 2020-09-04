@@ -20,19 +20,26 @@
 package org.neo4j.gds.embeddings.graphsage.ddl4j.functions;
 
 import org.neo4j.gds.embeddings.graphsage.ddl4j.ComputationContext;
-import org.neo4j.gds.embeddings.graphsage.ddl4j.Tensor;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.Variable;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Matrix;
 
-public class NormalizeRows extends SingleParentVariable {
-    public NormalizeRows(Variable matrix) {
+public class NormalizeRows extends SingleParentVariable<Matrix> {
+
+    private final int rows;
+    private final int cols;
+
+    public NormalizeRows(Variable<Matrix> matrix) {
         super(matrix, matrix.dimensions());
+
+        this.rows = dimension(0);
+        this.cols = dimension(1);
     }
 
     @Override
-    protected Tensor apply(ComputationContext ctx) {
-        int rows = dimension(0);
-        int cols = dimension(1);
-        double[] parentData = ctx.data(parent).data;
+    public Matrix apply(ComputationContext ctx) {
+        double[] parentData = ctx.data(parent()).data();
+        int rows = this.rows;
+        int cols = this.cols;
         double[] result = new double[rows * cols];
         for (int row = 0; row < rows; row++) {
             double sum = 0;
@@ -46,16 +53,16 @@ public class NormalizeRows extends SingleParentVariable {
                 result[elementIndex] = parentData[elementIndex] / l2;
             }
         }
-        return Tensor.matrix(result, rows, cols);
+        return new Matrix(result, this.rows, this.cols);
     }
 
     @Override
-    protected Tensor gradient(ComputationContext ctx) {
-        int rows = dimension(0);
-        int cols = dimension(1);
-        double[] parentData = ctx.data(parent).data;
-        double[] gradientData = ctx.gradient(this).data;
+    public Matrix gradient(Variable<?> parent, ComputationContext ctx) {
+        double[] parentData = ctx.data(parent).data();
+        double[] gradientData = ctx.gradient(this).data();
         double[] result = new double[parentData.length];
+        int rows = this.rows;
+        int cols = this.cols;
         for (int row = 0; row < rows; row++) {
             double l2Squared = 0;
             for (int col = 0; col < cols; col++) {
@@ -68,13 +75,17 @@ public class NormalizeRows extends SingleParentVariable {
                 int elementIndex = row * cols + col;
                 for (int gradCol = 0; gradCol < cols; gradCol++) {
                     if (col == gradCol) {
-                        result[elementIndex] += gradientData[elementIndex] * (l2Squared - parentData[elementIndex] * parentData[elementIndex]) / l2Cubed;
+                        result[elementIndex] +=
+                            gradientData[elementIndex] *
+                            (l2Squared - parentData[elementIndex] * parentData[elementIndex]) / l2Cubed;
                     } else {
-                        result[elementIndex] -= gradientData[row * cols + gradCol] * (parentData[elementIndex] * parentData[row * cols + gradCol]) / l2Cubed;
+                        result[elementIndex] -=
+                            gradientData[row * cols + gradCol] *
+                            (parentData[elementIndex] * parentData[row * cols + gradCol]) / l2Cubed;
                     }
                 }
             }
         }
-        return Tensor.matrix(result, rows, cols);
+        return new Matrix(result, this.rows, this.cols);
     }
 }

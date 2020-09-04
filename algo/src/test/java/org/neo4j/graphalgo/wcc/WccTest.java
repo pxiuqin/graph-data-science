@@ -32,7 +32,7 @@ import org.neo4j.graphalgo.core.ImmutableGraphDimensions;
 import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.mem.MemoryRange;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.dss.DisjointSetStruct;
 
 import java.util.Arrays;
@@ -117,7 +117,7 @@ class WccTest {
             communitySize() / 4,
             ImmutableWccStreamConfig.builder().concurrency(2).build(),
             testLogger,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         ).compute();
 
         List<AtomicLong> progresses = testLogger.getProgresses();
@@ -244,7 +244,7 @@ class WccTest {
             communitySize() / concurrency,
             config,
             ProgressLogger.NULL_LOGGER,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         ).compute();
     }
 }

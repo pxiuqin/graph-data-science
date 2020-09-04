@@ -162,7 +162,7 @@ public class LabelPropagationMutateProcTest extends LabelPropagationProcTest<Lab
     @Test
     void testGraphMutationFiltered() {
         long deletedNodes = clearDb();
-        runQuery("CREATE (x:Ignore {id: -1, communityId: null}) " + DB_CYPHER);
+        runQuery("CREATE (x:Ignore {id: -1, communityId: null}) " + createQuery());
 
         String graphName = "loadGraph";
 
@@ -194,7 +194,7 @@ public class LabelPropagationMutateProcTest extends LabelPropagationProcTest<Lab
         mutatedGraph.forEachNode(nodeId -> {
             assertEquals(
                     expectedValueList.get(Math.toIntExact(nodeId)),
-                    mutatedGraph.nodeProperties("communityId").getLong(nodeId)
+                    mutatedGraph.nodeProperties("communityId").longValue(nodeId)
                 );
                 return true;
             }

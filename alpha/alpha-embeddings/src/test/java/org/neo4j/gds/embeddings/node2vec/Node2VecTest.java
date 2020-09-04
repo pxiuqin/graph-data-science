@@ -29,7 +29,7 @@ import org.neo4j.graphalgo.StoreLoaderBuilder;
 import org.neo4j.graphalgo.TestLog;
 import org.neo4j.graphalgo.TestProgressLogger;
 import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeObjectArray;
 
 import java.util.List;
@@ -74,7 +74,7 @@ class Node2VecTest extends AlgoTestBase {
             graph,
             ImmutableNode2VecStreamConfig.builder().embeddingSize(embeddingSize).build(),
             progressLogger,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         ).compute();
 
         graph.forEachNode(node -> {
@@ -102,7 +102,7 @@ class Node2VecTest extends AlgoTestBase {
             graph,
             config,
             testLogger,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         ).compute();
 
         List<AtomicLong> progresses = testLogger.getProgresses();

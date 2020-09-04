@@ -24,7 +24,7 @@ import org.neo4j.graphalgo.annotation.ValueClass;
 import org.neo4j.graphalgo.core.SecureTransaction;
 import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.utils.TerminationFlag;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.logging.Log;
 
@@ -49,11 +49,23 @@ public interface GraphLoaderContext {
 
     @Value.Default
     default AllocationTracker tracker() {
-        return AllocationTracker.EMPTY;
+        return AllocationTracker.empty();
     }
 
     @Value.Default
     default TerminationFlag terminationFlag() {
         return TerminationFlag.RUNNING_TRUE;
     }
+
+    GraphLoaderContext NULL_CONTEXT_FOR_FICTITIOUS_LOADING = new GraphLoaderContext() {
+        @Override
+        public GraphDatabaseAPI api() {
+            return null;
+        }
+
+        @Override
+        public Log log() {
+            return null;
+        }
+    };
 }

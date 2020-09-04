@@ -22,6 +22,9 @@ package org.neo4j.graphalgo.beta.pregel.sssp;
 import org.immutables.value.Value;
 import org.neo4j.graphalgo.annotation.Configuration;
 import org.neo4j.graphalgo.annotation.ValueClass;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
+import org.neo4j.graphalgo.beta.pregel.NodeSchemaBuilder;
+import org.neo4j.graphalgo.beta.pregel.Pregel;
 import org.neo4j.graphalgo.beta.pregel.PregelComputation;
 import org.neo4j.graphalgo.beta.pregel.PregelConfig;
 import org.neo4j.graphalgo.beta.pregel.PregelContext;
@@ -31,43 +34,52 @@ import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 
 import java.util.Optional;
-import java.util.Queue;
 
 import static org.neo4j.graphalgo.beta.pregel.sssp.SingleSourceShortestPathPregel.SingleSourceShortestPathPregelConfig;
 
 @PregelProcedure(name = "example.pregel.sssp", modes = {GDSMode.STREAM})
 public class SingleSourceShortestPathPregel implements PregelComputation<SingleSourceShortestPathPregelConfig> {
 
+    static final String DISTANCE = "DISTANCE";
+
     @Override
-    public void compute(PregelContext<SingleSourceShortestPathPregelConfig> pregel, long nodeId, Queue<Double> messages) {
-        if (pregel.isInitialSuperstep()) {
-            if (nodeId == pregel.getConfig().startNode()) {
-                pregel.setNodeValue(nodeId, 0);
-                pregel.sendMessages(nodeId, 1);
-            } else {
-                pregel.setNodeValue(nodeId, Long.MAX_VALUE);
+    public Pregel.NodeSchema nodeSchema() {
+        return new NodeSchemaBuilder().putElement(DISTANCE, ValueType.LONG).build();
+    }
+
+    @Override
+    public void init(PregelContext.InitContext<SingleSourceShortestPathPregelConfig> context) {
+        if (context.nodeId() == context.config().startNode()) {
+            context.setNodeValue(DISTANCE, 0);
+        } else {
+            context.setNodeValue(DISTANCE, Long.MAX_VALUE);
+        }
+    }
+
+    @Override
+    public void compute(PregelContext.ComputeContext<SingleSourceShortestPathPregelConfig> context, Pregel.Messages messages) {
+        if (context.isInitialSuperstep()) {
+            if (context.nodeId() == context.config().startNode()) {
+                context.sendToNeighbors(1);
             }
         } else {
             // This is basically the same message passing as WCC (except the new message)
-            long newDistance = (long) pregel.getNodeValue(nodeId);
+            long newDistance = context.longNodeValue(DISTANCE);
             boolean hasChanged = false;
 
-            if (messages != null) {
-                Double message;
-                while ((message = messages.poll()) != null) {
-                    if (message < newDistance) {
-                        newDistance = message.longValue();
-                        hasChanged = true;
-                    }
+            for (var message : messages) {
+                if (message < newDistance) {
+                    newDistance = message.longValue();
+                    hasChanged = true;
                 }
             }
 
             if (hasChanged) {
-                pregel.setNodeValue(nodeId, newDistance);
-                pregel.sendMessages(nodeId, newDistance + 1);
+                context.setNodeValue(DISTANCE, newDistance);
+                context.sendToNeighbors(newDistance + 1);
             }
 
-            pregel.voteToHalt(nodeId);
+            context.voteToHalt();
         }
 
     }

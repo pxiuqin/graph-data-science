@@ -25,7 +25,7 @@ import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
 import org.neo4j.graphalgo.core.utils.mem.MemoryRange;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
@@ -44,10 +44,7 @@ class IncrementalDisjointSetStructTest extends DisjointSetStructTest {
     }
 
     SequentialDisjointSetStruct newSet(final int capacity, final NodeProperties weightMapping) {
-        return new IncrementalDisjointSetStruct(
-                capacity,
-                weightMapping,
-                AllocationTracker.EMPTY);
+        return new IncrementalDisjointSetStruct(capacity, weightMapping, AllocationTracker.empty());
     }
 
     @Test
@@ -119,7 +116,7 @@ class IncrementalDisjointSetStructTest extends DisjointSetStructTest {
         }
 
         @Override
-        public long getLong(long nodeId) {
+        public long longValue(long nodeId) {
             int key = Math.toIntExact(nodeId);
             int index = weights.indexOf(key);
             if (weights.indexExists(index)) {

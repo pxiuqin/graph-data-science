@@ -22,7 +22,7 @@ package org.neo4j.graphalgo.beta.generator;
 import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.config.RandomGraphGeneratorConfig;
 import org.neo4j.graphalgo.core.Aggregation;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import java.util.Optional;
 
@@ -36,7 +36,7 @@ public class RandomGraphGeneratorBuilder {
     private Aggregation aggregation = Aggregation.NONE;
     private Orientation orientation = Orientation.NATURAL;
     private RandomGraphGeneratorConfig.AllowSelfLoops allowSelfLoops = RandomGraphGeneratorConfig.AllowSelfLoops.NO;
-    private AllocationTracker allocationTracker;
+    private AllocationTracker allocationTracker = AllocationTracker.empty();
 
     public RandomGraphGeneratorBuilder nodeCount(long nodeCount) {
         this.nodeCount = nodeCount;

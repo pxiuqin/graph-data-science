@@ -26,8 +26,8 @@ import org.jetbrains.annotations.Nullable;
 import org.neo4j.graphalgo.annotation.ValueClass;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
-import org.neo4j.graphalgo.api.GraphStoreFactory;
 import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.compat.Neo4jProxy;
 import org.neo4j.graphalgo.config.AlgoBaseConfig;
 import org.neo4j.graphalgo.config.BaseConfig;
 import org.neo4j.graphalgo.config.ConfigurableSeedConfig;
@@ -36,6 +36,7 @@ import org.neo4j.graphalgo.config.GraphCreateFromCypherConfig;
 import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
 import org.neo4j.graphalgo.config.MutatePropertyConfig;
 import org.neo4j.graphalgo.config.MutateRelationshipConfig;
+import org.neo4j.graphalgo.config.NodePropertiesConfig;
 import org.neo4j.graphalgo.config.NodeWeightConfig;
 import org.neo4j.graphalgo.config.RandomGraphGeneratorConfig;
 import org.neo4j.graphalgo.config.RelationshipWeightConfig;
@@ -49,18 +50,20 @@ import org.neo4j.graphalgo.core.loading.GraphStoreWithConfig;
 import org.neo4j.graphalgo.core.loading.ImmutableGraphStoreWithConfig;
 import org.neo4j.graphalgo.core.utils.ProgressTimer;
 import org.neo4j.graphalgo.core.utils.TerminationFlag;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimations;
 import org.neo4j.graphalgo.core.utils.mem.MemoryTree;
 import org.neo4j.graphalgo.core.utils.mem.MemoryTreeWithDimensions;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.graphalgo.utils.StringJoining;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
@@ -95,7 +98,9 @@ public abstract class AlgoBaseProc<
         // implicit loading
         if (graphName.isEmpty()) {
             // inherit concurrency from AlgoBaseConfig
-            config = config.withNumber(READ_CONCURRENCY_KEY, config.getInt(CONCURRENCY_KEY, DEFAULT_CONCURRENCY));
+            if (!config.containsKey(READ_CONCURRENCY_KEY)) {
+                config = config.withNumber(READ_CONCURRENCY_KEY, config.getInt(CONCURRENCY_KEY, DEFAULT_CONCURRENCY));
+            }
             GraphCreateConfig createConfig = GraphCreateConfig.createImplicit(username(), config);
             maybeImplicitCreate = Optional.of(createConfig);
             allowedKeys.addAll(createConfig.configKeys());
@@ -134,20 +139,9 @@ public abstract class AlgoBaseProc<
 
         if (config.implicitCreateConfig().isPresent()) {
             GraphCreateConfig createConfig = config.implicitCreateConfig().get();
-            GraphLoader loader = newLoader(createConfig, AllocationTracker.EMPTY);
-            GraphStoreFactory<?, ?> graphStoreFactory = loader.graphStoreFactory();
-            estimateDimensions = graphStoreFactory.estimationDimensions();
-
-            if (createConfig.nodeCount() >= 0 || createConfig.relationshipCount() >= 0) {
-                estimateDimensions = ImmutableGraphDimensions.builder()
-                    .from(estimateDimensions)
-                    .nodeCount(createConfig.nodeCount())
-                    .highestNeoId(createConfig.nodeCount())
-                    .maxRelCount(createConfig.relationshipCount())
-                    .build();
-            }
-
-            estimationBuilder.add("graph", graphStoreFactory.memoryEstimation());
+            var memoryTreeWithDimensions = estimateGraphCreate(createConfig);
+            estimateDimensions = memoryTreeWithDimensions.graphDimensions();
+            estimationBuilder.add("graph", memoryTreeWithDimensions.memoryEstimation());
         } else {
             String graphName = config.graphName().orElseThrow(IllegalStateException::new);
 
@@ -243,7 +237,7 @@ public abstract class AlgoBaseProc<
             graphCandidate = GraphStoreCatalog.get(username(), databaseId(), maybeGraphName.get());
         } else if (config.implicitCreateConfig().isPresent()) {
             GraphCreateConfig createConfig = config.implicitCreateConfig().get();
-            GraphLoader loader = newLoader(createConfig, AllocationTracker.EMPTY);
+            GraphLoader loader = newLoader(createConfig, AllocationTracker.empty());
             GraphStore graphStore = loader.graphStore();
 
             graphCandidate = ImmutableGraphStoreWithConfig.of(graphStore, createConfig);
@@ -283,6 +277,21 @@ public abstract class AlgoBaseProc<
                     configurableSeedConfig.propertyNameOverride(),
                     seedProperty,
                     graphStore.nodePropertyKeys().values()
+                ));
+            }
+        }
+        if (config instanceof NodePropertiesConfig) {
+            List<String> weightProperties = ((NodePropertiesConfig) config).nodePropertyNames();
+            List<String> missingProperties = weightProperties
+                .stream()
+                .filter(weightProperty -> !graphStore.hasNodeProperty(filterLabels, weightProperty))
+                .collect(Collectors.toList());
+            if (!missingProperties.isEmpty()) {
+                throw new IllegalArgumentException(formatWithLocale(
+                    "Node properties %s not found in graph with node properties: %s in all node labels: %s",
+                    missingProperties,
+                    graphStore.nodePropertyKeys(filterLabels),
+                    StringJoining.join(filterLabels.stream().map(NodeLabel::name))
                 ));
             }
         }
@@ -411,7 +420,9 @@ public abstract class AlgoBaseProc<
         boolean releaseTopology
     ) {
         ImmutableComputationResult.Builder<ALGO, ALGO_RESULT, CONFIG> builder = ImmutableComputationResult.builder();
-        AllocationTracker tracker = AllocationTracker.create();
+        var memoryTracker = Neo4jProxy.memoryTracker(transaction);
+        var memoryTrackerProxy = Neo4jProxy.memoryTrackerProxy(memoryTracker);
+        var tracker = AllocationTracker.create(memoryTrackerProxy);
 
         Pair<CONFIG, Optional<String>> input = processInput(graphNameOrConfig, configuration);
         CONFIG config = input.getOne();
@@ -462,7 +473,7 @@ public abstract class AlgoBaseProc<
         return builder
             .graph(graph)
             .graphStore(graphStore)
-            .tracker(AllocationTracker.EMPTY)
+            .tracker(AllocationTracker.empty())
             .algorithm(algo)
             .result(result)
             .config(config)

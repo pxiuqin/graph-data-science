@@ -20,33 +20,43 @@
 package org.neo4j.graphalgo.beta.pregel;
 
 import com.carrotsearch.hppc.BitSet;
+import org.immutables.builder.Builder;
+import org.immutables.value.Value;
 import org.jctools.queues.MpscLinkedQueue;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.neo4j.graphalgo.annotation.ValueClass;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.Degrees;
 import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.api.RelationshipIterator;
+import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
-import org.neo4j.graphalgo.core.utils.LazyBatchCollection;
-import org.neo4j.graphalgo.core.utils.LazyMappingCollection;
-import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongCollections;
-import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterable;
-import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimations;
 import org.neo4j.graphalgo.core.utils.mem.MemoryUsage;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
+import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.graphalgo.core.utils.paged.HugeObjectArray;
+import org.neo4j.graphalgo.core.utils.partition.Partition;
+import org.neo4j.graphalgo.core.utils.partition.PartitionUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
+import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
+
+@Value.Style(builderVisibility = Value.Style.BuilderVisibility.PUBLIC, depluralize = true, deepImmutablesDetection = true)
 public final class Pregel<CONFIG extends PregelConfig> {
 
     // Marks the end of messages from the previous iteration in synchronous mode.
@@ -58,73 +68,32 @@ public final class Pregel<CONFIG extends PregelConfig> {
 
     private final Graph graph;
 
-    private final HugeDoubleArray nodeValues;
+    private final CompositeNodeValue nodeValues;
 
     private final HugeObjectArray<MpscLinkedQueue<Double>> messageQueues;
 
-    private final int batchSize;
     private final int concurrency;
     private final ExecutorService executor;
 
-    public static <CONFIG extends PregelConfig> Pregel<CONFIG> withDefaultNodeValues(
-            final Graph graph,
-            final CONFIG config,
-            final PregelComputation<CONFIG> computation,
-            final int batchSize,
-            final ExecutorService executor,
-            final AllocationTracker tracker) {
-
-        // HugeDoubleArray is faster for set operations compared to HugeNodePropertyMap
-        double defaultNodeValue = config.initialNodeValue();
-        HugeDoubleArray nodeValues = HugeDoubleArray.newArray(graph.nodeCount(), tracker);
-        ParallelUtil.parallelStreamConsume(
-                LongStream.range(0, graph.nodeCount()),
-                config.concurrency(),
-                nodeIds -> nodeIds.forEach(nodeId -> nodeValues.set(nodeId, defaultNodeValue))
-        );
-
+    public static <CONFIG extends PregelConfig> Pregel<CONFIG> create(
+            Graph graph,
+            CONFIG config,
+            PregelComputation<CONFIG> computation,
+            ExecutorService executor,
+            AllocationTracker tracker
+    ) {
         return new Pregel<>(
                 graph,
                 config,
                 computation,
-                nodeValues,
-                batchSize,
+                CompositeNodeValue.of(computation.nodeSchema(), graph.nodeCount(), config.concurrency(), tracker),
                 executor,
                 tracker
         );
     }
 
-    public static <CONFIG extends PregelConfig> Pregel<CONFIG> withInitialNodeValues(
-            final Graph graph,
-            final CONFIG config,
-            final PregelComputation<CONFIG> computation,
-            final NodeProperties initialNodeValues,
-            final int batchSize,
-            final ExecutorService executor,
-            final AllocationTracker tracker) {
-
-        // HugeDoubleArray is faster for set operations compared to HugeNodePropertyMap
-        HugeDoubleArray nodeValues = HugeDoubleArray.newArray(graph.nodeCount(), tracker);
-        ParallelUtil.parallelStreamConsume(
-                LongStream.range(0, graph.nodeCount()),
-                config.concurrency(),
-                nodeIds -> nodeIds.forEach(nodeId -> nodeValues.set(nodeId, initialNodeValues.getDouble(nodeId)))
-        );
-
-        return new Pregel<>(
-                graph,
-                config,
-                computation,
-                nodeValues,
-                batchSize,
-                executor,
-                tracker
-        );
-    }
-
-    public static MemoryEstimation memoryEstimation() {
+    public static MemoryEstimation memoryEstimation(NodeSchema nodeSchema) {
         return MemoryEstimations.builder(Pregel.class)
-            .perNode("node values", HugeDoubleArray::memoryEstimation)
             .perNode("receiver bits", MemoryUsage::sizeOfBitset)
             .perNode("vote bits", MemoryUsage::sizeOfBitset)
             .perThread("compute steps", MemoryEstimations.builder(ComputeStep.class)
@@ -134,13 +103,49 @@ public final class Pregel<CONFIG extends PregelConfig> {
             .add(
                 "message queues",
                 MemoryEstimations.setup("", (dimensions, concurrency) ->
-                    MemoryEstimations.builder(HugeObjectArray.class)
+                    MemoryEstimations.builder()
+                        .fixed(HugeObjectArray.class.getSimpleName(), MemoryUsage.sizeOfInstance(HugeObjectArray.class))
                         .perNode("node queue", MemoryEstimations.builder(MpscLinkedQueue.class)
                             .fixed("messages", dimensions.averageDegree() * Double.BYTES)
                             .build()
                         )
                         .build()
                 )
+            )
+            .add(
+                "composite node value",
+                MemoryEstimations.setup("", (dimensions, concurrency) -> {
+                    var builder = MemoryEstimations.builder();
+
+                    nodeSchema.elements().forEach(element -> {
+                        var entry = formatWithLocale("%s (%s)", element.propertyKey(), element.propertyType());
+
+                        switch (element.propertyType()) {
+                            case LONG:
+                                builder.fixed(entry, HugeLongArray.memoryEstimation(dimensions.nodeCount()));
+                                break;
+                            case DOUBLE:
+                                builder.fixed(entry, HugeDoubleArray.memoryEstimation(dimensions.nodeCount()));
+                                break;
+                            case LONG_ARRAY:
+                                builder.add(entry, MemoryEstimations.builder()
+                                    .fixed(HugeObjectArray.class.getSimpleName(), MemoryUsage.sizeOfInstance(HugeObjectArray.class))
+                                    .perNode("long[10]", nodeCount -> nodeCount * MemoryUsage.sizeOfLongArray(10))
+                                    .build());
+                                break;
+                            case DOUBLE_ARRAY:
+                                builder.add(entry, MemoryEstimations.builder()
+                                    .fixed(HugeObjectArray.class.getSimpleName(), MemoryUsage.sizeOfInstance(HugeObjectArray.class))
+                                    .perNode("double[10]", nodeCount -> nodeCount * MemoryUsage.sizeOfDoubleArray(10))
+                                    .build());
+                                break;
+                            default:
+                                builder.add(entry, MemoryEstimations.empty());
+                        }
+                    });
+
+                    return builder.build();
+                })
             )
             .build();
     }
@@ -149,15 +154,13 @@ public final class Pregel<CONFIG extends PregelConfig> {
             final Graph graph,
             final CONFIG config,
             final PregelComputation<CONFIG> computation,
-            final HugeDoubleArray initialNodeValues,
-            final int batchSize,
+            final CompositeNodeValue initialNodeValues,
             final ExecutorService executor,
             final AllocationTracker tracker) {
         this.graph = graph;
         this.config = config;
         this.computation = computation;
         this.nodeValues = initialNodeValues;
-        this.batchSize = batchSize;
         this.concurrency = config.concurrency();
         this.executor = executor;
 
@@ -173,19 +176,22 @@ public final class Pregel<CONFIG extends PregelConfig> {
         // Tracks if a node voted to halt in the previous iteration
         BitSet voteBits = new BitSet(graph.nodeCount());
 
-        // TODO: maybe try degree partitioning or clustering (better locality)
-        Collection<PrimitiveLongIterable> nodeBatches = LazyBatchCollection.of(
-                graph.nodeCount(),
-                batchSize,
-                (start, length) -> () -> PrimitiveLongCollections.range(start, start + length - 1L));
+        List<ComputeStep<CONFIG>> computeSteps = createComputeSteps();
 
         while (iterations < config.maxIterations() && !canHalt) {
             int iteration = iterations++;
 
-            final List<ComputeStep<CONFIG>> computeSteps = runComputeSteps(nodeBatches, iteration, receiverBits, voteBits);
+            // Init compute steps with the updated state
+            for (ComputeStep<CONFIG> computeStep : computeSteps) {
+                computeStep.init(iteration, receiverBits, voteBits);
+            }
 
-            receiverBits = unionBitSets(computeSteps, ComputeStep::getSenders);
-            voteBits = unionBitSets(computeSteps, ComputeStep::getVotes);
+            runComputeSteps(computeSteps, iteration, receiverBits);
+
+            if (iteration > 0) {
+                receiverBits.clear();
+            }
+            receiverBits = unionBitSets(computeSteps, receiverBits, ComputeStep::getSenders);
 
             // No messages have been sent
             if (receiverBits.nextSetBit(0) == -1) {
@@ -204,21 +210,39 @@ public final class Pregel<CONFIG extends PregelConfig> {
         messageQueues.release();
     }
 
-    private BitSet unionBitSets(Collection<ComputeStep<CONFIG>> computeSteps, Function<ComputeStep<CONFIG>, BitSet> fn) {
-        return ParallelUtil.parallelStream(computeSteps.stream(), concurrency, stream ->
-                stream.map(fn).reduce((bitSet1, bitSet2) -> {
-                    bitSet1.union(bitSet2);
-                    return bitSet1;
-                }).orElseGet(BitSet::new));
+    private List<ComputeStep<CONFIG>> createComputeSteps() {
+        List<Partition> partitions = PartitionUtils.rangePartition(concurrency, graph.nodeCount());
+
+        List<ComputeStep<CONFIG>> computeSteps = new ArrayList<>(concurrency);
+
+        for (Partition partition : partitions) {
+            computeSteps.add(new ComputeStep<>(
+                graph,
+                computation,
+                config,
+                0,
+                partition,
+                nodeValues,
+                messageQueues,
+                graph
+            ));
+        }
+        return computeSteps;
     }
 
-    private List<ComputeStep<CONFIG>> runComputeSteps(
-            Collection<PrimitiveLongIterable> nodeBatches,
-            final int iteration,
-            BitSet messageBits,
-            BitSet voteToHaltBits) {
+    private BitSet unionBitSets(Collection<ComputeStep<CONFIG>> computeSteps, BitSet identity, Function<ComputeStep<CONFIG>, BitSet> fn) {
+        return ParallelUtil.parallelStream(computeSteps.stream(), concurrency, stream ->
+                stream.map(fn).reduce(identity, (bitSet1, bitSet2) -> {
+                    bitSet1.union(bitSet2);
+                    return bitSet1;
+                }));
+    }
 
-        final List<ComputeStep<CONFIG>> tasks = new ArrayList<>(nodeBatches.size());
+    private void runComputeSteps(
+        Collection<ComputeStep<CONFIG>> computeSteps,
+        final int iteration,
+        BitSet messageBits
+    ) {
 
         if (!config.isAsynchronous()) {
             // Synchronization barrier:
@@ -236,27 +260,7 @@ public final class Pregel<CONFIG extends PregelConfig> {
             }
         }
 
-        Collection<ComputeStep<CONFIG>> computeSteps = LazyMappingCollection.of(
-                nodeBatches,
-                nodeBatch -> {
-                    ComputeStep<CONFIG> task = new ComputeStep<>(
-                        graph,
-                        computation,
-                        config,
-                        iteration,
-                        nodeBatch,
-                        nodeValues,
-                        messageBits,
-                        voteToHaltBits,
-                        messageQueues,
-                        graph
-                    );
-                    tasks.add(task);
-                    return task;
-                });
-
         ParallelUtil.runWithConcurrency(concurrency, computeSteps, executor);
-        return tasks;
     }
 
     @SuppressWarnings({"unchecked"})
@@ -279,57 +283,81 @@ public final class Pregel<CONFIG extends PregelConfig> {
 
     public static final class ComputeStep<CONFIG extends PregelConfig> implements Runnable {
 
-        private final int iteration;
         private final long nodeCount;
         private final long relationshipCount;
+        private final boolean isAsync;
         private final PregelComputation<CONFIG> computation;
-        private final PregelContext<CONFIG> pregelContext;
+        private final PregelContext.InitContext<CONFIG> initContext;
+        private final PregelContext.ComputeContext<CONFIG> computeContext;
         private final BitSet senderBits;
-        private final BitSet receiverBits;
-        private final BitSet voteBits;
-        private final PrimitiveLongIterable nodeBatch;
+        private final Partition nodeBatch;
         private final Degrees degrees;
-        private final HugeDoubleArray nodeValues;
+        private final CompositeNodeValue nodeValues;
         private final HugeObjectArray<? extends Queue<Double>> messageQueues;
         private final RelationshipIterator relationshipIterator;
+
+        private int iteration;
+        private BitSet receiverBits;
+        private BitSet voteBits;
 
         private ComputeStep(
             Graph graph,
             PregelComputation<CONFIG> computation,
             CONFIG config,
             int iteration,
-            PrimitiveLongIterable nodeBatch,
-            HugeDoubleArray nodeValues,
-            BitSet receiverBits,
-            BitSet voteBits,
+            Partition nodeBatch,
+            CompositeNodeValue nodeValues,
             HugeObjectArray<? extends Queue<Double>> messageQueues,
             RelationshipIterator relationshipIterator
         ) {
             this.iteration = iteration;
             this.nodeCount = graph.nodeCount();
             this.relationshipCount = graph.relationshipCount();
+            this.isAsync = config.isAsynchronous();
             this.computation = computation;
             this.senderBits = new BitSet(nodeCount);
-            this.receiverBits = receiverBits;
-            this.voteBits = voteBits;
             this.nodeBatch = nodeBatch;
             this.degrees = graph;
             this.nodeValues = nodeValues;
             this.messageQueues = messageQueues;
             this.relationshipIterator = relationshipIterator.concurrentCopy();
-            this.pregelContext = new PregelContext<>(this, config);
+            this.computeContext = PregelContext.computeContext(this, config);
+            this.initContext = PregelContext.initContext(this, config, graph);
+        }
+
+        void init(int iteration, BitSet receiverBits, BitSet voteBits) {
+            this.iteration = iteration;
+            this.receiverBits = receiverBits;
+            this.voteBits = voteBits;
+
+            if (iteration > 0) {
+                this.senderBits.clear();
+            }
         }
 
         @Override
         public void run() {
-            final PrimitiveLongIterator nodesIterator = nodeBatch.iterator();
+            var messageIterator = isAsync
+                ? new MessageIterator.Async()
+                : new MessageIterator.Sync();
+            var messages = new Messages(messageIterator);
 
-            while (nodesIterator.hasNext()) {
-                final long nodeId = nodesIterator.next();
+            long batchStart = nodeBatch.startNode();
+            long batchEnd = batchStart + nodeBatch.nodeCount();
+
+            for (long nodeId = batchStart; nodeId < batchEnd; nodeId++) {
+
+                if (computeContext.isInitialSuperstep()) {
+                    initContext.setNodeId(nodeId);
+                    computation.init(initContext);
+                }
 
                 if (receiverBits.get(nodeId) || !voteBits.get(nodeId)) {
                     voteBits.clear(nodeId);
-                    computation.compute(pregelContext, nodeId, receiveMessages(nodeId));
+                    computeContext.setNodeId(nodeId);
+
+                    messageIterator.init(receiveMessages(nodeId));
+                    computation.compute(computeContext, messages);
                 }
             }
         }
@@ -338,63 +366,291 @@ public final class Pregel<CONFIG extends PregelConfig> {
             return senderBits;
         }
 
-        BitSet getVotes() {
-            return voteBits;
-        }
-
-        public int getIteration() {
+        public int iteration() {
             return iteration;
         }
 
-        long getNodeCount() {
+        long nodeCount() {
             return nodeCount;
         }
 
-        long getRelationshipCount() {
+        long relationshipCount() {
             return relationshipCount;
         }
 
-        int getDegree(final long nodeId) {
+        int degree(long nodeId) {
             return degrees.degree(nodeId);
-        }
-
-        double getNodeValue(final long nodeId) {
-            return nodeValues.get(nodeId);
-        }
-
-        void setNodeValue(final long nodeId, final double value) {
-            nodeValues.set(nodeId, value);
         }
 
         void voteToHalt(long nodeId) {
             voteBits.set(nodeId);
         }
 
-        void sendMessages(final long nodeId, final double message) {
-            relationshipIterator.forEachRelationship(nodeId, (sourceNodeId, targetNodeId) -> {
-                messageQueues.get(targetNodeId).add(message);
-                senderBits.set(targetNodeId);
+        void sendToNeighbors(long sourceNodeId, double message) {
+            relationshipIterator.forEachRelationship(sourceNodeId, (ignored, targetNodeId) -> {
+                sendTo(targetNodeId, message);
                 return true;
             });
         }
 
-        void sendWeightedMessages(long nodeId, double message) {
-            relationshipIterator.forEachRelationship(nodeId, 1.0, (source, target, weight) -> {
+        void sendTo(long targetNodeId, double message) {
+            messageQueues.get(targetNodeId).add(message);
+            senderBits.set(targetNodeId);
+        }
+
+        void sendToNeighborsWeighted(long sourceNodeId, double message) {
+            relationshipIterator.forEachRelationship(sourceNodeId, 1.0, (source, target, weight) -> {
                 messageQueues.get(target).add(computation.applyRelationshipWeight(message, weight));
                 senderBits.set(target);
                 return true;
             });
         }
 
-        private Queue<Double> receiveMessages(final long nodeId) {
+        private @Nullable Queue<Double> receiveMessages(long nodeId) {
             return receiverBits.get(nodeId) ? messageQueues.get(nodeId) : null;
         }
+
+        double doubleNodeValue(String key, long nodeId) {
+            return nodeValues.doubleValue(key, nodeId);
+        }
+
+        long longNodeValue(String key, long nodeId) {
+            return nodeValues.longValue(key, nodeId);
+        }
+
+        long[] longArrayNodeValue(String key, long nodeId) {
+            return nodeValues.longArrayValue(key, nodeId);
+        }
+
+         double[] doubleArrayNodeValue(String key, long nodeId) {
+            return nodeValues.doubleArrayValue(key, nodeId);
+        }
+
+        void setNodeValue(String key, long nodeId, double value) {
+            nodeValues.set(key, nodeId, value);
+        }
+
+        void setNodeValue(String key, long nodeId, long value) {
+            nodeValues.set(key, nodeId, value);
+        }
+
+        void setNodeValue(String key, long nodeId, long[] value) {
+            nodeValues.set(key, nodeId, value);
+        }
+
+        void setNodeValue(String key, long nodeId, double[] value) {
+            nodeValues.set(key, nodeId, value);
+        }
+    }
+
+    public static final class CompositeNodeValue {
+
+        private final NodeSchema nodeSchema;
+        private final Map<String, Object> properties;
+
+        static CompositeNodeValue of(NodeSchema nodeSchema, long nodeCount, int concurrency, AllocationTracker tracker) {
+            Map<String, Object> properties = new HashMap<>();
+
+            nodeSchema.elements().forEach(element -> {
+                switch(element.propertyType()) {
+                    case DOUBLE:
+                        var doubleNodeValues = HugeDoubleArray.newArray(nodeCount, tracker);
+                        ParallelUtil.parallelStreamConsume(
+                            LongStream.range(0, nodeCount),
+                            concurrency,
+                            nodeIds -> nodeIds.forEach(nodeId -> doubleNodeValues.set(nodeId, DefaultValue.DOUBLE_DEFAULT_FALLBACK))
+                        );
+                        properties.put(element.propertyKey(), doubleNodeValues);
+                        break;
+                    case LONG:
+                        var longNodeValues = HugeLongArray.newArray(nodeCount, tracker);
+                        ParallelUtil.parallelStreamConsume(
+                            LongStream.range(0, nodeCount),
+                            concurrency,
+                            nodeIds -> nodeIds.forEach(nodeId -> longNodeValues.set(nodeId, DefaultValue.LONG_DEFAULT_FALLBACK))
+                        );
+                        properties.put(element.propertyKey(), longNodeValues);
+                        break;
+                    case LONG_ARRAY:
+                        properties.put(
+                            element.propertyKey(),
+                            HugeObjectArray.newArray(long[].class, nodeCount, tracker)
+                        );
+                        break;
+                    case DOUBLE_ARRAY:
+                        properties.put(
+                            element.propertyKey(),
+                            HugeObjectArray.newArray(double[].class, nodeCount, tracker)
+                        );
+                        break;
+                    default:
+                        throw new IllegalArgumentException(formatWithLocale("Unsupported value type: %s", element.propertyType()));
+                }
+            });
+
+            return new CompositeNodeValue(nodeSchema, properties);
+        }
+
+        private CompositeNodeValue(
+            NodeSchema nodeSchema,
+            Map<String, Object> properties
+        ) {
+            this.nodeSchema = nodeSchema;
+            this.properties = properties;
+        }
+
+        public NodeSchema schema() {
+            return nodeSchema;
+        }
+
+        public HugeDoubleArray doubleProperties(String propertyKey) {
+            return checkProperty(propertyKey, HugeDoubleArray.class);
+        }
+
+        public HugeLongArray longProperties(String propertyKey) {
+            return checkProperty(propertyKey, HugeLongArray.class);
+        }
+
+        public HugeObjectArray<long[]> longArrayProperties(String propertyKey) {
+            return checkProperty(propertyKey, HugeObjectArray.class);
+        }
+
+        public HugeObjectArray<double[]> doubleArrayProperties(String propertyKey) {
+            return checkProperty(propertyKey, HugeObjectArray.class);
+        }
+
+        public double doubleValue(String key, long nodeId) {
+            return doubleProperties(key).get(nodeId);
+        }
+
+        public long longValue(String key, long nodeId) {
+            return longProperties(key).get(nodeId);
+        }
+
+        public long[] longArrayValue(String key, long nodeId) {
+            HugeObjectArray<long[]> arrayProperties = longArrayProperties(key);
+            return arrayProperties.get(nodeId);
+        }
+
+        public double[] doubleArrayValue(String key, long nodeId) {
+            HugeObjectArray<double[]> arrayProperties = doubleArrayProperties(key);
+            return arrayProperties.get(nodeId);
+        }
+
+        void set(String key, long nodeId, double value) {
+            doubleProperties(key).set(nodeId, value);
+        }
+
+        void set(String key, long nodeId, long value) {
+            longProperties(key).set(nodeId, value);
+        }
+
+        void set(String key, long nodeId, long[] value) {
+            longArrayProperties(key).set(nodeId, value);
+        }
+
+        void set(String key, long nodeId, double[] value) {
+            doubleArrayProperties(key).set(nodeId, value);
+        }
+
+        @SuppressWarnings("unchecked")
+        private <PROPERTY> PROPERTY checkProperty(String key, Class<? extends PROPERTY> propertyKlass) {
+            var property = properties.get(key);
+            if (property == null) {
+                throw new IllegalArgumentException(formatWithLocale(
+                    "Property with key %s does not exist. Available properties are: %s",
+                    key,
+                    properties.keySet()
+                ));
+            }
+
+            if (!(propertyKlass.isAssignableFrom(property.getClass()))) {
+                throw new IllegalArgumentException(formatWithLocale(
+                    "Could not cast property %s of type %s into %s",
+                    key,
+                    property.getClass().getSimpleName(),
+                    propertyKlass.getSimpleName()
+                ));
+            }
+
+            return (PROPERTY) property;
+        }
+    }
+
+    public static class Messages implements Iterable<Double> {
+
+        private final MessageIterator iterator;
+
+        Messages(MessageIterator iterator) {
+            this.iterator = iterator;
+        }
+
+        @NotNull
+        @Override
+        public Iterator<Double> iterator() {
+            return iterator;
+        }
+    }
+
+    abstract static class MessageIterator implements Iterator<Double> {
+
+        Queue<Double> queue;
+
+        @Nullable Double next;
+
+        @Override
+        public @Nullable Double next() {
+            return next;
+        }
+
+        void init(@Nullable Queue<Double> queue) {
+            this.queue = queue;
+        }
+
+        static class Sync extends MessageIterator {
+            @Override
+            public boolean hasNext() {
+                if (queue == null) {
+                    return false;
+                }
+                return !Double.isNaN(next = queue.poll());
+            }
+        }
+
+        static class Async extends MessageIterator {
+            @Override
+            public boolean hasNext() {
+                if (queue == null) {
+                    return false;
+                }
+                return (next = queue.poll()) != null;
+            }
+        }
+    }
+
+    @ValueClass
+    public interface NodeSchema {
+        List<Element> elements();
+    }
+
+    @ValueClass
+    public interface Element {
+        String propertyKey();
+        ValueType propertyType();
+    }
+
+    @Builder.Factory
+    static NodeSchema nodeSchema(Map<String, ValueType> elements) {
+        return ImmutableNodeSchema.of(elements.entrySet().stream()
+            .map(entry -> ImmutableElement.of(entry.getKey(), entry.getValue()))
+            .collect(Collectors.toList())
+        );
     }
 
     @ValueClass
     public interface PregelResult {
 
-        HugeDoubleArray nodeValues();
+        CompositeNodeValue nodeValues();
 
         int ranIterations();
 

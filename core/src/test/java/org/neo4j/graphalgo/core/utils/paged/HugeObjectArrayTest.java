@@ -19,18 +19,19 @@
  */
 package org.neo4j.graphalgo.core.utils.paged;
 
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.mem.MemoryUsage;
 
 final class HugeObjectArrayTest extends HugeArrayTestBase<String[], String, HugeObjectArray<String>> {
 
     @Override
     HugeObjectArray<String> singleArray(final int size) {
-        return HugeObjectArray.newSingleArray(String.class, size, AllocationTracker.EMPTY);
+        return HugeObjectArray.newSingleArray(String.class, size, AllocationTracker.empty());
     }
 
     @Override
     HugeObjectArray<String> pagedArray(final int size) {
-        return HugeObjectArray.newPagedArray(String.class, size, AllocationTracker.EMPTY);
+        return HugeObjectArray.newPagedArray(String.class, size, AllocationTracker.empty());
     }
 
     @Override

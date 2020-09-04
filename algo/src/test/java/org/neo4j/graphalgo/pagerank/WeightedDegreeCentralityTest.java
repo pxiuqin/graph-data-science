@@ -26,7 +26,7 @@ import org.neo4j.graphalgo.RelationshipType;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.extension.GdlExtension;
 import org.neo4j.graphalgo.extension.GdlGraph;
 import org.neo4j.graphalgo.extension.IdFunction;
@@ -123,7 +123,7 @@ final class WeightedDegreeCentralityTest {
             1,
             true,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         ).compute().weights();
 
         expected.forEach((originalNodeId, expectedPageRank) -> {
@@ -150,7 +150,7 @@ final class WeightedDegreeCentralityTest {
                 1,
                 false,
                 Pools.DEFAULT,
-                AllocationTracker.EMPTY
+                AllocationTracker.empty()
             );
         });
 
@@ -238,7 +238,7 @@ final class WeightedDegreeCentralityTest {
             concurrency,
             false,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         ).compute().degrees();
 
         expected.forEach((originalNodeId, expectedPageRank) -> {

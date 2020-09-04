@@ -30,6 +30,8 @@ import org.neo4j.procedure.Context;
 import org.neo4j.procedure.Description;
 import org.neo4j.procedure.Name;
 import org.neo4j.procedure.UserFunction;
+import org.neo4j.values.storable.DoubleArray;
+import org.neo4j.values.storable.LongArray;
 
 import java.util.Objects;
 
@@ -47,7 +49,7 @@ public class NodePropertyFunc {
 
     @UserFunction("gds.util.nodeProperty")
     @Description("Returns a node property value from a named in-memory graph.")
-    public Double nodeProperty(
+    public Object nodeProperty(
         @Name(value = "graphName") String graphName,
         @Name(value = "nodeId") Number nodeId,
         @Name(value = "propertyKey") String propertyKey,
@@ -94,16 +96,22 @@ public class NodePropertyFunc {
             ? graphStore.nodePropertyValues(propertyKey) // builds UnionNodeProperties and returns the first matching property
             : graphStore.nodePropertyValues(NodeLabel.of(nodeLabel), propertyKey);
 
-        if (propertyValues.getType() == ValueType.DOUBLE) {
-            double propertyValue = propertyValues.getDouble(internalId);
+        if (propertyValues.valueType() == ValueType.DOUBLE) {
+            double propertyValue = propertyValues.doubleValue(internalId);
             return Double.isNaN(propertyValue) ? null : propertyValue;
-        } else if (propertyValues.getType() == ValueType.LONG) {
-            long longValue = propertyValues.getLong(internalId);
+        } else if (propertyValues.valueType() == ValueType.LONG) {
+            long longValue = propertyValues.longValue(internalId);
             return longValue == DefaultValue.LONG_DEFAULT_FALLBACK ? DefaultValue.DOUBLE_DEFAULT_FALLBACK : (double) longValue;
+        } else if (propertyValues.valueType() == ValueType.LONG_ARRAY) {
+            long[] longArray = ((LongArray)propertyValues.value(internalId)).asObjectCopy();
+            return longArray == null ? new long[] {} : longArray;
+        } else if (propertyValues.valueType() == ValueType.DOUBLE_ARRAY) {
+            double[] doubleArray = ((DoubleArray)propertyValues.value(internalId)).asObjectCopy();
+            return doubleArray == null ? new double[] {} : doubleArray;
         } else {
             throw new UnsupportedOperationException(formatWithLocale(
-                "Cannot retrieve a double value from a property with type %s",
-                propertyValues.getType()
+                "Cannot retrieve value from a property with type %s",
+                propertyValues.valueType()
             ));
         }
     }

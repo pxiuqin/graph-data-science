@@ -33,7 +33,7 @@ import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.api.RelationshipIterator;
 import org.neo4j.graphalgo.compat.Neo4jProxy;
 import org.neo4j.graphalgo.core.Settings;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeIntArray;
 import org.neo4j.internal.batchimport.AdditionalInitialIds;
 import org.neo4j.internal.batchimport.BatchImporterFactory;
@@ -42,11 +42,11 @@ import org.neo4j.internal.batchimport.ImportLogic;
 import org.neo4j.internal.batchimport.input.Collector;
 import org.neo4j.internal.batchimport.input.Input;
 import org.neo4j.internal.batchimport.staging.ExecutionMonitors;
-import org.neo4j.io.fs.DefaultFileSystemAbstraction;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.layout.Neo4jLayout;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
 import org.neo4j.kernel.impl.store.format.RecordFormatSelector;
+import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.logging.internal.LogService;
 import org.neo4j.logging.internal.NullLogService;
@@ -73,10 +73,17 @@ public class GraphStoreExport {
 
     private final GraphStoreExportConfig config;
 
-    public GraphStoreExport(GraphStore graphStore, Path neo4jHome, GraphStoreExportConfig config) {
+    private final FileSystemAbstraction fs;
+
+    public GraphStoreExport(
+        GraphStore graphStore,
+        GraphDatabaseAPI api,
+        GraphStoreExportConfig config
+    ) {
         this.graphStore = graphStore;
-        this.neo4jHome = neo4jHome;
+        this.neo4jHome = Neo4jProxy.homeDirectory(api.databaseLayout());
         this.config = config;
+        this.fs = api.getDependencyResolver().resolveDependency(FileSystemAbstraction.class);
     }
 
     public ImportedProperties run() {
@@ -101,7 +108,7 @@ public class GraphStoreExport {
 
         var lifeSupport = new LifeSupport();
 
-        try (FileSystemAbstraction fs = new DefaultFileSystemAbstraction()) {
+       try {
             LogService logService;
             if (config.enableDebugLog()) {
                 var storeInternalLogPath = databaseConfig.get(Settings.storeInternalLogPath());
@@ -184,6 +191,7 @@ public class GraphStoreExport {
     public interface ImportedProperties {
 
         long nodePropertyCount();
+
         long relationshipPropertyCount();
     }
 
@@ -258,7 +266,7 @@ public class GraphStoreExport {
             var nodeLabels = graphStore.nodes();
 
             if (!nodeLabels.containsOnlyAllNodesLabel()) {
-                labelCounts = HugeIntArray.newArray(graphStore.nodeCount(), AllocationTracker.EMPTY);
+                labelCounts = HugeIntArray.newArray(graphStore.nodeCount(), AllocationTracker.empty());
                 labelCounts.setAll(i -> {
                     int labelCount = 0;
                     for (var nodeLabel : nodeLabels.availableNodeLabels()) {
@@ -282,11 +290,11 @@ public class GraphStoreExport {
                 ));
             }
             return new NodeStore(
-                    graphStore.nodeCount(),
-                    labelCounts,
-                    nodeLabels.containsOnlyAllNodesLabel() ? null : nodeLabels,
-                    nodeProperties
-                );
+                graphStore.nodeCount(),
+                labelCounts,
+                nodeLabels.containsOnlyAllNodesLabel() ? null : nodeLabels,
+                nodeProperties
+            );
         }
     }
 

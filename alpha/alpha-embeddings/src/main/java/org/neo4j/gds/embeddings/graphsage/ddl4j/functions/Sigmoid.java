@@ -20,23 +20,23 @@
 package org.neo4j.gds.embeddings.graphsage.ddl4j.functions;
 
 import org.neo4j.gds.embeddings.graphsage.ddl4j.ComputationContext;
-import org.neo4j.gds.embeddings.graphsage.ddl4j.Tensor;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Tensor;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.Variable;
 
-public class Sigmoid extends SingleParentVariable {
+public class Sigmoid<T extends Tensor<T>> extends SingleParentVariable<T> {
 
-    public Sigmoid(Variable parent) {
+    public Sigmoid(Variable<T> parent) {
         super(parent, parent.dimensions());
     }
 
     @Override
-    protected Tensor apply(ComputationContext ctx) {
-        return ctx.data(parent).map(Sigmoid::sigmoid);
+    public T apply(ComputationContext ctx) {
+        return (T) ctx.data(parent()).map(Sigmoid::sigmoid);
     }
 
     @Override
-    protected Tensor gradient(ComputationContext ctx) {
-        return ctx.gradient(this).elementwiseProduct(ctx.data(this).map(value -> value * (1 - value)));
+    public T gradient(Variable<?> contextParent, ComputationContext ctx) {
+        return (T) ctx.gradient(this).elementwiseProduct(ctx.data(this).map(value -> value * (1 - value)));
     }
 
     public static double sigmoid(double x) {

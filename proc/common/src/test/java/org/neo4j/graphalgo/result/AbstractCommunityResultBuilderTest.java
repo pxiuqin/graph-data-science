@@ -22,7 +22,7 @@ package org.neo4j.graphalgo.result;
 import com.carrotsearch.hppc.cursors.LongLongCursor;
 import org.HdrHistogram.Histogram;
 import org.junit.jupiter.api.Test;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongLongMap;
 import org.neo4j.internal.kernel.api.procs.ProcedureCallContext;
 
@@ -157,7 +157,7 @@ final class AbstractCommunityResultBuilderTest {
 
     @Test
     void oneCommunityFromHugeMap() {
-        HugeLongLongMap communitySizeMap = new HugeLongLongMap(AllocationTracker.EMPTY);
+        HugeLongLongMap communitySizeMap = new HugeLongLongMap(AllocationTracker.empty());
         communitySizeMap.addTo(1, 4);
 
         final Histogram histogram = new Histogram(5);
@@ -219,7 +219,7 @@ final class AbstractCommunityResultBuilderTest {
     ) {
         return new AbstractCommunityResultBuilder<Void>(
             context,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         ) {
             @Override
             protected Void buildResult() {
