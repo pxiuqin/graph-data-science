@@ -21,6 +21,8 @@ package org.neo4j.gds.embeddings.graphsage;
 
 import org.neo4j.gds.embeddings.graphsage.ddl4j.Variable;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.Weights;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Matrix;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Vector;
 
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
@@ -29,20 +31,20 @@ public class MaxPoolAggregatingLayer implements Layer {
 
     private final UniformNeighborhoodSampler sampler;
     private final long sampleSize;
-    private final Weights poolWeights;
-    private final Weights selfWeights;
-    private final Weights neighborsWeights;
-    private final Weights bias;
+    private final Weights<Matrix> poolWeights;
+    private final Weights<Matrix> selfWeights;
+    private final Weights<Matrix> neighborsWeights;
+    private final Weights<Vector> bias;
     private long randomState;
-    private final Function<Variable, Variable> activationFunction;
+    private final Function<Variable<Matrix>, Variable<Matrix>> activationFunction;
 
-    public MaxPoolAggregatingLayer(
+    MaxPoolAggregatingLayer(
         long sampleSize,
-        Weights poolWeights,
-        Weights selfWeights,
-        Weights neighborsWeights,
-        Weights bias,
-        Function<Variable, Variable> activationFunction
+        Weights<Matrix> poolWeights,
+        Weights<Matrix> selfWeights,
+        Weights<Matrix> neighborsWeights,
+        Weights<Vector> bias,
+        Function<Variable<Matrix>, Variable<Matrix>> activationFunction
     ) {
         this.poolWeights = poolWeights;
         this.selfWeights = selfWeights;

@@ -76,6 +76,8 @@ import org.neo4j.logging.internal.SimpleLogService;
 import org.neo4j.logging.log4j.Log4jLogProvider;
 import org.neo4j.logging.log4j.LogConfig;
 import org.neo4j.memory.EmptyMemoryTracker;
+import org.neo4j.memory.LocalMemoryTracker;
+import org.neo4j.memory.MemoryPools;
 import org.neo4j.memory.MemoryTracker;
 import org.neo4j.scheduler.JobScheduler;
 
@@ -179,6 +181,11 @@ public final class Neo4jProxy42 implements Neo4jProxyApi {
     }
 
     @Override
+    public long relationshipsReference(NodeCursor nodeCursor) {
+        return nodeCursor.relationshipsReference();
+    }
+
+    @Override
     public long[] getNodeLabelFields(NodeRecord node, NodeStore nodeStore, PageCursorTracer cursorTracer) {
         return NodeLabelsField.get(node, nodeStore, cursorTracer);
     }
@@ -206,6 +213,21 @@ public final class Neo4jProxy42 implements Neo4jProxyApi {
     @Override
     public MemoryTracker memoryTracker(KernelTransaction kernelTransaction) {
         return kernelTransaction.memoryTracker();
+    }
+
+    @Override
+    public MemoryTracker emptyMemoryTracker() {
+        return EmptyMemoryTracker.INSTANCE;
+    }
+
+    @Override
+    public MemoryTracker limitedMemoryTracker(long limitInBytes, long grabSizeInBytes) {
+        return new LocalMemoryTracker(MemoryPools.NO_TRACKING, limitInBytes, grabSizeInBytes, "setting");
+    }
+
+    @Override
+    public MemoryTrackerProxy memoryTrackerProxy(MemoryTracker memoryTracker) {
+        return MemoryTrackerProxy42.of(memoryTracker);
     }
 
     @Override

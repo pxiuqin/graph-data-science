@@ -20,9 +20,11 @@
 package org.neo4j.gds.embeddings.graphsage.ddl4j.functions;
 
 import org.junit.jupiter.api.Test;
-import org.neo4j.gds.embeddings.graphsage.ddl4j.GraphSageBaseTest;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.FiniteDifferenceTest;
-import org.neo4j.gds.embeddings.graphsage.ddl4j.Tensor;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.GraphSageBaseTest;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.Variable;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.helper.ElementSum;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Matrix;
 
 import java.util.List;
 
@@ -42,10 +44,10 @@ class NormalizeRowsTest extends GraphSageBaseTest implements FiniteDifferenceTes
             0, 1
         };
 
-        Weights w = new Weights(Tensor.matrix(data, 3, 2));
-        NormalizeRows normalizeRows = new NormalizeRows(w);
+        Weights<Matrix> w = new Weights<>(new Matrix(data, 3, 2));
+        Variable<Matrix> normalizeRows = new NormalizeRows(w);
 
-        finiteDifferenceShouldApproximateGradient(w, new Sum(List.of(normalizeRows)));
+        finiteDifferenceShouldApproximateGradient(w, new ElementSum(List.of(normalizeRows)));
     }
 
     @Test
@@ -60,9 +62,9 @@ class NormalizeRowsTest extends GraphSageBaseTest implements FiniteDifferenceTes
             1, 0,
             0, 1
         };
-        Weights w = new Weights(Tensor.matrix(data, 3, 2));
-        NormalizeRows normalizeRows = new NormalizeRows(w);
-        assertArrayEquals(expectedData, ctx.forward(normalizeRows).data);
+        Weights<Matrix> w = new Weights<>(new Matrix(data, 3, 2));
+        Variable<Matrix> normalizeRows = new NormalizeRows(w);
+        assertArrayEquals(expectedData, ctx.forward(normalizeRows).data());
     }
 
 

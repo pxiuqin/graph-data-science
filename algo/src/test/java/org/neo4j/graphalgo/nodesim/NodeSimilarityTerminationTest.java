@@ -23,9 +23,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.neo4j.graphalgo.AlgoTestBase;
 import org.neo4j.graphalgo.beta.generator.RandomGraphGenerator;
+import org.neo4j.graphalgo.beta.generator.RelationshipDistribution;
 import org.neo4j.graphalgo.core.concurrency.Pools;
+import org.neo4j.graphalgo.core.huge.HugeGraph;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import static org.neo4j.graphalgo.TestSupport.assertAlgorithmTermination;
 import static org.neo4j.graphalgo.nodesim.NodeSimilarityTest.configBuilder;
@@ -35,12 +37,20 @@ class NodeSimilarityTerminationTest extends AlgoTestBase {
     @Timeout(value = 10)
     @Test
     void shouldTerminate() {
+        HugeGraph graph = RandomGraphGenerator.builder()
+            .nodeCount(10)
+            .averageDegree(2)
+            .relationshipDistribution(RelationshipDistribution.POWER_LAW)
+            .allocationTracker(AllocationTracker.empty())
+            .build()
+            .generate();
+
         NodeSimilarity nodeSimilarity = new NodeSimilarity(
-            RandomGraphGenerator.generate(10, 2),
+            graph,
             configBuilder().concurrency(1).build(),
             Pools.DEFAULT,
             ProgressLogger.NULL_LOGGER,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         assertAlgorithmTermination(

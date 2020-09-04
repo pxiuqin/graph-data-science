@@ -21,6 +21,7 @@ package org.neo4j.graphalgo.core.utils.paged;
 
 import org.junit.jupiter.api.Test;
 import org.neo4j.function.ThrowingConsumer;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.mem.MemoryUsage;
 import org.opentest4j.AssertionFailedError;
 
@@ -335,19 +336,19 @@ final class HugeAtomicLongArrayTest {
     }
 
     private HugeAtomicLongArray singleArray(final int size) {
-        return HugeAtomicLongArray.newSingleArray(size, LongPageCreator.passThrough(1), AllocationTracker.EMPTY);
+        return HugeAtomicLongArray.newSingleArray(size, LongPageCreator.passThrough(1), AllocationTracker.empty());
     }
 
     private HugeAtomicLongArray singleArray(final int size, final LongPageCreator pageFiller) {
-        return HugeAtomicLongArray.newSingleArray(size, pageFiller, AllocationTracker.EMPTY);
+        return HugeAtomicLongArray.newSingleArray(size, pageFiller, AllocationTracker.empty());
     }
 
     private HugeAtomicLongArray pagedArray(final int size) {
-        return HugeAtomicLongArray.newPagedArray(size, LongPageCreator.passThrough(1), AllocationTracker.EMPTY);
+        return HugeAtomicLongArray.newPagedArray(size, LongPageCreator.passThrough(1), AllocationTracker.empty());
     }
 
     private HugeAtomicLongArray pagedArray(final int size, final LongPageCreator pageFiller) {
-        return HugeAtomicLongArray.newPagedArray(size, pageFiller, AllocationTracker.EMPTY);
+        return HugeAtomicLongArray.newPagedArray(size, pageFiller, AllocationTracker.empty());
     }
 
     /**

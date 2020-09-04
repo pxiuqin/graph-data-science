@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.loading.HugeGraphUtil;
 import org.neo4j.graphalgo.core.loading.IdMap;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.extension.GdlSupportExtension;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -39,7 +39,7 @@ class NewOldGraphTest {
 
     private static final IdMap ID_MAP = idMap(5);
     private static final int CONCURRENCY = 1;
-    private static final AllocationTracker TRACKER = AllocationTracker.EMPTY;
+    private static final AllocationTracker TRACKER = AllocationTracker.empty();
 
     @Test
     void allRelationshipsNewByDefault() {
@@ -92,7 +92,7 @@ class NewOldGraphTest {
         HugeGraphUtil.IdMapBuilder idMapBuilder = HugeGraphUtil.idMapBuilder(
             numberOfNodes,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
         for (int i = 0; i < numberOfNodes; i++) {
             idMapBuilder.addNode(i);

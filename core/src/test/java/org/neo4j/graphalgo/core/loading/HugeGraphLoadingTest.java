@@ -93,7 +93,7 @@ final class HugeGraphLoadingTest extends BaseTest {
         assertEquals(0, propertyCountDiff, errorMessage);
 
         for (int nodeId = 0; nodeId < nodeCount; nodeId++) {
-            double propertyValue = nodeProperties.nodeProperty(nodeId);
+            double propertyValue = nodeProperties.doubleValue(nodeId);
             long neoId = graph.toOriginalNodeId(nodeId);
             assertEquals(neoId, (long) propertyValue, formatWithLocale("Property for node %d (neo = %d) was overwritten.", nodeId, neoId));
         }
@@ -194,7 +194,7 @@ final class HugeGraphLoadingTest extends BaseTest {
         assertGraphEquals(fromGdl("(a {id: 0})-->(b {id: 1}), (a)<--(b)"), both);
 
         Graph union = graphStore.getUnion();
-        assertGraphEquals(fromGdl("(a {id: 0})-->(b {id: 1}), (a)<--(b), (a)<--(b), (a)-->(b)"), union);
+        assertGraphEquals(fromGdl("(a {id: 0})-->(b {id: 1.0}), (a)<--(b), (a)<--(b), (a)-->(b)"), union);
     }
 
     @Test

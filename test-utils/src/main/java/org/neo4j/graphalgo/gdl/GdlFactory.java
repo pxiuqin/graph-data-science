@@ -21,9 +21,11 @@ package org.neo4j.graphalgo.gdl;
 
 import org.eclipse.collections.api.tuple.Pair;
 import org.eclipse.collections.impl.tuple.Tuples;
+import org.jetbrains.annotations.NotNull;
 import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.PropertyMapping;
 import org.neo4j.graphalgo.RelationshipType;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.GraphLoaderContext;
 import org.neo4j.graphalgo.api.GraphStoreFactory;
 import org.neo4j.graphalgo.api.IdMapping;
@@ -37,7 +39,7 @@ import org.neo4j.graphalgo.core.loading.CSRGraphStore;
 import org.neo4j.graphalgo.core.loading.HugeGraphUtil;
 import org.neo4j.graphalgo.core.loading.IdMap;
 import org.neo4j.graphalgo.core.loading.IdsAndProperties;
-import org.neo4j.graphalgo.core.loading.NodePropertiesBuilder;
+import org.neo4j.graphalgo.core.loading.nodeproperties.NodePropertiesFromStoreBuilder;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimations;
@@ -47,16 +49,21 @@ import org.neo4j.kernel.database.NamedDatabaseId;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.NullLog;
+import org.neo4j.values.storable.Values;
 import org.s1ck.gdl.GDLHandler;
 import org.s1ck.gdl.model.Element;
 
+import java.lang.reflect.Array;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 public final class GdlFactory extends GraphStoreFactory<CSRGraphStore, GraphCreateFromGdlConfig> {
 
@@ -167,7 +174,7 @@ public final class GdlFactory extends GraphStoreFactory<CSRGraphStore, GraphCrea
 
     private Map<NodeLabel, Map<PropertyMapping, NodeProperties>> loadNodeProperties(IdMapping idMap) {
         var propertyKeysByLabel = new HashMap<NodeLabel, Set<PropertyMapping>>();
-        var propertyBuilders = new HashMap<PropertyMapping, NodePropertiesBuilder>();
+        var propertyBuilders = new HashMap<PropertyMapping, NodePropertiesFromStoreBuilder>();
 
         gdlHandler.getVertices().forEach(vertex -> vertex
             .getProperties()
@@ -178,16 +185,20 @@ public final class GdlFactory extends GraphStoreFactory<CSRGraphStore, GraphCrea
                         .computeIfAbsent(nodeLabel, (ignore) -> new HashSet<>())
                         .add(PropertyMapping.of(propertyKey))
                     );
+
+                if (propertyValue instanceof List) {
+                    propertyValue = convertListProperty((List<?>) propertyValue);
+                }
+
                 propertyBuilders.computeIfAbsent(PropertyMapping.of(propertyKey), (key) ->
-                    NodePropertiesBuilder.of(
+                    NodePropertiesFromStoreBuilder.of(
                         dimensions.nodeCount(),
-                        ValueType.DOUBLE,
                         loadingContext.tracker(),
-                        PropertyMapping.DEFAULT_FALLBACK_VALUE
-                    )).set(idMap.toMappedNodeId(vertex.getId()), gdsValue(vertex, propertyKey, propertyValue));
+                        DefaultValue.DEFAULT
+                    )).set(idMap.toMappedNodeId(vertex.getId()), Values.of(propertyValue));
             }));
 
-        var nodeProperties = propertyBuilders
+        Map<PropertyMapping, NodeProperties> nodeProperties = propertyBuilders
             .entrySet()
             .stream()
             .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().build()));
@@ -200,6 +211,40 @@ public final class GdlFactory extends GraphStoreFactory<CSRGraphStore, GraphCrea
                     nodeProperties::get
                 ))
             ));
+    }
+
+    @NotNull
+    private Object convertListProperty(List<?> list) {
+        var firstType = list.get(0).getClass();
+
+        var isLong = firstType.equals(Long.class);
+        var isDouble = firstType.equals(Double.class);
+        var isFloat = firstType.equals(Float.class);
+
+        if (!isLong && !isDouble && !isFloat) {
+            throw new IllegalArgumentException(formatWithLocale(
+                "List property contains in-compatible type: %s.",
+                firstType.getSimpleName()
+            ));
+        }
+
+        var sameType = list.stream().allMatch(firstType::isInstance);
+        if (!sameType) {
+            throw new IllegalArgumentException(formatWithLocale(
+                "List property contains mixed types: %s",
+                list
+                    .stream()
+                    .map(Object::getClass)
+                    .map(Class::getSimpleName)
+                    .collect(Collectors.joining(", ", "[", "]"))
+            ));
+        }
+
+        var array = Array.newInstance(firstType, list.size());
+        for (int i = 0; i < list.size(); i++) {
+            Array.set(array, i, firstType.cast(list.get(i)));
+        }
+        return array;
     }
 
     private Map<RelationshipType, Pair<Optional<String>, Relationships>> loadRelationships(IdMap nodes) {
@@ -255,6 +300,14 @@ public final class GdlFactory extends GraphStoreFactory<CSRGraphStore, GraphCrea
             entry -> RelationshipType.of(entry.getKey()),
             entry -> Tuples.pair(propertyKeysByRelType.get(entry.getKey()), entry.getValue().build())
         ));
+    }
+
+    private ValueType inferValueType(Object gdlValue) {
+        if (gdlValue instanceof Long || gdlValue instanceof Integer) {
+            return ValueType.LONG;
+        } else {
+            return ValueType.DOUBLE;
+        }
     }
 
     private double gdsValue(Element element, String propertyKey, Object gdlValue) {

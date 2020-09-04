@@ -22,7 +22,7 @@ package org.neo4j.gds.embeddings.node2vec;
 import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
 import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeObjectArray;
 
 import java.util.ArrayList;
@@ -86,7 +86,11 @@ public class Node2VecModel {
     }
 
     private HugeObjectArray<Vector> initializeEmbeddings(long nodeCount, int embeddingDimensions) {
-        HugeObjectArray<Vector> embeddings = HugeObjectArray.newArray(Vector.class, nodeCount, AllocationTracker.EMPTY);
+        HugeObjectArray<Vector> embeddings = HugeObjectArray.newArray(
+            Vector.class,
+            nodeCount,
+            AllocationTracker.empty()
+        );
         for (var i = 0L; i < nodeCount; i++) {
             var data = new Random()
                 .doubles(embeddingDimensions, -1, 1)

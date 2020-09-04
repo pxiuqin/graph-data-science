@@ -25,7 +25,7 @@ import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.SecureTransaction;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.impl.similarity.ApproxNearestNeighborsAlgorithm;
 import org.neo4j.graphalgo.impl.similarity.ApproximateNearestNeighborsConfig;
 import org.neo4j.graphalgo.impl.similarity.ApproximateNearestNeighborsConfigImpl;
@@ -99,7 +99,10 @@ public class ApproxNearestNeighborsProc extends SimilarityProc<ApproxNearestNeig
     }
 
     @Override
-    ApproxNearestNeighborsAlgorithm<SimilarityInput> newAlgo(ApproximateNearestNeighborsConfig config) {
+    ApproxNearestNeighborsAlgorithm<SimilarityInput> newAlgo(
+        ApproximateNearestNeighborsConfig config,
+        AllocationTracker tracker
+    ) {
         SimilarityAlgorithm<?, SimilarityInput> similarity =
             (SimilarityAlgorithm<?, SimilarityInput>) similarityAlgorithm(config);
         return new ApproxNearestNeighborsAlgorithm<>(
@@ -108,7 +111,7 @@ public class ApproxNearestNeighborsProc extends SimilarityProc<ApproxNearestNeig
             api,
             log,
             Pools.DEFAULT,
-            AllocationTracker.create()
+            tracker
         );
     }
 

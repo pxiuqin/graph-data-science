@@ -25,7 +25,7 @@ import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
 import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.utils.BiLongConsumer;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeCursor;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArrayBuilder;
@@ -81,7 +81,9 @@ public final class IdMapBuilder {
         AllocationTracker tracker
     ) {
         HugeSparseLongArray.Builder nodeMappingBuilder = HugeSparseLongArray.Builder.create(
-            highestNodeId == 0 ? 1 : highestNodeId,
+            // We need to allocate space for `highestNode + 1` since we
+            // need to be able to store a node with `id = highestNodeId`.
+            highestNodeId + 1,
             tracker
         );
         ParallelUtil.readParallel(concurrency, nodeCount, Pools.DEFAULT, nodeAdder.apply(nodeMappingBuilder));

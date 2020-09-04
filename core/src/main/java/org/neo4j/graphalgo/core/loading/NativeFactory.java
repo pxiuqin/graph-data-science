@@ -30,15 +30,17 @@ import org.neo4j.graphalgo.api.GraphLoaderContext;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.api.GraphStoreFactory;
 import org.neo4j.graphalgo.config.GraphCreateFromStoreConfig;
+import org.neo4j.graphalgo.core.GraphDimensions;
 import org.neo4j.graphalgo.core.GraphDimensionsStoreReader;
 import org.neo4j.graphalgo.core.huge.HugeGraph;
 import org.neo4j.graphalgo.core.huge.TransientAdjacencyList;
 import org.neo4j.graphalgo.core.huge.TransientAdjacencyOffsets;
+import org.neo4j.graphalgo.core.loading.nodeproperties.NodePropertiesFromStoreBuilder;
 import org.neo4j.graphalgo.core.utils.BatchingProgressLogger;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimations;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -54,7 +56,19 @@ public final class NativeFactory extends GraphStoreFactory<CSRGraphStore, GraphC
         GraphCreateFromStoreConfig graphCreateConfig,
         GraphLoaderContext loadingContext
     ) {
-        super(graphCreateConfig, loadingContext, new GraphDimensionsStoreReader(loadingContext.transaction(), graphCreateConfig).call());
+        this(
+            graphCreateConfig,
+            loadingContext,
+            new GraphDimensionsStoreReader(loadingContext.transaction(), graphCreateConfig).call()
+        );
+    }
+
+    public NativeFactory(
+        GraphCreateFromStoreConfig graphCreateConfig,
+        GraphLoaderContext loadingContext,
+        GraphDimensions graphDimensions
+    ) {
+        super(graphCreateConfig, loadingContext, graphDimensions);
         this.storeConfig = graphCreateConfig;
     }
 
@@ -71,7 +85,7 @@ public final class NativeFactory extends GraphStoreFactory<CSRGraphStore, GraphC
 
         // nodeProperties
         nodeProjections.allProperties()
-            .forEach(property -> builder.add(property, NodePropertyArray.memoryEstimation()));
+            .forEach(property -> builder.add(property, NodePropertiesFromStoreBuilder.memoryEstimation()));
 
         // relationships
         relationshipProjections.projections().forEach((relationshipType, relationshipProjection) -> {

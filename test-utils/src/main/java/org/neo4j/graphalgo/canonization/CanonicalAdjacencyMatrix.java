@@ -23,6 +23,7 @@ import org.apache.commons.compress.utils.Lists;
 import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.api.Graph;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,10 +50,39 @@ public final class CanonicalAdjacencyMatrix {
                 .collect(Collectors.joining(":"));
 
             String sortedProperties = g.availableNodeProperties().stream()
-                    .map(propertyKey -> formatWithLocale(
-                            "%s: %f",
-                            propertyKey,
-                            g.nodeProperties(propertyKey).nodeProperty(nodeId)))
+                    .map(propertyKey -> {
+                        var nodeProperties = g.nodeProperties(propertyKey);
+
+                        switch (nodeProperties.valueType()) {
+                            case DOUBLE:
+                                return formatWithLocale("%s: %f", propertyKey, nodeProperties.doubleValue(nodeId));
+                            case LONG:
+                                return formatWithLocale("%s: %d", propertyKey, nodeProperties.longValue(nodeId));
+                            case DOUBLE_ARRAY:
+                                return formatWithLocale(
+                                    "%s: %s",
+                                    propertyKey,
+                                    Arrays.toString(nodeProperties.doubleArrayValue(nodeId))
+                                );
+                            case LONG_ARRAY:
+                                return formatWithLocale(
+                                    "%s: %s",
+                                    propertyKey,
+                                    Arrays.toString(nodeProperties.longArrayValue(nodeId))
+                                );
+                            case FLOAT_ARRAY:
+                                return formatWithLocale(
+                                    "%s: %s",
+                                    propertyKey,
+                                    Arrays.toString(nodeProperties.floatArrayValue(nodeId))
+                                );
+                            default:
+                                throw new IllegalArgumentException(formatWithLocale(
+                                    "Unsupported type: %s",
+                                    nodeProperties.valueType()
+                                ));
+                        }
+                    })
                     .sorted()
                     .collect(Collectors.joining(", "));
 

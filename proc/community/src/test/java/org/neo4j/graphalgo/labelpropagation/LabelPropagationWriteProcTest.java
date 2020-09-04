@@ -29,6 +29,7 @@ import org.neo4j.graphalgo.GdsCypher;
 import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.TestSupport;
 import org.neo4j.graphalgo.WritePropertyConfigTest;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.compat.MapUtil;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 
@@ -141,7 +142,7 @@ class LabelPropagationWriteProcTest extends LabelPropagationProcTest<LabelPropag
 
     static Stream<Arguments> concurrenciesExplicitAndImplicitCreate() {
         return TestSupport.crossArguments(
-            () -> Stream.of(1, 4, 8).map(Arguments::of),
+            () -> Stream.of(1, 2, 4).map(Arguments::of),
             LabelPropagationProcTest::gdsGraphVariations
         );
     }
@@ -191,14 +192,14 @@ class LabelPropagationWriteProcTest extends LabelPropagationProcTest<LabelPropag
     @Test
     void shouldRunLabelPropagationNaturalOnFilteredNodes() {
         clearDb();
-        runQuery("CREATE (c:Ignore {id:12, seed: 0}) " + DB_CYPHER + " CREATE (a)-[:X]->(c), (c)-[:X]->(b)");
+        runQuery("CREATE (c:Ignore {id:12, seed: 0}) " + createQuery() + " CREATE (a)-[:X]->(c), (c)-[:X]->(b)");
 
         String graphCreateQuery = GdsCypher
             .call()
             .withNodeLabels("A", "B", "Ignore")
-            .withNodeProperty("id")
-            .withNodeProperty("seed")
-            .withNodeProperty("weight")
+            .withNodeProperty("id", DefaultValue.of(-1))
+            .withNodeProperty("seed", DefaultValue.of(Long.MIN_VALUE))
+            .withNodeProperty("weight", DefaultValue.of(Double.NaN))
             .withAnyRelationshipType()
             .graphCreate("nodeFilterGraph")
             .yields("nodeCount", "relationshipCount");

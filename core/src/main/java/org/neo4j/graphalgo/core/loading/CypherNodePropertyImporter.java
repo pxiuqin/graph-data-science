@@ -22,9 +22,11 @@ package org.neo4j.graphalgo.core.loading;
 import com.carrotsearch.hppc.IntObjectMap;
 import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.PropertyMapping;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.NodeProperties;
-import org.neo4j.graphalgo.api.nodeproperties.ValueType;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.loading.nodeproperties.NodePropertiesFromStoreBuilder;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
+import org.neo4j.values.storable.Value;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -38,12 +40,12 @@ import static org.neo4j.graphalgo.core.GraphDimensions.IGNORE;
 
 public class CypherNodePropertyImporter {
 
-    public static final double NO_PROPERTY_VALUE = Double.NaN;
+    public static final DefaultValue NO_PROPERTY_VALUE = DefaultValue.DEFAULT;
 
     private final Collection<String> propertyColumns;
     private final long nodeCount;
     private final IntObjectMap<List<NodeLabel>> labelTokenNodeLabelMapping;
-    private final Map<NodeLabel, Map<String, NodePropertiesBuilder>> buildersByNodeLabel;
+    private final Map<NodeLabel, Map<String, NodePropertiesFromStoreBuilder>> buildersByNodeLabel;
 
 
     public CypherNodePropertyImporter(
@@ -65,22 +67,22 @@ public class CypherNodePropertyImporter {
     public void registerPropertiesForLabels(List<String> labels) {
         for (String label : labels) {
             NodeLabel nodeLabel = new NodeLabel(label);
-            Map<String, NodePropertiesBuilder> propertyBuilders = buildersByNodeLabel.computeIfAbsent(
+            Map<String, NodePropertiesFromStoreBuilder> propertyBuilders = buildersByNodeLabel.computeIfAbsent(
                 nodeLabel,
                 (ignore) -> new HashMap<>()
             );
             for (String property : propertyColumns) {
                 propertyBuilders.computeIfAbsent(
                     property,
-                    (ignore) -> NodePropertiesBuilder.of(
-                        nodeCount, ValueType.DOUBLE, AllocationTracker.EMPTY, NO_PROPERTY_VALUE
+                    (ignore) -> NodePropertiesFromStoreBuilder.of(
+                        nodeCount, AllocationTracker.empty(), NO_PROPERTY_VALUE
                     )
                 );
             }
         }
     }
 
-    public int importProperties(long nodeId, long[] labels, Map<String, Number> nodeProperties) {
+    int importProperties(long nodeId, long[] labels, Map<String, Value> nodeProperties) {
         int propertiesImported = 0;
 
         // If there is a node projection for ANY label, then we need to consume the node properties regardless.
@@ -106,7 +108,7 @@ public class CypherNodePropertyImporter {
             .collect(Collectors.toMap(
                 Map.Entry::getKey,
                 entry -> entry.getValue().entrySet().stream().collect(Collectors.toMap(
-                    builderEntry -> PropertyMapping.of(builderEntry.getKey(), Double.NaN),
+                    builderEntry -> PropertyMapping.of(builderEntry.getKey(), DefaultValue.of(Double.NaN)),
                     builderEntry -> builderEntry.getValue().build()
                 ))
             ));
@@ -114,18 +116,18 @@ public class CypherNodePropertyImporter {
 
     private int setPropertyForLabel(
         NodeLabel labelIdentifier,
-        Map<String, Number> nodeProperties,
+        Map<String, Value> nodeProperties,
         long nodeId
     ) {
         int propertiesImported = 0;
 
         if (buildersByNodeLabel.containsKey(labelIdentifier)) {
-            Map<String, NodePropertiesBuilder> buildersByProperty = buildersByNodeLabel.get(labelIdentifier);
+            Map<String, NodePropertiesFromStoreBuilder> buildersByProperty = buildersByNodeLabel.get(labelIdentifier);
 
-            for (Map.Entry<String, Number> propertyEntry : nodeProperties.entrySet()) {
+            for (Map.Entry<String, Value> propertyEntry : nodeProperties.entrySet()) {
                 if (buildersByProperty.containsKey(propertyEntry.getKey())) {
-                    NodePropertiesBuilder builder = buildersByProperty.get(propertyEntry.getKey());
-                    builder.set(nodeId, propertyEntry.getValue().doubleValue());
+                    NodePropertiesFromStoreBuilder builder = buildersByProperty.get(propertyEntry.getKey());
+                    builder.set(nodeId, propertyEntry.getValue());
                     propertiesImported++;
                 }
             }

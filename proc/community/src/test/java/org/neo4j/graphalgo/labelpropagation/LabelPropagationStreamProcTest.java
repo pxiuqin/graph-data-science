@@ -24,6 +24,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.graphalgo.AlgoBaseProc;
 import org.neo4j.graphalgo.GdsCypher;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.compat.MapUtil;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 
@@ -69,14 +70,14 @@ class LabelPropagationStreamProcTest extends LabelPropagationProcTest<LabelPropa
     @Test
     void testStreamWithFilteredNodes() {
         long deletedNodes = clearDb();
-        runQuery("CREATE (c:Ignore {id:12, seed: 0}) " + DB_CYPHER + " CREATE (a)-[:X]->(c), (c)-[:X]->(b)");
+        runQuery("CREATE (c:Ignore {id:12, seed: 0}) " + createQuery() + " CREATE (a)-[:X]->(c), (c)-[:X]->(b)");
 
         String graphCreateQuery = GdsCypher
             .call()
             .withNodeLabels("A", "B", "Ignore")
-            .withNodeProperty("id")
-            .withNodeProperty("seed")
-            .withNodeProperty("weight")
+            .withNodeProperty("id", DefaultValue.of(-1))
+            .withNodeProperty("seed", DefaultValue.of(Long.MIN_VALUE))
+            .withNodeProperty("weight", DefaultValue.of(Double.NaN))
             .withAnyRelationshipType()
             .graphCreate("nodeFilteredGraph")
             .yields("nodeCount", "relationshipCount");

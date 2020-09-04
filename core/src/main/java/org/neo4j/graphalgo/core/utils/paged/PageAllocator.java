@@ -20,6 +20,7 @@
 package org.neo4j.graphalgo.core.utils.paged;
 
 import org.neo4j.graphalgo.core.utils.BitUtil;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import java.lang.reflect.Array;
 import java.util.function.Supplier;
@@ -143,7 +144,7 @@ public abstract class PageAllocator<T> {
         T newPage(AllocationTracker tracker);
 
         default T newPage() {
-            return newPage(AllocationTracker.EMPTY);
+            return newPage(AllocationTracker.empty());
         }
     }
 

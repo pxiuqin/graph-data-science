@@ -47,7 +47,6 @@ import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
 import static org.junit.platform.commons.support.AnnotationSupport.isAnnotated;
-import static org.mockito.internal.util.reflection.FieldSetter.setField;
 
 public class GdlSupportExtension implements BeforeEachCallback, AfterEachCallback {
 
@@ -165,6 +164,7 @@ public class GdlSupportExtension implements BeforeEachCallback, AfterEachCallbac
 
         context.getRequiredTestInstances().getAllInstances().forEach(testInstance -> {
             injectInstance(testInstance, graphNamePrefix, graph, Graph.class, "Graph");
+            injectInstance(testInstance, graphNamePrefix, graph, CSRGraph.class, "Graph");
             injectInstance(testInstance, graphNamePrefix, testGraph, TestGraph.class, "Graph");
             injectInstance(testInstance, graphNamePrefix, graphStore, GraphStore.class, "GraphStore");
             injectInstance(testInstance, graphNamePrefix, idFunction, IdFunction.class, "IdFunction");
@@ -182,6 +182,15 @@ public class GdlSupportExtension implements BeforeEachCallback, AfterEachCallbac
             testClass = testClass.getSuperclass();
         }
         while (testClass != null);
+    }
+
+    private static void setField(Object testInstance, Field field, Object db) {
+        field.setAccessible(true);
+        try {
+            field.set(testInstance, db);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @ValueClass

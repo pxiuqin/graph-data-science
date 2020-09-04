@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.AlgoTestBase;
 import org.neo4j.graphalgo.TestLog;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.impl.similarity.ApproxNearestNeighborsAlgorithm;
 import org.neo4j.graphalgo.impl.similarity.ApproximateNearestNeighborsConfig;
 import org.neo4j.graphalgo.impl.similarity.CategoricalInput;
@@ -85,7 +85,7 @@ class ApproximateNearestNeighborsTest extends AlgoTestBase {
             db,
             new TestLog(),
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         SimilarityAlgorithmResult result = ann.compute();

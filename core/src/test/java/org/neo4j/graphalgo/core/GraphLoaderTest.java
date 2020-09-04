@@ -29,6 +29,7 @@ import org.neo4j.graphalgo.TestGraphLoader;
 import org.neo4j.graphalgo.TestSupport;
 import org.neo4j.graphalgo.TestSupport.AllGraphStoreFactoryTypesTest;
 import org.neo4j.graphalgo.api.Graph;
+import org.neo4j.graphalgo.core.loading.NodesBatchBuffer;
 import org.neo4j.graphalgo.core.utils.TerminationFlag;
 
 import static org.neo4j.graphalgo.TestSupport.assertGraphEquals;
@@ -72,44 +73,44 @@ class GraphLoaderTest extends BaseTest {
 
     @AllGraphStoreFactoryTypesTest
     void testWithMultipleLabelsAndProperties(TestSupport.FactoryType factoryType) {
-        PropertyMappings properties = PropertyMappings.of(PropertyMapping.of("prop1", 42.0));
+        PropertyMappings properties = PropertyMappings.of(PropertyMapping.of("prop1", 42L));
         PropertyMappings multipleProperties = PropertyMappings.of(
-            PropertyMapping.of("prop1", 42.0),
-            PropertyMapping.of("prop2", 42.0)
+            PropertyMapping.of("prop1", 42L),
+            PropertyMapping.of("prop2", 42L)
         );
 
         Graph graph = TestGraphLoader.from(db)
             .withLabels("Node1", "Node2")
             .withNodeProperties(properties)
             .graph(factoryType);
-        assertGraphEquals(fromGdl("(a:Node1 {prop1: 1.0})-->(b:Node2 {prop1: 42.0})"), graph);
+        assertGraphEquals(fromGdl("(a:Node1 {prop1: 1L})-->(b:Node2 {prop1: 42L})"), graph);
 
         graph = TestGraphLoader.from(db)
             .withLabels("Node1", "Node2")
             .withNodeProperties(multipleProperties)
             .graph(factoryType);
-        assertGraphEquals(fromGdl("(a:Node1 {prop1: 1.0, prop2: 42.0})-->(b:Node2 {prop1: 42.0, prop2: 2.0})"), graph);
+        assertGraphEquals(fromGdl("(a:Node1 {prop1: 1L, prop2: 42L})-->(b:Node2 {prop1: 42L, prop2: 2L})"), graph);
     }
 
     @AllGraphStoreFactoryTypesTest
     void testWithSingleLabelAndProperties(TestSupport.FactoryType factoryType) {
-        PropertyMappings properties = PropertyMappings.of(PropertyMapping.of("prop1", 42.0));
+        PropertyMappings properties = PropertyMappings.of(PropertyMapping.of("prop1", 42));
         PropertyMappings multipleProperties = PropertyMappings.of(
-            PropertyMapping.of("prop1", 42.0),
-            PropertyMapping.of("prop2", 42.0)
+            PropertyMapping.of("prop1", 42),
+            PropertyMapping.of("prop2", 42)
         );
 
         Graph graph = TestGraphLoader.from(db)
             .withLabels("Node1")
             .withNodeProperties(properties)
             .graph(factoryType);
-        assertGraphEquals(fromGdl("(a:Node1 {prop1: 1.0})"), graph);
+        assertGraphEquals(fromGdl("(a:Node1 {prop1: 1})"), graph);
 
         graph = TestGraphLoader.from(db)
             .withLabels("Node1")
             .withNodeProperties(multipleProperties)
             .graph(factoryType);
-        assertGraphEquals(fromGdl("(a:Node1 {prop1: 1.0, prop2: 42.0})"), graph);
+        assertGraphEquals(fromGdl("(a:Node1 {prop1: 1, prop2: 42})"), graph);
     }
 
     @AllGraphStoreFactoryTypesTest
@@ -139,9 +140,9 @@ class GraphLoaderTest extends BaseTest {
     @AllGraphStoreFactoryTypesTest
     void testWithNodeProperties(TestSupport.FactoryType factoryType) {
         PropertyMappings nodePropertyMappings = PropertyMappings.of(
-            PropertyMapping.of("prop1", "prop1", 0D),
-            PropertyMapping.of("prop2", "prop2", 0D),
-            PropertyMapping.of("prop3", "prop3", 0D)
+            PropertyMapping.of("prop1", "prop1", 0),
+            PropertyMapping.of("prop2", "prop2", 0),
+            PropertyMapping.of("prop3", "prop3", 0)
         );
 
         Graph graph = TestGraphLoader
@@ -182,6 +183,24 @@ class GraphLoaderTest extends BaseTest {
             .withLabels("Node1")
             .graph(TestSupport.FactoryType.NATIVE);
         assertGraphEquals(fromGdl("(a:Node1), (c:Node1)"), graph);
+    }
+
+    @Test
+    void testDontSkipOrphanNodesByDefault() {
+        // existing graph is `(a)-->(b), (a)-->(c), (b)-->(c)`
+        runQuery("CREATE (:Node1),(:Node2),(:Node1),(n:Node2)-[:REL]->(m:Node3)");
+        Graph graph = TestGraphLoader.from(db).graph(TestSupport.FactoryType.NATIVE);
+        assertGraphEquals(fromGdl("(a)-->(b), (a)-->(c), (b)-->(c), (b)-->(c), (d), (e), (f), (g)-->(h)"), graph);
+    }
+
+    @Test
+    void testSkipOrphanNodes() {
+        NodesBatchBuffer.whileSkippingOrphans(() -> {
+            // existing graph is `(a)-->(b), (a)-->(c), (b)-->(c)`
+            runQuery("CREATE (:Node1),(:Node2),(:Node1),(n:Node2)-[:REL]->(m:Node3)");
+            Graph graph = TestGraphLoader.from(db).graph(TestSupport.FactoryType.NATIVE);
+            assertGraphEquals(fromGdl("(a)-->(b), (a)-->(c), (b)-->(c), (b)-->(c), (d)-->(e)"), graph);
+        });
     }
 
     @Test

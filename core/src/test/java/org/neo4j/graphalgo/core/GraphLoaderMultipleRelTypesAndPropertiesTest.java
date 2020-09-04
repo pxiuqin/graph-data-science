@@ -35,6 +35,7 @@ import org.neo4j.graphalgo.RelationshipType;
 import org.neo4j.graphalgo.StoreLoaderBuilder;
 import org.neo4j.graphalgo.TestGraphLoader;
 import org.neo4j.graphalgo.TestSupport;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.api.NodeProperties;
@@ -116,12 +117,12 @@ class GraphLoaderMultipleRelTypesAndPropertiesTest extends BaseTest {
         assertEquals(Collections.singleton("prop2"), graphStore.nodePropertyKeys(NodeLabel.of("N3")));
 
         NodeProperties prop1 = graphStore.nodePropertyValues("prop1");
-        assertEquals(1.0D, prop1.nodeProperty(0));
-        assertTrue(Double.isNaN(prop1.nodeProperty(1)));
+        assertEquals(1L, prop1.longValue(0));
+        assertEquals(DefaultValue.LONG_DEFAULT_FALLBACK, prop1.longValue(1));
 
         NodeProperties prop2 = graphStore.nodePropertyValues("prop2");
-        assertTrue(Double.isNaN(prop2.nodeProperty(0)));
-        assertEquals(2.0D, prop2.nodeProperty(1));
+        assertEquals(DefaultValue.LONG_DEFAULT_FALLBACK, prop2.longValue(0));
+        assertEquals(2L, prop2.longValue(1));
     }
 
     @Test
@@ -159,9 +160,9 @@ class GraphLoaderMultipleRelTypesAndPropertiesTest extends BaseTest {
         NodeProperties node2Prop2 = graphStore.nodePropertyValues(node2Identifier, "prop2");
 
         LongStream.range(0, 3).forEach(nodeId -> {
-            double allProp1Value = allProp1.nodeProperty(nodeId);
-            double allProp2Value = allProp2.nodeProperty(nodeId);
-            double node2Prop2Value = node2Prop2.nodeProperty(nodeId);
+            double allProp1Value = allProp1.doubleValue(nodeId);
+            double allProp2Value = allProp2.doubleValue(nodeId);
+            double node2Prop2Value = node2Prop2.doubleValue(nodeId);
 
             if (nodeId == 0) {
                 assertEquals(1.0, allProp1Value);
@@ -325,12 +326,12 @@ class GraphLoaderMultipleRelTypesAndPropertiesTest extends BaseTest {
                 RelationshipProjection
                     .builder()
                     .type(rel1.name)
-                    .addProperty(prop1, prop1, Double.NaN)
+                    .addProperty(prop1, prop1, DefaultValue.of(Double.NaN))
                     .build(),
                 RelationshipProjection
                     .builder()
                     .type(rel2.name)
-                    .addProperty(prop2, prop2, Double.NaN)
+                    .addProperty(prop2, prop2, DefaultValue.of(Double.NaN))
                     .build()
             ).build().graphStore();
 

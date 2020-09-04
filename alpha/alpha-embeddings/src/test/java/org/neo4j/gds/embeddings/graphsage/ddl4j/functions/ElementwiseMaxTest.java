@@ -21,10 +21,13 @@ package org.neo4j.gds.embeddings.graphsage.ddl4j.functions;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.neo4j.gds.embeddings.graphsage.ddl4j.GraphSageBaseTest;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.FiniteDifferenceTest;
-import org.neo4j.gds.embeddings.graphsage.ddl4j.Tensor;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.GraphSageBaseTest;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.Variable;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.helper.ConstantScale;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.helper.ElementSum;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Matrix;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Scalar;
 
 import java.util.List;
 
@@ -32,12 +35,12 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 public class ElementwiseMaxTest extends GraphSageBaseTest implements FiniteDifferenceTest {
 
-    private Weights weights;
+    private Weights<Matrix> weights;
 
     @BeforeEach
     protected void setup() {
         super.setup();
-        weights = new Weights(Tensor.matrix(new double[]{
+        weights = new Weights<>(new Matrix(new double[]{
             1, 2, 3,
             3, 2, 1,
             1, 3, 2
@@ -50,13 +53,13 @@ public class ElementwiseMaxTest extends GraphSageBaseTest implements FiniteDiffe
             new int[]{},
             new int[]{0, 1, 2}
         };
-        ElementwiseMax max = new ElementwiseMax(weights, adjacencyMatrix);
+        Variable<Matrix> max = new ElementwiseMax(weights, adjacencyMatrix);
 
         double[] expected = new double[]{
             0, 0, 0,
             3, 3, 3
         };
-        assertArrayEquals(expected, ctx.forward(max).data);
+        assertArrayEquals(expected, ctx.forward(max).data());
     }
 
     @Test
@@ -66,8 +69,8 @@ public class ElementwiseMaxTest extends GraphSageBaseTest implements FiniteDiffe
             new int[]{0, 1, 2},
             new int[]{}
         };
-        Sum sum = new Sum(List.of(new ElementwiseMax(weights, adjacencyMatrix)));
-        Variable loss = new ConstantScale(sum, 2);
+        ElementSum sum = new ElementSum(List.of(new ElementwiseMax(weights, adjacencyMatrix)));
+        Variable<Scalar> loss = new ConstantScale<>(sum, 2);
         finiteDifferenceShouldApproximateGradient(weights, loss);
     }
 }

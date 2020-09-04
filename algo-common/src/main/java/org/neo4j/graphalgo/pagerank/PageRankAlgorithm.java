@@ -25,7 +25,7 @@ import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.mem.Assessable;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimations;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import java.util.concurrent.ExecutorService;
 import java.util.stream.LongStream;
@@ -45,7 +45,9 @@ public interface PageRankAlgorithm extends Assessable {
         LongStream sourceNodeIds,
         ProgressLogger progressLogger
     ) {
-        return create(graph, sourceNodeIds, algoConfig, null, ParallelUtil.DEFAULT_BATCH_SIZE, progressLogger, AllocationTracker.EMPTY);
+        return create(graph, sourceNodeIds, algoConfig, null, ParallelUtil.DEFAULT_BATCH_SIZE, progressLogger,
+            AllocationTracker.empty()
+        );
     }
 
     default PageRank create(

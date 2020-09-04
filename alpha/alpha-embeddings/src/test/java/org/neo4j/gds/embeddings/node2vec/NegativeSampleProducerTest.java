@@ -20,7 +20,7 @@
 package org.neo4j.gds.embeddings.node2vec;
 
 import org.junit.jupiter.api.Test;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeObjectArray;
 
 import java.util.Map;
@@ -39,7 +39,7 @@ class NegativeSampleProducerTest {
             new long[]{1}
         );
 
-        var probabilityComputer = new ProbabilityComputer(walks, 2, 0.001, 0.75, 4, AllocationTracker.EMPTY);
+        var probabilityComputer = new ProbabilityComputer(walks, 2, 0.001, 0.75, 4, AllocationTracker.empty());
 
         var sampler = new NegativeSampleProducer(probabilityComputer.getContextNodeDistribution());
 

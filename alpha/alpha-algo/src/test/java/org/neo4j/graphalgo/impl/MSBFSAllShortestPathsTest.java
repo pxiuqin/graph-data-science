@@ -26,7 +26,7 @@ import org.neo4j.graphalgo.StoreLoaderBuilder;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.config.ConcurrencyConfig;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.graphbuilder.GraphBuilder;
 import org.neo4j.graphalgo.impl.msbfs.MSBFSASPAlgorithm;
 import org.neo4j.graphalgo.impl.msbfs.MSBFSAllShortestPaths;
@@ -79,7 +79,7 @@ class MSBFSAllShortestPathsTest extends AlgoTestBase {
             .addRelationshipType(RELATIONSHIP)
             .build()
             .graph();
-        testASP(new MSBFSAllShortestPaths(graph, AllocationTracker.EMPTY, ConcurrencyConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT));
+        testASP(new MSBFSAllShortestPaths(graph, AllocationTracker.empty(), ConcurrencyConfig.DEFAULT_CONCURRENCY, Pools.DEFAULT));
     }
 
     private void testASP(final MSBFSASPAlgorithm hugeMSBFSAllShortestPaths) {

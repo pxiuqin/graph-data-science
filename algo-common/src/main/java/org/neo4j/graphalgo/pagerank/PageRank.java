@@ -26,7 +26,7 @@ import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.IdMapping;
 import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
 import org.neo4j.graphalgo.core.utils.partition.Partition;
 import org.neo4j.graphalgo.core.utils.partition.PartitionUtils;
@@ -268,14 +268,14 @@ public class PageRank extends Algorithm<PageRank, PageRank> {
         //对每个分片进行处理
         while (parts.hasNext()) {
             Partition partition = parts.next();  //获取一个分片
-            int partitionSize = (int) partition.nodeCount;  //当前分片的节点个数
-            long start = partition.startNode;  //当前分配的开始节点
+            int partitionSize = (int) partition.nodeCount();  //当前分片的节点个数
+            long start = partition.startNode();  //当前分配的开始节点
             int i = 1;
             while (parts.hasNext()
                    && i < partitionsPerThread  //每个线程分片数量
                    && partition.fits(partitionSize)) {  //判断满足条件
                 partition = parts.next();
-                partitionSize += partition.nodeCount;  //处理的数量
+                partitionSize += partition.nodeCount();  //处理的数量
                 ++i;
             }
 

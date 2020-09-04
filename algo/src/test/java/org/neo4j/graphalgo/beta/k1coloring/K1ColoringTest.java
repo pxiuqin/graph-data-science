@@ -35,13 +35,12 @@ import org.neo4j.graphalgo.core.concurrency.Pools;
 import org.neo4j.graphalgo.core.huge.UnionGraph;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.mem.MemoryRange;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.LongStream;
@@ -76,7 +75,7 @@ class K1ColoringTest {
             1,
             Pools.DEFAULT,
             ProgressLogger.NULL_LOGGER,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         k1Coloring.compute();
@@ -92,23 +91,24 @@ class K1ColoringTest {
     void testParallelK1Coloring() {
         long seed = 42L;
 
-        RandomGraphGenerator outGenerator = new RandomGraphGenerator(
-            100_000,
-            5,
-            RelationshipDistribution.POWER_LAW,
-            seed,
-            Optional.empty(),
-            AllocationTracker.EMPTY
-        );
+        RandomGraphGenerator outGenerator = RandomGraphGenerator.builder()
+            .nodeCount(100_000)
+            .averageDegree(5)
+            .relationshipDistribution(RelationshipDistribution.POWER_LAW)
+            .seed(seed)
+            .allocationTracker(AllocationTracker.empty())
+            .build();
 
-        RandomGraphGenerator inGenerator = new RandomGraphGenerator(
-            100_000,
-            5,
-            RelationshipDistribution.POWER_LAW,
-            seed,
-            Optional.empty(),
-            Aggregation.NONE, Orientation.REVERSE, AllowSelfLoops.NO, AllocationTracker.EMPTY
-        );
+        RandomGraphGenerator inGenerator = RandomGraphGenerator.builder()
+            .nodeCount(100_000)
+            .averageDegree(5)
+            .relationshipDistribution(RelationshipDistribution.POWER_LAW)
+            .seed(seed)
+            .aggregation(Aggregation.NONE)
+            .orientation(Orientation.REVERSE)
+            .allowSelfLoops(AllowSelfLoops.NO)
+            .allocationTracker(AllocationTracker.empty())
+            .build();
 
         var naturalGraph = outGenerator.generate();
         var reverseGraph = inGenerator.generate();
@@ -121,7 +121,7 @@ class K1ColoringTest {
             8,
             Pools.DEFAULT,
             ProgressLogger.NULL_LOGGER,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         k1Coloring.compute();
@@ -169,13 +169,12 @@ class K1ColoringTest {
 
     @Test
     void everyNodeShouldHaveBeenColored() {
-        RandomGraphGenerator generator = new RandomGraphGenerator(
-            100_000,
-            10,
-            RelationshipDistribution.UNIFORM,
-            Optional.empty(),
-            AllocationTracker.EMPTY
-        );
+        RandomGraphGenerator generator = RandomGraphGenerator.builder()
+            .nodeCount(100_000)
+            .averageDegree(10)
+            .relationshipDistribution(RelationshipDistribution.UNIFORM)
+            .allocationTracker(AllocationTracker.empty())
+            .build();
 
         Graph graph = generator.generate();
 
@@ -186,7 +185,7 @@ class K1ColoringTest {
             8,
             Pools.DEFAULT,
             ProgressLogger.NULL_LOGGER,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         k1Coloring.compute();
@@ -196,12 +195,14 @@ class K1ColoringTest {
 
     @Test
     void shouldLogProgress(){
-        var graph = RandomGraphGenerator.generate(
-            100,
-            10,
-            RelationshipDistribution.UNIFORM,
-            42L
-        );
+        var graph = RandomGraphGenerator.builder()
+            .nodeCount(100)
+            .averageDegree(10)
+            .relationshipDistribution(RelationshipDistribution.UNIFORM)
+            .allocationTracker(AllocationTracker.empty())
+            .seed(42L)
+            .build()
+            .generate();
 
         var testLogger = new TestProgressLogger(graph.relationshipCount() * 2, "K1Coloring", 8);
 
@@ -212,7 +213,7 @@ class K1ColoringTest {
             8,
             Pools.DEFAULT,
             testLogger,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
         k1Coloring.compute();

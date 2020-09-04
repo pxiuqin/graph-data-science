@@ -19,48 +19,53 @@
  */
 package org.neo4j.gds.embeddings.graphsage.algo;
 
-import org.neo4j.gds.embeddings.graphsage.GraphSageModel;
+import org.neo4j.gds.embeddings.graphsage.GraphSageEmbeddingsGenerator;
+import org.neo4j.gds.embeddings.graphsage.Layer;
 import org.neo4j.graphalgo.Algorithm;
 import org.neo4j.graphalgo.annotation.ValueClass;
 import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.api.NodeProperties;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.model.Model;
 import org.neo4j.graphalgo.core.utils.paged.HugeObjectArray;
-import org.neo4j.logging.Log;
 
-import java.util.List;
-import java.util.Map;
-import java.util.stream.DoubleStream;
-
-import static java.util.stream.Collectors.toList;
+import static org.neo4j.gds.embeddings.graphsage.GraphSageHelper.initializeFeatures;
 
 public class GraphSage extends Algorithm<GraphSage, GraphSage.GraphSageResult> {
 
-    private final GraphSageModel graphSageModel;
+    public static final String MODEL_TYPE = "graphSage";
+
     private final Graph graph;
-    private final List<NodeProperties> nodeProperties;
-    private final boolean useDegreeAsProperty;
+    private final GraphSageBaseConfig config;
+    private final Model<Layer[], GraphSageTrainConfig> model;
 
-    public GraphSage(Graph graph, GraphSageBaseConfig config, Log log) {
-        this.useDegreeAsProperty = config.degreeAsProperty();
+    public GraphSage(
+        Graph graph,
+        GraphSageBaseConfig config,
+        Model<Layer[], GraphSageTrainConfig> model
+    ) {
         this.graph = graph;
-
-        nodeProperties = config
-            .nodePropertyNames()
-            .stream()
-            .map(graph::nodeProperties)
-            .collect(toList());
-
-        graphSageModel = new GraphSageModel(config, log);
+        this.config = config;
+        this.model = model;
     }
 
     @Override
     public GraphSageResult compute() {
-        // TODO: Split training into its own procedure?
-        HugeObjectArray<double[]> features = initializeFeatures();
-        GraphSageModel.TrainResult trainResult = graphSageModel.train(graph, features);
-        HugeObjectArray<double[]> embeddings = graphSageModel.makeEmbeddings(graph, features);
-        return GraphSageResult.of(trainResult.startLoss(), trainResult.epochLosses(), embeddings);
+        Layer[] layers = model.data();
+        GraphSageEmbeddingsGenerator embeddingsGenerator = new GraphSageEmbeddingsGenerator(
+            layers,
+            config.batchSize(),
+            config.concurrency()
+        );
+
+        GraphSageTrainConfig trainConfig = model.trainConfig();
+        HugeObjectArray<double[]> embeddings = embeddingsGenerator.makeEmbeddings(
+            graph,
+            initializeFeatures(
+                graph,
+                trainConfig.nodePropertyNames(),
+                trainConfig.degreeAsProperty()
+            )
+        );
+        return GraphSageResult.of(embeddings);
     }
 
     @Override
@@ -73,41 +78,13 @@ public class GraphSage extends Algorithm<GraphSage, GraphSage.GraphSageResult> {
 
     }
 
-    private HugeObjectArray<double[]> initializeFeatures() {
-        HugeObjectArray<double[]> features = HugeObjectArray.newArray(
-            double[].class,
-            graph.nodeCount(),
-            AllocationTracker.EMPTY
-        );
-        features.setAll(n -> {
-            DoubleStream nodeFeatures = this.nodeProperties.stream().mapToDouble(p -> p.nodeProperty(n));
-            if (useDegreeAsProperty) {
-                nodeFeatures = DoubleStream.concat(nodeFeatures, DoubleStream.of(graph.degree(n)));
-            }
-            return nodeFeatures.toArray();
-        });
-        return features;
-    }
-
     @ValueClass
-    public interface GraphSageResult {
-
-        Map<String, Double> epochLosses();
-
+    public
+    interface GraphSageResult {
         HugeObjectArray<double[]> embeddings();
 
-        double startLoss();
-
-        static GraphSageResult of(
-            double startLoss,
-            Map<String, Double> epochLosses,
-            HugeObjectArray<double[]> embeddings
-        ) {
-            return ImmutableGraphSageResult.builder()
-                .startLoss(startLoss)
-                .epochLosses(epochLosses)
-                .embeddings(embeddings)
-                .build();
+        static GraphSageResult of(HugeObjectArray<double[]> embeddings) {
+            return ImmutableGraphSageResult.of(embeddings);
         }
     }
 }

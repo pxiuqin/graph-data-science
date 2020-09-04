@@ -19,34 +19,46 @@
  */
 package org.neo4j.gds.embeddings.graphsage.ddl4j.functions;
 
+import org.neo4j.gds.embeddings.graphsage.ddl4j.AbstractVariable;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.ComputationContext;
-import org.neo4j.gds.embeddings.graphsage.ddl4j.Tensor;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.Variable;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Matrix;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Tensor;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Vector;
 
 import java.util.List;
 
-public class MatrixVectorSum extends Variable {
+import static org.neo4j.gds.embeddings.graphsage.ddl4j.Dimensions.COLUMNS_INDEX;
+import static org.neo4j.gds.embeddings.graphsage.ddl4j.Dimensions.ROWS_INDEX;
+import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
-    private final Variable matrix;
-    private final Variable vector;
+public class MatrixVectorSum extends AbstractVariable<Matrix> {
 
-    public MatrixVectorSum(Variable matrix, Variable vector) {
+    private final Variable<Matrix> matrix;
+    private final Variable<Vector> vector;
+    private final int rows;
+    private final int cols;
+
+    public MatrixVectorSum(Variable<Matrix> matrix, Variable<Vector> vector) {
         super(List.of(matrix, vector), matrix.dimensions());
-
+        assert matrix.dimension(COLUMNS_INDEX) == vector.dimension(ROWS_INDEX) : formatWithLocale(
+            "Cannot broadcast vector with length %d to a matrix with %d columns",
+            vector.dimension(ROWS_INDEX),
+            matrix.dimension(COLUMNS_INDEX)
+        );
         this.matrix = matrix;
+        this.rows = matrix.dimension(ROWS_INDEX);
+        this.cols = matrix.dimension(COLUMNS_INDEX);
         this.vector = vector;
     }
 
     @Override
-    protected Tensor apply(ComputationContext ctx) {
+    public Matrix apply(ComputationContext ctx) {
 
-        double[] matrixData = ctx.data(matrix).data;
-        double[] vectorData = ctx.data(vector).data;
+        double[] matrixData = ctx.data(matrix).data();
+        double[] vectorData = ctx.data(vector).data();
 
         double[] result = new double[matrixData.length];
-
-        int rows = dimension(0);
-        int cols = dimension(1);
 
         for(int row = 0; row < rows; row++) {
             for (int col = 0; col < cols; col++) {
@@ -55,26 +67,24 @@ public class MatrixVectorSum extends Variable {
             }
         }
 
-        return Tensor.matrix(result, rows, cols);
+        return new Matrix(result, rows, cols);
     }
 
     @Override
-    protected Tensor gradient(Variable parent, ComputationContext ctx) {
+    public Tensor<?> gradient(Variable<?> parent, ComputationContext ctx) {
         if (parent == matrix) {
             return ctx.gradient(this);
         } else {
-            Tensor gradient = ctx.gradient(this);
-            int rows = dimension(0);
-            int cols = vector.dimension(0);
+            Tensor<?> gradient = ctx.gradient(this);
             double[] result = new double[cols];
             for (int row = 0; row < rows; row++) {
                 for (int col = 0; col < cols; col++) {
                     int matrixIndex = row * cols + col;
-                    result[col] += gradient.data[matrixIndex];
+                    result[col] += gradient.dataAt(matrixIndex);
                 }
             }
 
-            return Tensor.vector(result);
+            return new Vector(result);
         }
     }
 }

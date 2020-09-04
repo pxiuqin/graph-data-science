@@ -19,57 +19,47 @@
  */
 package org.neo4j.graphalgo.api;
 
+import org.jetbrains.annotations.Nullable;
 import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.values.storable.Value;
 
+import java.util.OptionalDouble;
 import java.util.OptionalLong;
+
+import static org.neo4j.graphalgo.utils.StringFormatting.formatWithLocale;
 
 //节点属性信息描述
 public interface NodeProperties {
 
-    default double getDouble(long nodeId) {
-        throw new UnsupportedOperationException("double is not supported");
+    default double doubleValue(long nodeId) {
+        throw unsupportedTypeException(ValueType.DOUBLE);
     }
 
-    default long getLong(long nodeId) {
-        throw new UnsupportedOperationException("long is not supported");
+    default long longValue(long nodeId) {
+        throw unsupportedTypeException(ValueType.LONG);
     };
 
-    default double[] getDoubleArray(long nodeId) {
-        throw new UnsupportedOperationException("double[] is not supported");
+    @Nullable
+    default double[] doubleArrayValue(long nodeId) {
+        throw unsupportedTypeException(ValueType.DOUBLE_ARRAY);
     }
 
-    default long[] getLongArray(long nodeId) {
-        throw new UnsupportedOperationException("long[] is not supported");
+    @Nullable
+    default float[] floatArrayValue(long nodeId) {
+        throw unsupportedTypeException(ValueType.FLOAT_ARRAY);
     }
 
-    default Object getObject(long nodeId) {
-        return getDouble(nodeId);
+    @Nullable
+    default long[] longArrayValue(long nodeId) {
+        throw unsupportedTypeException(ValueType.LONG_ARRAY);
     }
 
-    ValueType getType();
+    @Nullable
+    Object getObject(long nodeId);
 
-    Value getValue(long nodeId);
+    ValueType valueType();
 
-    default double getDouble(long nodeId, double defaultValue) {
-        return getDouble(nodeId);
-    }
-
-    default long getLong(long nodeId, long defaultValue) {
-        return getLong(nodeId);
-    }
-
-    default double[] getDoubleArray(long nodeId, double[] defaultValue) {
-        return getDoubleArray(nodeId);
-    }
-
-    default long[] getLongArray(long nodeId, long[] defaultValue) {
-        return getLongArray(nodeId);
-    }
-
-    default Object getObject(long nodeId, Object defaultValue) {
-        return getObject(nodeId);
-    }
+    Value value(long nodeId);
 
     /**
      * Release internal data structures and return an estimate how many bytes were freed.
@@ -87,32 +77,33 @@ public interface NodeProperties {
         return 0;
     }
 
-    //------------- Old Interface
-
     /**
-     * Returns the property value for a node or the loaded default value if no property has been defined.
-     */
-    @Deprecated
-    default double nodeProperty(long nodeId) {
-        return getDouble(nodeId);
-    };
-
-    /**
-     * Returns the property value for a node or the given default value if no property had been defined.
-     * The default value has precedence over the default value defined by the loader.
-     */
-    @Deprecated
-    default double nodeProperty(long nodeId, double defaultValue) {
-        return getDouble(nodeId, defaultValue);
-    }
-
-    /**
-     * @return the maximum value contained in the mapping or an empty {@link OptionalLong} if the mapping is
+     * @return the maximum long value contained in the mapping or an empty {@link OptionalLong} if the mapping is
      *         empty or the feature is not supported.
+     * @throws java.lang.UnsupportedOperationException if the type is not coercible into a long.
      */
-    @Deprecated
-    default OptionalLong getMaxPropertyValue() {
-        return OptionalLong.empty();
+    default OptionalLong getMaxLongPropertyValue() {
+        if (valueType() == ValueType.LONG) {
+            throw new UnsupportedOperationException(formatWithLocale("%s does not overwrite `getMaxLongPropertyValue`", getClass().getSimpleName()));
+        } else {
+            throw unsupportedTypeException(ValueType.LONG);
+        }
     }
 
+    /**
+     * @return the maximum double value contained in the mapping or an empty {@link OptionalDouble} if the mapping is
+     *         empty or the feature is not supported.
+     * @throws java.lang.UnsupportedOperationException if the type is not coercible into a double.
+     */
+    default OptionalDouble getMaxDoublePropertyValue() {
+        if (valueType() == ValueType.DOUBLE) {
+            throw new UnsupportedOperationException(formatWithLocale("%s does not overwrite `getMaxDoublePropertyValue`", getClass().getSimpleName()));
+        } else {
+            throw unsupportedTypeException(ValueType.DOUBLE);
+        }
+    }
+
+    private UnsupportedOperationException unsupportedTypeException(ValueType expectedType) {
+        return new UnsupportedOperationException(formatWithLocale("Tried to retrieve a value of type %s value from properties of type %s", expectedType, valueType()));
+    }
 }

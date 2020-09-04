@@ -28,7 +28,6 @@ import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.config.IterationsConfig;
 import org.neo4j.graphalgo.config.MutatePropertyConfig;
 import org.neo4j.graphalgo.config.RelationshipWeightConfig;
-import org.neo4j.graphalgo.config.SeedConfig;
 import org.neo4j.graphalgo.config.WritePropertyConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 
@@ -41,15 +40,9 @@ public interface PregelConfig extends
     AlgoBaseConfig,
     RelationshipWeightConfig,
     IterationsConfig,
-    SeedConfig,
     WritePropertyConfig,
     MutatePropertyConfig,
     ConcurrencyConfig {
-
-    @Value.Default
-    default double initialNodeValue() {
-        return -1;
-    }
 
     @Value.Default
     default boolean isAsynchronous() {
@@ -59,13 +52,13 @@ public interface PregelConfig extends
     @Value.Default
     @Configuration.ConvertWith("org.apache.commons.lang3.StringUtils#trimToNull")
     default String writeProperty() {
-        return "pregelValue";
+        return "pregel_";
     }
 
     @Value.Default
     @Configuration.ConvertWith("org.apache.commons.lang3.StringUtils#trimToNull")
     default String mutateProperty() {
-        return "pregelValue";
+        return "pregel_";
     }
 
     @Value.Default

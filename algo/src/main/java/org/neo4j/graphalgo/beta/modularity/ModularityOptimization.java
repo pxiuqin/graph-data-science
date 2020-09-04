@@ -33,7 +33,7 @@ import org.neo4j.graphalgo.beta.k1coloring.K1ColoringFactory;
 import org.neo4j.graphalgo.beta.k1coloring.K1ColoringStreamConfig;
 import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeAtomicDoubleArray;
 import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
@@ -182,13 +182,17 @@ public final class ModularityOptimization extends Algorithm<ModularityOptimizati
             return;
         }
 
-        final long maxSeedCommunity = seedProperty.getMaxPropertyValue().orElse(0);
+        long maxSeedCommunity = seedProperty.getMaxLongPropertyValue().orElse(0L);
 
         HugeLongLongMap communityMapping = new HugeLongLongMap(nodeCount, tracker);
         long nextAvailableInternalCommunityId = -1;
 
         for (long nodeId = 0; nodeId < nodeCount; nodeId++) {
-            long seedCommunity = (long) seedProperty.nodeProperty(nodeId, -1);
+            long seedCommunity = seedProperty.longValue(nodeId);
+            if (seedCommunity < 0) {
+                seedCommunity = -1;
+            }
+
             seedCommunity = seedCommunity >= 0 ? seedCommunity : graph.toOriginalNodeId(nodeId) + maxSeedCommunity;
             if (communityMapping.getOrDefault(seedCommunity, -1) < 0) {
                 communityMapping.addTo(seedCommunity, ++nextAvailableInternalCommunityId);
@@ -370,7 +374,7 @@ public final class ModularityOptimization extends Algorithm<ModularityOptimizati
     public LongNodeProperties asNodeProperties() {
         return new LongNodeProperties() {
             @Override
-            public long getLong(long nodeId) {
+            public long longValue(long nodeId) {
                 return getCommunityId(nodeId);
             }
 

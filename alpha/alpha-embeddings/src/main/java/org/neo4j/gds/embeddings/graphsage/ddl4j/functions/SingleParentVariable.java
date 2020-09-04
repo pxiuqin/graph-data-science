@@ -19,27 +19,22 @@
  */
 package org.neo4j.gds.embeddings.graphsage.ddl4j.functions;
 
-import org.neo4j.gds.embeddings.graphsage.ddl4j.ComputationContext;
-import org.neo4j.gds.embeddings.graphsage.ddl4j.Tensor;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.AbstractVariable;
 import org.neo4j.gds.embeddings.graphsage.ddl4j.Variable;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Tensor;
 
 import java.util.List;
 
-public abstract class SingleParentVariable extends Variable {
-    protected Variable parent;
+public abstract class SingleParentVariable<T extends Tensor<T>> extends AbstractVariable<T> {
 
     public SingleParentVariable(
-        Variable parent,
+        Variable<?> parent,
         int[] dimensions
     ) {
         super(List.of(parent), dimensions);
-        this.parent = parent;
     }
 
-    @Override
-    protected Tensor gradient(Variable parent, ComputationContext ctx) {
-        return gradient(ctx);
+    protected Variable<?> parent() {
+        return parents().get(0);
     }
-
-    protected abstract Tensor gradient(ComputationContext ctx);
 }

@@ -20,6 +20,7 @@
 package org.neo4j.graphalgo.core.utils.paged;
 
 import org.junit.jupiter.api.Test;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.mem.MemoryUsage;
 
 import static io.qala.datagen.RandomShortApi.integer;
@@ -72,12 +73,12 @@ final class HugeIntArrayTest extends HugeArrayTestBase<int[], Integer, HugeIntAr
 
     @Override
     HugeIntArray singleArray(final int size) {
-        return HugeIntArray.newSingleArray(size, AllocationTracker.EMPTY);
+        return HugeIntArray.newSingleArray(size, AllocationTracker.empty());
     }
 
     @Override
     HugeIntArray pagedArray(final int size) {
-        return HugeIntArray.newPagedArray(size, AllocationTracker.EMPTY);
+        return HugeIntArray.newPagedArray(size, AllocationTracker.empty());
     }
 
     @Override

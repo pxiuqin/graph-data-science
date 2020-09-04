@@ -23,24 +23,36 @@ import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.values.storable.Value;
 import org.neo4j.values.storable.Values;
 
+import java.util.OptionalDouble;
+import java.util.stream.LongStream;
+
 public interface DoubleNodeProperties extends NodeProperties {
 
     @Override
-    double getDouble(long nodeId);
+    double doubleValue(long nodeId);
 
     @Override
-    default Object getObject(long nodeId, Object defaultValue) {
-        return getDouble(nodeId, (Double) defaultValue);
+    default Object getObject(long nodeId) {
+        return doubleValue(nodeId);
     }
 
     @Override
-    default Value getValue(long nodeId) {
-        var value = getDouble(nodeId);
+    default Value value(long nodeId) {
+        var value = doubleValue(nodeId);
         return Double.isNaN(value) ? null : Values.doubleValue(value);
     };
 
     @Override
-    default ValueType getType() {
+    default ValueType valueType() {
         return ValueType.DOUBLE;
     };
+
+    @Override
+    default OptionalDouble getMaxDoublePropertyValue() {
+        return LongStream
+            .range(0, size())
+            .parallel()
+            .mapToDouble(this::doubleValue)
+            .max();
+    }
 }

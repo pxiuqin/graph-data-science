@@ -20,10 +20,11 @@
 package org.neo4j.graphalgo.core.utils.paged.dss;
 
 
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimations;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongLongMap;
 
@@ -78,17 +79,15 @@ public final class IncrementalDisjointSetStruct extends SequentialDisjointSetStr
      * reset the container
      */
     private void init(AllocationTracker tracker) {
-        this.maxCommunity = communityMapping.getMaxPropertyValue().orElse(NO_SUCH_SEED_PROPERTY);
+        this.maxCommunity = communityMapping.getMaxLongPropertyValue().orElse(NO_SUCH_SEED_PROPERTY);
 
         final HugeLongLongMap internalMapping = new HugeLongLongMap(size, tracker);
 
         this.parent.setAll(nodeId -> {
             long parentValue = -1;
-            double communityIdValue = communityMapping.nodeProperty(nodeId, Double.NaN);
+            long communityId = communityMapping.longValue(nodeId);
 
-            if (!Double.isNaN(communityIdValue)) {
-                long communityId = (long) communityIdValue;
-
+            if (!(communityId == DefaultValue.LONG_DEFAULT_FALLBACK)) {
                 long internalCommunityId = internalMapping.getOrDefault(communityId, -1);
                 if (internalCommunityId != -1) {
                     parentValue = internalCommunityId;

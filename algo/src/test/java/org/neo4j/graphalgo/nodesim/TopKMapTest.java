@@ -23,7 +23,7 @@ import com.carrotsearch.hppc.BitSet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -58,7 +58,7 @@ class TopKMapTest {
         BitSet bitSet = new BitSet();
         bitSet.set(0, input.size());
 
-        TopKMap topKMap = new TopKMap(input.size(), bitSet, 1, SimilarityResult.DESCENDING, AllocationTracker.EMPTY);
+        TopKMap topKMap = new TopKMap(input.size(), bitSet, 1, SimilarityResult.DESCENDING, AllocationTracker.empty());
 
         input.forEach(sim -> topKMap.put(sim.node1, sim.node2, sim.similarity));
 
@@ -85,7 +85,7 @@ class TopKMapTest {
         BitSet bitSet = new BitSet();
         bitSet.set(0, input.size());
 
-        TopKMap topKMap = new TopKMap(input.size(), bitSet, 3, SimilarityResult.DESCENDING, AllocationTracker.EMPTY);
+        TopKMap topKMap = new TopKMap(input.size(), bitSet, 3, SimilarityResult.DESCENDING, AllocationTracker.empty());
 
         input.forEach(sim -> topKMap.put(sim.node1, sim.node2, sim.similarity));
 
@@ -112,7 +112,7 @@ class TopKMapTest {
         BitSet bitSet = new BitSet();
         bitSet.set(0, input.size());
 
-        TopKMap topKMap = new TopKMap(input.size(), bitSet, 3, SimilarityResult.ASCENDING, AllocationTracker.EMPTY);
+        TopKMap topKMap = new TopKMap(input.size(), bitSet, 3, SimilarityResult.ASCENDING, AllocationTracker.empty());
 
         input.forEach(sim -> topKMap.put(sim.node1, sim.node2, sim.similarity));
 
@@ -144,7 +144,7 @@ class TopKMapTest {
         BitSet bitSet = new BitSet();
         bitSet.set(0, input.size());
 
-        TopKMap topKMap = new TopKMap(input.size(), bitSet, 3, comparator, AllocationTracker.EMPTY);
+        TopKMap topKMap = new TopKMap(input.size(), bitSet, 3, comparator, AllocationTracker.empty());
 
         input.forEach(sim -> topKMap.put(sim.node1, sim.node2, sim.similarity));
 

@@ -24,6 +24,7 @@ import org.neo4j.graphalgo.AlgoBaseProc;
 import org.neo4j.graphalgo.GdsCypher;
 import org.neo4j.graphalgo.MutateNodePropertyTest;
 import org.neo4j.graphalgo.StoreLoaderBuilder;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.graphalgo.compat.MapUtil;
@@ -113,7 +114,7 @@ public class LabelPropagationMutateProcTest extends LabelPropagationProcTest<Lab
         runQuery(writeQuery);
 
         var updatedGraph = new StoreLoaderBuilder().api(db)
-            .addNodeProperty(mutateProperty(), mutateProperty(), 42.0, Aggregation.NONE)
+            .addNodeProperty(mutateProperty(), mutateProperty(), DefaultValue.of(42.0), Aggregation.NONE)
             .build()
             .graph();
 
@@ -161,7 +162,7 @@ public class LabelPropagationMutateProcTest extends LabelPropagationProcTest<Lab
     @Test
     void testGraphMutationFiltered() {
         long deletedNodes = clearDb();
-        runQuery("CREATE (x:Ignore {id: -1, communityId: null}) " + DB_CYPHER);
+        runQuery("CREATE (x:Ignore {id: -1, communityId: null}) " + createQuery());
 
         String graphName = "loadGraph";
 
@@ -193,7 +194,7 @@ public class LabelPropagationMutateProcTest extends LabelPropagationProcTest<Lab
         mutatedGraph.forEachNode(nodeId -> {
             assertEquals(
                     expectedValueList.get(Math.toIntExact(nodeId)),
-                    mutatedGraph.nodeProperties("communityId").getLong(nodeId)
+                    mutatedGraph.nodeProperties("communityId").longValue(nodeId)
                 );
                 return true;
             }

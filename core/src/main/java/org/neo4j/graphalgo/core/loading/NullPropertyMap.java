@@ -20,9 +20,13 @@
 package org.neo4j.graphalgo.core.loading;
 
 import org.neo4j.graphalgo.api.NodeProperties;
+import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
 import org.neo4j.graphalgo.api.nodeproperties.ValueType;
 import org.neo4j.values.storable.Value;
 import org.neo4j.values.storable.Values;
+
+import java.util.OptionalDouble;
+import java.util.OptionalLong;
 
 /**
  * {@link NodeProperties} implementation which always returns
@@ -36,48 +40,58 @@ public abstract class NullPropertyMap implements NodeProperties {
         public DoubleNullPropertyMap(double defaultValue) {this.defaultValue = defaultValue;}
 
         @Override
-        public double getDouble(long nodeId) {
+        public double doubleValue(long nodeId) {
             return this.defaultValue;
         }
 
         @Override
-        public double getDouble(long nodeId, double defaultValue) {
-            return defaultValue;
+        public Object getObject(long nodeId) {
+            return doubleValue(nodeId);
         }
 
         @Override
-        public Value getValue(long nodeId) {
+        public Value value(long nodeId) {
             return Values.doubleValue(defaultValue);
         }
 
         @Override
-        public ValueType getType() {
+        public ValueType valueType() {
             return ValueType.DOUBLE;
+        }
+
+        @Override
+        public OptionalDouble getMaxDoublePropertyValue() {
+            return OptionalDouble.empty();
         }
     }
 
-    static public class LongNullPropertyMap extends NullPropertyMap {
+    static public class LongNullPropertyMap extends NullPropertyMap implements LongNodeProperties {
         private final long defaultValue;
 
         public LongNullPropertyMap(long defaultValue) {this.defaultValue = defaultValue;}
 
         @Override
-        public long getLong(long nodeId) {
+        public long longValue(long nodeId) {
             return this.defaultValue;
         }
 
         @Override
-        public long getLong(long nodeId, long defaultValue) {
-            return defaultValue;
+        public Object getObject(long nodeId) {
+            return longValue(nodeId);
         }
 
         @Override
-        public Value getValue(long nodeId) {
+        public Value value(long nodeId) {
             return Values.longValue(defaultValue);
         }
 
         @Override
-        public ValueType getType() {
+        public OptionalLong getMaxLongPropertyValue() {
+            return OptionalLong.empty();
+        }
+
+        @Override
+        public ValueType valueType() {
             return ValueType.LONG;
         }
     }

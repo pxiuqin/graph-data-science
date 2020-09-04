@@ -20,7 +20,7 @@
 package org.neo4j.graphalgo.api.nodeproperties;
 
 import org.neo4j.graphalgo.core.utils.BitUtil;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongLongMap;
 
@@ -45,7 +45,7 @@ public class ConsecutiveLongNodeProperties implements LongNodeProperties {
         this.communities = HugeLongArray.newArray(nodeCount, tracker);
 
         for (var nodeId = 0; nodeId < nodeCount; nodeId++) {
-            var setId = longNodeProperties.getLong(nodeId);
+            var setId = longNodeProperties.longValue(nodeId);
             var communityId = setIdToConsecutiveId.getOrDefault(setId, -1);
             if (communityId == -1) {
                 setIdToConsecutiveId.addTo(setId, ++nextConsecutiveId);
@@ -56,7 +56,7 @@ public class ConsecutiveLongNodeProperties implements LongNodeProperties {
     }
 
     @Override
-    public long getLong(long nodeId) {
+    public long longValue(long nodeId) {
         return communities.get(nodeId);
     }
 }

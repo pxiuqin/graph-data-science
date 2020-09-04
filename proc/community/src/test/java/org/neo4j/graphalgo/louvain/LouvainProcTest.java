@@ -19,7 +19,6 @@
  */
 package org.neo4j.graphalgo.louvain;
 
-import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.provider.Arguments;
@@ -75,47 +74,7 @@ abstract class LouvainProcTest<CONFIG extends LouvainBaseConfig> extends BasePro
     static final String LOUVAIN_GRAPH = "myGraph";
 
     @Override
-    public GraphDatabaseAPI graphDb() {
-        return db;
-    }
-
-    @BeforeEach
-    void setupGraph() throws Exception {
-        registerProcedures(
-            LouvainStreamProc.class,
-            LouvainWriteProc.class,
-            LouvainStatsProc.class,
-            LouvainMutateProc.class,
-            GraphCreateProc.class,
-            GraphWriteNodePropertiesProc.class
-        );
-        registerFunctions(AsNodeFunc.class);
-
-        @Language("Cypher") String cypher =
-            dbCypher();
-        runQuery(cypher);
-        graphCreateQueries().forEach(this::runQuery);
-    }
-
-    List<String> graphCreateQueries() {
-        return singletonList(
-            GdsCypher.call()
-                .withNodeLabel("Node")
-                .withNodeProperty("seed")
-                .withRelationshipType(
-                    "TYPE",
-                    RelationshipProjection.of(
-                        "TYPE",
-                        Orientation.UNDIRECTED,
-                        Aggregation.DEFAULT
-                    )
-                )
-                .graphCreate(LOUVAIN_GRAPH)
-                .yields()
-        );
-    }
-
-    String dbCypher() {
+    public String createQuery() {
         return "CREATE" +
                "  (a:Node {seed: 1})" +        // 0
                ", (b:Node {seed: 1})" +        // 1
@@ -158,6 +117,45 @@ abstract class LouvainProcTest<CONFIG extends LouvainBaseConfig> extends BasePro
                ", (k)-[:TYPE {weight: 1.0}]->(l)" +
                ", (l)-[:TYPE {weight: 1.0}]->(n)" +
                ", (m)-[:TYPE {weight: 1.0}]->(n)";
+    }
+
+    @Override
+    public GraphDatabaseAPI graphDb() {
+        return db;
+    }
+
+    @BeforeEach
+    void setupGraph() throws Exception {
+        registerProcedures(
+            LouvainStreamProc.class,
+            LouvainWriteProc.class,
+            LouvainStatsProc.class,
+            LouvainMutateProc.class,
+            GraphCreateProc.class,
+            GraphWriteNodePropertiesProc.class
+        );
+        registerFunctions(AsNodeFunc.class);
+
+        runQuery(createQuery());
+        graphCreateQueries().forEach(this::runQuery);
+    }
+
+    List<String> graphCreateQueries() {
+        return singletonList(
+            GdsCypher.call()
+                .withNodeLabel("Node")
+                .withNodeProperty("seed")
+                .withRelationshipType(
+                    "TYPE",
+                    RelationshipProjection.of(
+                        "TYPE",
+                        Orientation.UNDIRECTED,
+                        Aggregation.DEFAULT
+                    )
+                )
+                .graphCreate(LOUVAIN_GRAPH)
+                .yields()
+        );
     }
 
     @AfterEach

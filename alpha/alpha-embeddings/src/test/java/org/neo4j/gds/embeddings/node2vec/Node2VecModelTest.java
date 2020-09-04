@@ -23,7 +23,7 @@ import org.apache.commons.lang3.mutable.MutableLong;
 import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.TestProgressLogger;
 import org.neo4j.graphalgo.core.utils.Intersections;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeObjectArray;
 
 import java.util.Random;
@@ -45,7 +45,7 @@ class Node2VecModelTest {
         var walks = HugeObjectArray.newArray(
             long[].class,
             numberOfClusters * clusterSize * numberOfWalks,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
         LongStream.range(0, numberOfClusters)
             .boxed()
@@ -75,7 +75,7 @@ class Node2VecModelTest {
             nodeCount,
             config,
             walks,
-            new ProbabilityComputer(walks, nodeCount, 0.001, 0.75, 4, AllocationTracker.EMPTY),
+            new ProbabilityComputer(walks, nodeCount, 0.001, 0.75, 4, AllocationTracker.empty()),
             TestProgressLogger.NULL_LOGGER
         );
 

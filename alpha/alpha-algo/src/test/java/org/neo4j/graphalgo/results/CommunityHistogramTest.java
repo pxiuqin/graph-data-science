@@ -21,7 +21,7 @@ package org.neo4j.graphalgo.results;
 
 import org.HdrHistogram.Histogram;
 import org.junit.jupiter.api.Test;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongLongMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,7 +30,7 @@ class CommunityHistogramTest {
 
     @Test
     void oneCommunityFromHugeMap() {
-        HugeLongLongMap communitySizeMap = new HugeLongLongMap(AllocationTracker.EMPTY);
+        HugeLongLongMap communitySizeMap = new HugeLongLongMap(AllocationTracker.empty());
         communitySizeMap.addTo(1, 4);
 
         Histogram histogram = CommunityHistogram.buildFrom(communitySizeMap);
@@ -40,7 +40,7 @@ class CommunityHistogramTest {
 
     @Test
     void multipleCommunitiesFromHugeMap() {
-        HugeLongLongMap communitySizeMap = new HugeLongLongMap(AllocationTracker.EMPTY);
+        HugeLongLongMap communitySizeMap = new HugeLongLongMap(AllocationTracker.empty());
         communitySizeMap.addTo(1, 4);
         communitySizeMap.addTo(2, 10);
         communitySizeMap.addTo(3, 9);

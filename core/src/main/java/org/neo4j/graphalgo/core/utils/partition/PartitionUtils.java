@@ -19,10 +19,10 @@
  */
 package org.neo4j.graphalgo.core.utils.partition;
 
-import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.graphalgo.api.Degrees;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
+import org.neo4j.graphalgo.core.utils.collection.primitive.PrimitiveLongIterator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +33,17 @@ public final class PartitionUtils {
 
     private PartitionUtils() {}
 
+    public static List<Partition> rangePartition(int concurrency, long nodeCount) {
+        long batchSize = ParallelUtil.adjustedBatchSize(nodeCount, concurrency, ParallelUtil.DEFAULT_BATCH_SIZE);
+        List<Partition> partitions = new ArrayList<>(concurrency);
+        for (long i = 0; i < nodeCount; i += batchSize) {
+            long actualBatchSize = i + batchSize < nodeCount ? batchSize : nodeCount - i;
+            partitions.add(Partition.of(i, actualBatchSize));
+        }
+
+        return partitions;
+    }
+
     public static List<Partition> numberAlignedPartitioning(
         int concurrency,
         long nodeCount,
@@ -41,11 +52,10 @@ public final class PartitionUtils {
         final long initialBatchSize = ParallelUtil.adjustedBatchSize(nodeCount, concurrency, alignTo);
         final long remainder = initialBatchSize % alignTo;
         final long adjustedBatchSize = remainder == 0 ? initialBatchSize : initialBatchSize + (alignTo - remainder);
-
         List<Partition> partitions = new ArrayList<>(concurrency);
         for (long i = 0; i < nodeCount; i += adjustedBatchSize) {
             long actualBatchSize = i + adjustedBatchSize < nodeCount ? adjustedBatchSize : nodeCount - i;
-            partitions.add(new Partition(i, actualBatchSize));
+            partitions.add(Partition.of(i, actualBatchSize));
         }
 
         return partitions;
@@ -73,8 +83,8 @@ public final class PartitionUtils {
                 partitionSize += degrees.degree(nodeId); //节点的度大小累加到分片大小
             }
 
-            long end = nodeId + 1;  //通过度大小和batchSize找到end节点
-            partitions.add(new Partition(start, end - start));  //完成一个分片
+            long end = nodeId + 1;    //通过度大小和batchSize找到end节点
+            partitions.add(Partition.of(start, end - start));  //完成一个分片
             start = end;
         }
         return partitions;

@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.BaseTest;
 import org.neo4j.graphalgo.StoreLoaderBuilder;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.api.nodeproperties.DoubleNodeProperties;
 import org.neo4j.graphalgo.api.nodeproperties.LongNodeProperties;
@@ -47,9 +48,9 @@ class NodePropertyExporterTest extends BaseTest {
     void setup() {
         runQuery(
             "CREATE " +
-            "  (n1:Node {prop1: 1, prop2: 42})" +
-            ", (n2:Node {prop1: 2, prop2: 42})" +
-            ", (n3:Node {prop1: 3, prop2: 42})" +
+            "  (n1:Node {prop1: 1.0, prop2: 42.0})" +
+            ", (n2:Node {prop1: 2.0, prop2: 42.0})" +
+            ", (n3:Node {prop1: 3.0, prop2: 42.0})" +
             ", (n1)-[:REL]->(n2)" +
             ", (n1)-[:REL]->(n3)" +
             ", (n2)-[:REL]->(n3)" +
@@ -60,7 +61,7 @@ class NodePropertyExporterTest extends BaseTest {
     @Test
     void exportSingleNodeProperty() {
         Graph graph = new StoreLoaderBuilder().api(db)
-            .addNodeProperty("newProp1", "prop1", 42.0, Aggregation.NONE)
+            .addNodeProperty("newProp1", "prop1", DefaultValue.of(42.0), Aggregation.NONE)
             .build()
             .graph();
 
@@ -70,16 +71,16 @@ class NodePropertyExporterTest extends BaseTest {
         exporter.write("newProp1",  (LongNodeProperties) (long nodeId) -> intData[(int) nodeId]);
 
         Graph updatedGraph = new StoreLoaderBuilder().api(db)
-            .addNodeProperty("prop1", "prop1", 42.0, Aggregation.NONE)
-            .addNodeProperty("newProp1", "newProp1", 42.0, Aggregation.NONE)
+            .addNodeProperty("prop1", "prop1", DefaultValue.of(42.0), Aggregation.NONE)
+            .addNodeProperty("newProp1", "newProp1", DefaultValue.of(42), Aggregation.NONE)
             .build()
             .graph();
 
         assertGraphEquals(
             fromGdl(
-                "(a { prop1: 1, newProp1: 23 })" +
-                "(b { prop1: 2, newProp1: 42 })" +
-                "(c { prop1: 3, newProp1: 84 })" +
+                "(a { prop1: 1.0, newProp1: 23 })" +
+                "(b { prop1: 2.0, newProp1: 42 })" +
+                "(c { prop1: 3.0, newProp1: 84 })" +
                 "(a)-->(b)" +
                 "(a)-->(c)" +
                 "(b)-->(c)" +
@@ -91,8 +92,8 @@ class NodePropertyExporterTest extends BaseTest {
     @Test
     void exportMultipleNodeProperties() {
         Graph graph = new StoreLoaderBuilder().api(db)
-            .addNodeProperty("newProp1", "prop1", 42.0, Aggregation.NONE)
-            .addNodeProperty("newProp2", "prop2", 42.0, Aggregation.NONE)
+            .addNodeProperty("newProp1", "prop1", DefaultValue.of(42.0), Aggregation.NONE)
+            .addNodeProperty("newProp2", "prop2", DefaultValue.of(42.0), Aggregation.NONE)
             .build()
             .graph();
 
@@ -109,17 +110,17 @@ class NodePropertyExporterTest extends BaseTest {
         exporter.write(nodeProperties);
 
         Graph updatedGraph = new StoreLoaderBuilder().api(db)
-            .addNodeProperty("prop1", "prop1", 42.0, Aggregation.NONE)
-            .addNodeProperty("newProp1", "newProp1", 42.0, Aggregation.NONE)
-            .addNodeProperty("newProp2", "newProp2", 42.0, Aggregation.NONE)
+            .addNodeProperty("prop1", "prop1", DefaultValue.of(42.0), Aggregation.NONE)
+            .addNodeProperty("newProp1", "newProp1", DefaultValue.of(42), Aggregation.NONE)
+            .addNodeProperty("newProp2", "newProp2", DefaultValue.of(42.0), Aggregation.NONE)
             .build()
             .graph();
 
         assertGraphEquals(
             fromGdl(
-                "(a { prop1: 1, newProp1: 23, newProp2: 123.0d })" +
-                "(b { prop1: 2, newProp1: 42, newProp2: 142.0d })" +
-                "(c { prop1: 3, newProp1: 84, newProp2: 184.0d })" +
+                "(a { prop1: 1.0, newProp1: 23, newProp2: 123.0d })" +
+                "(b { prop1: 2.0, newProp1: 42, newProp2: 142.0d })" +
+                "(c { prop1: 3.0, newProp1: 84, newProp2: 184.0d })" +
                 "(a)-->(b)" +
                 "(a)-->(c)" +
                 "(b)-->(c)" +

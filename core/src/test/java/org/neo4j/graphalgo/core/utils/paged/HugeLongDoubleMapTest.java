@@ -21,6 +21,7 @@ package org.neo4j.graphalgo.core.utils.paged;
 
 import com.carrotsearch.hppc.LongDoubleHashMap;
 import org.junit.jupiter.api.Test;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -35,7 +36,7 @@ final class HugeLongDoubleMapTest {
 
     @Test
     void canClear() {
-        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.EMPTY);
+        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.empty());
         map.addTo(1, 1);
         map.clear();
         assertEquals(0, map.size());
@@ -48,7 +49,7 @@ final class HugeLongDoubleMapTest {
 
     @Test
     void canReadFromAddTo() {
-        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.EMPTY);
+        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.empty());
         map.addTo(1L, 1);
 
         double actual = map.getOrDefault(1L, 0);
@@ -61,7 +62,7 @@ final class HugeLongDoubleMapTest {
 
     @Test
     void addToAddsValues() {
-        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.EMPTY);
+        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.empty());
         map.addTo(1L, 1L);
         map.addTo(1L, 2L);
         map.addTo(1L, 3L);
@@ -73,17 +74,17 @@ final class HugeLongDoubleMapTest {
 
     @Test
     void acceptsInitialSize() {
-        HugeLongDoubleMap map = new HugeLongDoubleMap(0L, AllocationTracker.EMPTY);
+        HugeLongDoubleMap map = new HugeLongDoubleMap(0L, AllocationTracker.empty());
         map.addTo(1L, 1L);
         double actual = map.getOrDefault(1L, 0L);
         assertEquals(1L, actual);
 
-        map = new HugeLongDoubleMap(1L, AllocationTracker.EMPTY);
+        map = new HugeLongDoubleMap(1L, AllocationTracker.empty());
         map.addTo(1L, 1L);
         actual = map.getOrDefault(1L, 0L);
         assertEquals(1L, actual);
 
-        map = new HugeLongDoubleMap(100L, AllocationTracker.EMPTY);
+        map = new HugeLongDoubleMap(100L, AllocationTracker.empty());
         map.addTo(1L, 1L);
         actual = map.getOrDefault(1L, 0L);
         assertEquals(1L, actual);
@@ -91,7 +92,7 @@ final class HugeLongDoubleMapTest {
 
     @Test
     void hasSize() {
-        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.EMPTY);
+        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.empty());
         assertEquals(0L, map.size());
 
         map.addTo(1L, 1L);
@@ -107,7 +108,7 @@ final class HugeLongDoubleMapTest {
 
     @Test
     void hasIsEmpty() {
-        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.EMPTY);
+        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.empty());
         assertTrue(map.isEmpty());
         map.addTo(1L, 1L);
         assertFalse(map.isEmpty());
@@ -124,15 +125,15 @@ final class HugeLongDoubleMapTest {
 
         for (long i = 0L; i < 6L; i++) {
             map.addTo(i, i + 42L);
-            assertEquals(firstSize, tracker.tracked());
+            assertEquals(firstSize, tracker.trackedBytes());
         }
         for (long i = 6L; i < 12L; i++) {
             map.addTo(i, i + 42L);
-            assertEquals(secondSize, tracker.tracked());
+            assertEquals(secondSize, tracker.trackedBytes());
         }
         for (long i = 12L; i < 24L; i++) {
             map.addTo(i, i + 42L);
-            assertEquals(thirdSize, tracker.tracked());
+            assertEquals(thirdSize, tracker.trackedBytes());
         }
     }
 
@@ -145,12 +146,12 @@ final class HugeLongDoubleMapTest {
             map.addTo(i, i + 42L);
         }
         map.release();
-        assertEquals(0L, tracker.tracked());
+        assertEquals(0L, tracker.trackedBytes());
     }
 
     @Test
     void hasStringRepresentation() {
-        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.EMPTY);
+        HugeLongDoubleMap map = new HugeLongDoubleMap(AllocationTracker.empty());
         LongDoubleHashMap compare = new LongDoubleHashMap();
 
         assertEquals("[]", map.toString());

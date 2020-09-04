@@ -24,7 +24,9 @@ import org.neo4j.graphalgo.AbstractRelationshipProjection;
 import org.neo4j.graphalgo.NodeLabel;
 import org.neo4j.graphalgo.Orientation;
 import org.neo4j.graphalgo.RelationshipProjection;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.IdMapping;
+import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.graphalgo.api.Relationships;
 import org.neo4j.graphalgo.core.Aggregation;
 import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
@@ -32,7 +34,7 @@ import org.neo4j.graphalgo.core.huge.HugeGraph;
 import org.neo4j.graphalgo.core.huge.TransientAdjacencyOffsets;
 import org.neo4j.graphalgo.core.utils.RawValues;
 import org.neo4j.graphalgo.core.utils.SetBitsIterable;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.graphalgo.core.utils.paged.HugeSparseLongArray;
 
@@ -80,9 +82,18 @@ public final class HugeGraphUtil {
     }
 
     public static HugeGraph create(IdMap idMap, Relationships relationships, AllocationTracker tracker) {
-        return HugeGraph.create(
+        return create(
             idMap,
             Collections.emptyMap(),
+            relationships,
+            tracker
+        );
+    }
+
+    public static HugeGraph create(IdMap idMap, Map<String, NodeProperties> nodeProperties, Relationships relationships, AllocationTracker tracker) {
+        return HugeGraph.create(
+            idMap,
+            nodeProperties,
             relationships.topology(),
             relationships.properties(),
             tracker
@@ -201,7 +212,7 @@ public final class HugeGraphUtil {
                 .orientation(orientation);
 
             if (loadRelationshipProperty) {
-                projectionBuilder.addProperty(DUMMY_PROPERTY, DUMMY_PROPERTY, Double.NaN, aggregation);
+                projectionBuilder.addProperty(DUMMY_PROPERTY, DUMMY_PROPERTY, DefaultValue.DEFAULT, aggregation);
             }
 
             this.relationshipsBuilder = new org.neo4j.graphalgo.core.loading.RelationshipsBuilder(

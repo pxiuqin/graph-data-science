@@ -21,7 +21,7 @@ package org.neo4j.graphalgo.core.utils.paged.dss;
 
 import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.core.utils.mem.MemoryRange;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 
 import static org.neo4j.graphalgo.core.utils.paged.dss.NonInrementalDisjointSetStruct.memoryEstimation;
 
@@ -29,7 +29,7 @@ class NonInrementalDisjointSetStructTest extends DisjointSetStructTest {
 
     @Override
     SequentialDisjointSetStruct newSet(final int capacity) {
-        AllocationTracker tracker = AllocationTracker.EMPTY;
+        AllocationTracker tracker = AllocationTracker.empty();
         return new NonInrementalDisjointSetStruct(
                 capacity,
                 tracker);

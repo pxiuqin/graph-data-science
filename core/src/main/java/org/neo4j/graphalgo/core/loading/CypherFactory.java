@@ -28,6 +28,7 @@ import org.neo4j.graphalgo.RelationshipProjection;
 import org.neo4j.graphalgo.RelationshipProjections;
 import org.neo4j.graphalgo.RelationshipType;
 import org.neo4j.graphalgo.annotation.ValueClass;
+import org.neo4j.graphalgo.api.DefaultValue;
 import org.neo4j.graphalgo.api.GraphLoaderContext;
 import org.neo4j.graphalgo.api.GraphStore;
 import org.neo4j.graphalgo.api.GraphStoreFactory;
@@ -65,11 +66,32 @@ public class CypherFactory extends GraphStoreFactory<CSRGraphStore, GraphCreateF
         GraphCreateFromCypherConfig graphCreateConfig,
         GraphLoaderContext loadingContext
     ) {
-        super(graphCreateConfig, loadingContext, new GraphDimensionsCypherReader(loadingContext.transaction().withRestrictedAccess(READ), graphCreateConfig).call());
-        this.cypherConfig = getCypherConfig(graphCreateConfig).orElseThrow(() -> new IllegalArgumentException("Expected GraphCreateConfig to be a cypher config."));
+        this(
+            graphCreateConfig,
+            loadingContext,
+            new GraphDimensionsCypherReader(
+                loadingContext.transaction().withRestrictedAccess(READ),
+                graphCreateConfig
+            ).call()
+        );
+    }
+
+    public CypherFactory(
+        GraphCreateFromCypherConfig graphCreateConfig,
+        GraphLoaderContext loadingContext,
+        GraphDimensions graphDimensions
+    ) {
+        super(graphCreateConfig, loadingContext, graphDimensions);
+        this.cypherConfig = getCypherConfig(graphCreateConfig).orElseThrow(() -> new IllegalArgumentException(
+            "Expected GraphCreateConfig to be a cypher config."));
     }
 
     public final MemoryEstimation memoryEstimation() {
+        if (cypherConfig.isFictitiousLoading()) {
+            nodeEstimation = ImmutableEstimationResult.of(cypherConfig.nodeCount(), 0);
+            relationshipEstimation = ImmutableEstimationResult.of(cypherConfig.relationshipCount(), 0);
+        }
+
         var nodeProjection = NodeProjection
             .builder()
             .label(PROJECT_ALL)
@@ -255,8 +277,7 @@ public class CypherFactory extends GraphStoreFactory<CSRGraphStore, GraphCreateF
         default Collection<PropertyMapping> propertyMappings() {
             return LongStream
                 .range(0, propertyCount())
-                .boxed()
-                .map(property -> PropertyMapping.of(property.toString(), 0))
+                .mapToObj(property -> PropertyMapping.of(Long.toString(property), DefaultValue.DEFAULT))
                 .collect(Collectors.toList());
         }
 

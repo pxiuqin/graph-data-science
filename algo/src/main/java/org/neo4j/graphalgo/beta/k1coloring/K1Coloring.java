@@ -25,7 +25,7 @@ import org.neo4j.graphalgo.api.Graph;
 import org.neo4j.graphalgo.core.concurrency.ParallelUtil;
 import org.neo4j.graphalgo.core.utils.ProgressLogger;
 import org.neo4j.graphalgo.core.utils.SetBitsIterable;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.graphalgo.core.utils.partition.Partition;
 import org.neo4j.graphalgo.core.utils.partition.PartitionUtils;
@@ -195,8 +195,8 @@ public class K1Coloring extends Algorithm<K1Coloring, HugeLongArray> {
             colors,
             nodesToColor,
             nodeCount,
-            partition.startNode,
-            partition.nodeCount,
+            partition.startNode(),
+            partition.nodeCount(),
             getProgressLogger()
         )).collect(Collectors.toList());
 
@@ -215,8 +215,8 @@ public class K1Coloring extends Algorithm<K1Coloring, HugeLongArray> {
             nodesToColor,
             nextNodesToColor,
             nodeCount,
-            partition.startNode,
-            partition.nodeCount,
+            partition.startNode(),
+            partition.nodeCount(),
             getProgressLogger()
         )).collect(Collectors.toList());
 

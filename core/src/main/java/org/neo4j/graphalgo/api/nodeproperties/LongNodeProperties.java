@@ -22,29 +22,42 @@ package org.neo4j.graphalgo.api.nodeproperties;
 import org.neo4j.graphalgo.api.NodeProperties;
 import org.neo4j.values.storable.Value;
 import org.neo4j.values.storable.Values;
+
+import java.util.OptionalLong;
+import java.util.stream.LongStream;
+
 @FunctionalInterface
 public interface LongNodeProperties extends NodeProperties {
 
     @Override
-    long getLong(long nodeId);
+    long longValue(long nodeId);
 
     @Override
-    default Object getObject(long nodeId, Object defaultValue) {
-        return getLong(nodeId, (Long) defaultValue);
+    default Object getObject(long nodeId) {
+        return longValue(nodeId);
     }
 
     @Override
-    default Value getValue(long nodeId) {
-        return Values.longValue(getLong(nodeId));
+    default Value value(long nodeId) {
+        return Values.longValue(longValue(nodeId));
     };
 
     @Override
-    default ValueType getType() {
+    default ValueType valueType() {
         return ValueType.LONG;
     };
 
     @Override
-    default double getDouble(long nodeId) {
-        return getLong(nodeId);
+    default double doubleValue(long nodeId) {
+        return longValue(nodeId);
     };
+
+    @Override
+    default OptionalLong getMaxLongPropertyValue() {
+        return LongStream
+            .range(0, size())
+            .parallel()
+            .map(this::longValue)
+            .max();
+    }
 }

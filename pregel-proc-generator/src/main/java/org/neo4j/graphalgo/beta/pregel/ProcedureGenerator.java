@@ -26,17 +26,14 @@ import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
 import org.jetbrains.annotations.NotNull;
-import org.neo4j.graphalgo.AlgoBaseProc;
 import org.neo4j.graphalgo.AlgorithmFactory;
 import org.neo4j.graphalgo.BaseProc;
 import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.api.NodeProperties;
-import org.neo4j.graphalgo.api.nodeproperties.DoubleNodeProperties;
 import org.neo4j.graphalgo.beta.pregel.annotation.GDSMode;
 import org.neo4j.graphalgo.config.GraphCreateConfig;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.mem.MemoryEstimation;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
 import org.neo4j.graphalgo.results.MemoryEstimateResult;
 import org.neo4j.logging.Log;
 import org.neo4j.procedure.Description;
@@ -89,32 +86,36 @@ abstract class ProcedureGenerator extends PregelGenerator {
 
     TypeSpec typeSpec() {
         var configTypeName = pregelSpec.configTypeName();
-        var procedureClassName = className(pregelSpec, procGdsMode().camelCase() + PROCEDURE_SUFFIX);
-        var algorithmClassName = className(pregelSpec, ALGORITHM_SUFFIX);
+        var procedureClassName = computationClassName(pregelSpec, procGdsMode().camelCase() + PROCEDURE_SUFFIX);
+        var algorithmClassName = computationClassName(pregelSpec, ALGORITHM_SUFFIX);
 
-        var typeSpecBuilder = TypeSpec
-            .classBuilder(procedureClassName)
-            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-            .superclass(ParameterizedTypeName.get(
-                ClassName.get(procBaseClass()),
-                algorithmClassName,
-                ClassName.get(Pregel.PregelResult.class),
-                ClassName.get(procResultClass()),
-                configTypeName
-            ))
-            .addOriginatingElement(pregelSpec.element());
+        var typeSpecBuilder = getTypeSpecBuilder(configTypeName, procedureClassName, algorithmClassName);
 
         addGeneratedAnnotation(typeSpecBuilder);
 
         typeSpecBuilder.addMethod(procMethod());
         typeSpecBuilder.addMethod(procEstimateMethod());
         typeSpecBuilder.addMethod(procResultMethod());
-
         typeSpecBuilder.addMethod(newConfigMethod());
         typeSpecBuilder.addMethod(algorithmFactoryMethod(algorithmClassName));
-        typeSpecBuilder.addMethod(propertyTranslator(algorithmClassName));
-
         return typeSpecBuilder.build();
+    }
+
+    @NotNull
+    private TypeSpec.Builder getTypeSpecBuilder(
+        com.squareup.javapoet.TypeName configTypeName,
+        ClassName procedureClassName,
+        ClassName algorithmClassName
+    ) {
+        return TypeSpec
+            .classBuilder(procedureClassName)
+            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            .superclass(ParameterizedTypeName.get(
+                ClassName.get(procBaseClass()),
+                algorithmClassName,
+                configTypeName
+            ))
+            .addOriginatingElement(pregelSpec.element());
     }
 
     private MethodSpec procMethod() {
@@ -204,7 +205,8 @@ abstract class ProcedureGenerator extends PregelGenerator {
                 .addModifiers(Modifier.PUBLIC)
                 .returns(MemoryEstimation.class)
                 .addParameter(pregelSpec.configTypeName(), "configuration")
-                .addStatement("return $T.memoryEstimation()", Pregel.class)
+                .addStatement("var nodeSchema = new $T().nodeSchema()", computationClassName(pregelSpec, ""))
+                .addStatement("return $T.memoryEstimation(nodeSchema)", Pregel.class)
                 .build()
             )
             .build();
@@ -220,21 +222,4 @@ abstract class ProcedureGenerator extends PregelGenerator {
             .addStatement("return $L", anonymousFactoryType)
             .build();
     }
-
-    private MethodSpec propertyTranslator(ClassName algorithmClassName) {
-        return MethodSpec.methodBuilder("getNodeProperties")
-            .addAnnotation(Override.class)
-            .addModifiers(Modifier.PROTECTED)
-            .returns(NodeProperties.class)
-            .addParameter(ParameterizedTypeName.get(
-                ClassName.get(AlgoBaseProc.ComputationResult.class),
-                algorithmClassName,
-                ClassName.get(Pregel.PregelResult.class),
-                pregelSpec.configTypeName()
-                ), "computationResult"
-            )
-            .addStatement("return ($T) computationResult.result().nodeValues()::get", DoubleNodeProperties.class)
-            .build();
-    }
-
 }

@@ -22,7 +22,7 @@ package org.neo4j.graphalgo.beta.pregel.pr;
 import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.beta.pregel.Pregel;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
 import org.neo4j.graphalgo.extension.GdlExtension;
 import org.neo4j.graphalgo.extension.GdlGraph;
@@ -32,6 +32,7 @@ import org.neo4j.graphalgo.extension.TestGraph;
 import java.util.HashMap;
 
 import static org.neo4j.graphalgo.TestSupport.assertDoubleValues;
+import static org.neo4j.graphalgo.beta.pregel.pr.PageRankPregel.PAGE_RANK;
 
 @GdlExtension
 class PageRankPregelAlgoTest {
@@ -74,7 +75,6 @@ class PageRankPregelAlgoTest {
 
     @Test
     void runPR() {
-        int batchSize = 10;
         int maxIterations = 10;
         float dampingFactor = 0.85f;
 
@@ -84,16 +84,15 @@ class PageRankPregelAlgoTest {
             .isAsynchronous(false)
             .build();
 
-        var pregelJob = Pregel.withDefaultNodeValues(
+        var pregelJob = Pregel.create(
             graph,
             config,
             new PageRankPregel(),
-            batchSize,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
-        HugeDoubleArray nodeValues = pregelJob.run().nodeValues();
+        HugeDoubleArray nodeValues = pregelJob.run().nodeValues().doubleProperties(PAGE_RANK);
 
         var expected = new HashMap<String, Double>();
         expected.put("a", 0.0276D);

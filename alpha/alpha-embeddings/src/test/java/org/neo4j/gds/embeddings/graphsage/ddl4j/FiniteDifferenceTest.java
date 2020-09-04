@@ -20,6 +20,7 @@
 package org.neo4j.gds.embeddings.graphsage.ddl4j;
 
 import org.neo4j.gds.embeddings.graphsage.ddl4j.functions.Weights;
+import org.neo4j.gds.embeddings.graphsage.ddl4j.tensor.Tensor;
 
 import java.util.List;
 
@@ -35,20 +36,20 @@ public interface FiniteDifferenceTest {
         return 1E-4;
     }
 
-    default void finiteDifferenceShouldApproximateGradient(Weights weightVariable, Variable loss) {
+    default void finiteDifferenceShouldApproximateGradient(Weights<?> weightVariable, Variable<?> loss) {
         finiteDifferenceShouldApproximateGradient(List.of(weightVariable), loss);
     }
 
-    default void finiteDifferenceShouldApproximateGradient(List<Weights> weightVariables, Variable loss) {
-        for (Weights variable : weightVariables) {
+    default void finiteDifferenceShouldApproximateGradient(List<Weights<?>> weightVariables, Variable<?> loss) {
+        for (Weights<?> variable : weightVariables) {
             for (int i = 0; i < Tensor.totalSize(variable.dimensions()); i++) {
                 ComputationContext ctx = new ComputationContext();
-                double f0 = ctx.forward(loss).data[0];
+                double f0 = ctx.forward(loss).dataAt(0);
                 ctx.backward(loss);
-                var partialDerivative = ctx.gradient(variable).data[i];
+                var partialDerivative = ctx.gradient(variable).dataAt(i);
                 perturb(variable, i, epsilon());
                 ComputationContext ctx2 = new ComputationContext();
-                double f1 = ctx2.forward(loss).data[0];
+                double f1 = ctx2.forward(loss).dataAt(0);
                 assertEquals(
                     (f1 - f0) / epsilon(),
                     partialDerivative,
@@ -59,8 +60,8 @@ public interface FiniteDifferenceTest {
         }
     }
 
-    private void perturb(Weights variable, int index, double epsilon) {
-        variable.data().data[index] += epsilon;
+    private void perturb(Weights<?> variable, int index, double epsilon) {
+        variable.data().addDataAt(index, epsilon);
     }
 
 }

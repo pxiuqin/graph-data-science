@@ -25,7 +25,7 @@ import org.neo4j.graphalgo.AlgoTestBase;
 import org.neo4j.graphalgo.PropertyMapping;
 import org.neo4j.graphalgo.StoreLoaderBuilder;
 import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 import org.neo4j.graphdb.Node;
 
@@ -73,7 +73,7 @@ class SccTest extends AlgoTestBase {
     @Test
     void testDirect() {
         loadGraph();
-        SccAlgorithm scc = new SccAlgorithm(graph, AllocationTracker.EMPTY);
+        SccAlgorithm scc = new SccAlgorithm(graph, AllocationTracker.empty());
         HugeLongArray components = scc.compute();
 
         assertCC(components);
@@ -85,7 +85,7 @@ class SccTest extends AlgoTestBase {
     @Test
     void testHugeIterativeScc() {
         loadGraph();
-        SccAlgorithm algo = new SccAlgorithm(graph, AllocationTracker.EMPTY);
+        SccAlgorithm algo = new SccAlgorithm(graph, AllocationTracker.empty());
         HugeLongArray components = algo.compute();
         assertCC(components);
     }

@@ -38,7 +38,7 @@ import org.neo4j.graphalgo.catalog.GraphWriteNodePropertiesProc;
 import org.neo4j.graphalgo.compat.MapUtil;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.graphalgo.core.loading.GraphStoreCatalog;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
 import org.neo4j.graphalgo.core.utils.paged.dss.DisjointSetStruct;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 
@@ -63,7 +63,7 @@ abstract class WccProcTest<CONFIG extends WccBaseConfig> extends BaseProcTest im
         return db;
     }
 
-    protected static final @Language("Cypher") String DB_CYPHER =
+    static final @Language("Cypher") String DB_CYPHER =
         "CREATE" +
         " (nA:Label {nodeId: 0, seedId: 42})" +
         ",(nB:Label {nodeId: 1, seedId: 42})" +
@@ -86,6 +86,11 @@ abstract class WccProcTest<CONFIG extends WccBaseConfig> extends BaseProcTest im
         // {H, I}
         ",(nH)-[:TYPE]->(nI)";
 
+    @Override
+    public String createQuery() {
+        return DB_CYPHER;
+    }
+
     @BeforeEach
     void setupGraph() throws Exception {
         registerProcedures(
@@ -96,7 +101,7 @@ abstract class WccProcTest<CONFIG extends WccBaseConfig> extends BaseProcTest im
             GraphCreateProc.class,
             GraphWriteNodePropertiesProc.class
         );
-        runQuery(DB_CYPHER);
+        runQuery(createQuery());
     }
 
     @AfterEach
@@ -199,11 +204,10 @@ abstract class WccProcTest<CONFIG extends WccBaseConfig> extends BaseProcTest im
 
         applyOnProcedure(proc -> {
             WccBaseConfig config = proc.newConfig(Optional.empty(), userInput);
-            WccProc.algorithmFactory().build(graph, config, AllocationTracker.EMPTY, testLog);
+            WccProc.algorithmFactory().build(graph, config, AllocationTracker.empty(), testLog);
         });
         String expected = "Specifying a `relationshipWeightProperty` has no effect unless `threshold` is also set.";
         String actual = testLog.getMessages("warn").get(0);
         assertEquals(expected, actual);
     }
-
 }

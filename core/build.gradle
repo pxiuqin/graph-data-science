@@ -15,13 +15,19 @@ dependencies {
     compileOnly         group: 'org.neo4j',                name: 'neo4j',              version: ver.'neo4j'
 
     api(
-        project(':annotations'),
-        project(':cypher-printer'),
-        project(':neo4j-kernel-adapter'),
-        [ group: 'org.hdrhistogram', name: 'HdrHistogram', version: ver.'HdrHistogram' ],
-        [ group: 'com.carrotsearch', name: 'hppc',         version: ver.'hppc' ],
-        [ group: 'org.openjdk.jol',  name: 'jol-core',     version: ver.'jol'  ],
-        [ group: 'org.jctools',      name: 'jctools-core', version: ver.'jctools-core' ],
+            project(':annotations'),
+            project(':neo4j-kernel-adapter'),
+            [group: 'org.hdrhistogram', name: 'HdrHistogram', version: ver.'HdrHistogram'],
+            [group: 'com.carrotsearch', name: 'hppc', version: ver.'hppc'],
+            [group: 'org.openjdk.jol', name: 'jol-core', version: ver.'jol'],
+            [group: 'org.jctools', name: 'jctools-core', version: ver.'jctools-core'],
+            [group: 'io.jsonwebtoken', name: 'jjwt-api', version: ver.'jjwt']
+    )
+
+    implementation(
+            [group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: ver.'bouncy-castle'],
+            [group: 'io.jsonwebtoken', name: 'jjwt-impl', version: ver.'jjwt'],
+            [group: 'io.jsonwebtoken', name: 'jjwt-jackson', version: ver.'jjwt'],
     )
 
     testImplementation project(':test-utils')
@@ -29,4 +35,9 @@ dependencies {
     testCompileOnly group: 'org.immutables',    name: 'builder',            version: ver.'immutables'
     testCompileOnly group: 'org.jetbrains',     name: 'annotations',        version: ver.'jetbrains-annotations'
     testCompileOnly group: 'org.neo4j',         name: 'neo4j',              version: ver.'neo4j'
+
+    testAnnotationProcessor project(':annotations')
+    testAnnotationProcessor project(':config-generator')
+    testAnnotationProcessor group: 'org.immutables',           name: 'value',              version: ver.'immutables'
+    testAnnotationProcessor group: 'org.neo4j',                name: 'annotations',        version: ver.'neo4j'
 }

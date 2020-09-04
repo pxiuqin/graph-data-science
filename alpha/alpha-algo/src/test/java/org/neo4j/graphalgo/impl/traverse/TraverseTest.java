@@ -19,22 +19,16 @@
  */
 package org.neo4j.graphalgo.impl.traverse;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.AlgoTestBase;
 import org.neo4j.graphalgo.Orientation;
-import org.neo4j.graphalgo.PropertyMapping;
-import org.neo4j.graphalgo.RelationshipProjection;
-import org.neo4j.graphalgo.RelationshipType;
-import org.neo4j.graphalgo.StoreLoaderBuilder;
-import org.neo4j.graphalgo.api.Graph;
-import org.neo4j.graphalgo.api.GraphStore;
-import org.neo4j.graphalgo.core.Aggregation;
+import org.neo4j.graphalgo.extension.GdlExtension;
+import org.neo4j.graphalgo.extension.GdlGraph;
+import org.neo4j.graphalgo.extension.Inject;
+import org.neo4j.graphalgo.extension.TestGraph;
 import org.neo4j.graphalgo.impl.traverse.Traverse.ExitPredicate.Result;
-import org.neo4j.graphdb.Node;
 
 import java.util.Arrays;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -50,71 +44,56 @@ import static org.neo4j.graphalgo.impl.traverse.Traverse.DEFAULT_AGGREGATOR;
  *   1\ 2/ 1\ 2/
  *    (c)   (f)
  */
+@GdlExtension
 class TraverseTest extends AlgoTestBase {
 
-    private static GraphStore graphs;
 
-    @BeforeEach
-    void setupGraph() {
-        String cypher =
-                "CREATE (a:Node {name:'a'})\n" +
-                "CREATE (b:Node {name:'b'})\n" +
-                "CREATE (c:Node {name:'c'})\n" +
-                "CREATE (d:Node {name:'d'})\n" +
-                "CREATE (e:Node {name:'e'})\n" +
-                "CREATE (f:Node {name:'f'})\n" +
-                "CREATE (g:Node {name:'g'})\n" +
-                "CREATE" +
-                " (a)-[:REL {cost:2.0}]->(b),\n" +
-                " (a)-[:REL {cost:1.0}]->(c),\n" +
-                " (b)-[:REL {cost:1.0}]->(d),\n" +
-                " (c)-[:REL {cost:2.0}]->(d),\n" +
-                " (d)-[:REL {cost:1.0}]->(e),\n" +
-                " (d)-[:REL {cost:2.0}]->(f),\n" +
-                " (e)-[:REL {cost:2.0}]->(g),\n" +
-                " (f)-[:REL {cost:1.0}]->(g)";
+    @GdlGraph(graphNamePrefix = "natural")
+    @GdlGraph(graphNamePrefix = "reverse", orientation = Orientation.REVERSE)
+    @GdlGraph(graphNamePrefix = "undirected", orientation = Orientation.UNDIRECTED)
+    private static final String CYPHER = "CREATE (a:Node)" +
+                                         ", (b:Node)" +
+                                         ", (c:Node)" +
+                                         ", (d:Node)" +
+                                         ", (e:Node)" +
+                                         ", (f:Node)" +
+                                         ", (g:Node)" +
+                                         "," +
+                                         ", (a)-[:REL {cost:2.0}]->(b)" +
+                                         ", (a)-[:REL {cost:1.0}]->(c)" +
+                                         ", (b)-[:REL {cost:1.0}]->(d)" +
+                                         ", (c)-[:REL {cost:2.0}]->(d)" +
+                                         ", (d)-[:REL {cost:1.0}]->(e)" +
+                                         ", (d)-[:REL {cost:2.0}]->(f)" +
+                                         ", (e)-[:REL {cost:2.0}]->(g)" +
+                                         " (f)-[:REL {cost:1.0}]->(g)";
 
-        runQuery(cypher);
+    @GdlGraph(graphNamePrefix = "loop")
+    private static final String LOOP_CYPHER =
+        "CREATE (a)-[:REL]->(b)-[:REL]->(a)";
 
-        graphs = new StoreLoaderBuilder()
-            .api(db)
-            .addNodeLabel("Node")
-            .putRelationshipProjectionsWithIdentifier("REL_OUT", RelationshipProjection.of("REL", Orientation.NATURAL, Aggregation.NONE))
-            .putRelationshipProjectionsWithIdentifier("REL_IN", RelationshipProjection.of("REL", Orientation.REVERSE, Aggregation.NONE))
-            .putRelationshipProjectionsWithIdentifier("REL_BOTH", RelationshipProjection.of("REL", Orientation.UNDIRECTED, Aggregation.NONE))
-            .addRelationshipProperty(PropertyMapping.of("cost", Double.MAX_VALUE))
-            .build()
-            .graphStore();
-    }
 
-    private long id(String name) {
-        final Node[] node = new Node[1];
-        runQueryWithRowConsumer(
-            "MATCH (n:Node) WHERE n.name = '" + name + "' RETURN n",
-            row -> node[0] = row.getNode("n")
-        );
-        return node[0].getId();
-    }
+    @Inject
+    private static TestGraph naturalGraph;
 
-    private String name(long id) {
-        final String[] node = new String[1];
-        runQueryWithRowConsumer(
-            "MATCH (n:Node) WHERE id(n) = " + id + " RETURN n.name as name",
-            row -> node[0] = row.getString("name")
-        );
-        return node[0];
-    }
+    @Inject
+    private static TestGraph reverseGraph;
+
+    @Inject
+    private static TestGraph undirectedGraph;
+
+    @Inject
+    private static TestGraph loopGraph;
 
     /**
      * bfs on outgoing rels. until target 'd' is reached
      */
     @Test
     void testBfsToTargetOut() {
-        long source = id("a");
-        long target = id("d");
-        Graph graph = graphs.getGraph(RelationshipType.of("REL_OUT"), Optional.of("cost"));
+        long source = naturalGraph.toMappedNodeId("a");
+        long target = naturalGraph.toMappedNodeId("d");
         long[] nodes = Traverse.bfs(
-            graph,
+            naturalGraph,
             source,
             (s, t, w) -> t == target ? Result.BREAK : Result.FOLLOW,
             (s, t, w) -> 1.
@@ -129,11 +108,10 @@ class TraverseTest extends AlgoTestBase {
      */
     @Test
     void testDfsToTargetOut() {
-        long source = id("a");
-        long target = id("g");
-        Graph graph = graphs.getGraph(RelationshipType.of("REL_OUT"), Optional.of("cost"));
+        long source = naturalGraph.toMappedNodeId("a");
+        long target = naturalGraph.toMappedNodeId("g");
         long[] nodes = Traverse.dfs(
-            graph,
+            naturalGraph,
             source,
             (s, t, w) -> t == target ? Result.BREAK : Result.FOLLOW,
             DEFAULT_AGGREGATOR
@@ -148,10 +126,9 @@ class TraverseTest extends AlgoTestBase {
      */
     @Test
     void testExitConditionNeverTerminates() {
-        long source = id("a");
-        Graph graph = graphs.getGraph(RelationshipType.of("REL_OUT"), Optional.of("cost"));
+        long source = naturalGraph.toMappedNodeId("a");
         long[] nodes = Traverse.dfs(
-            graph,
+            naturalGraph,
             source,
             (s, t, w) -> Result.FOLLOW,
             DEFAULT_AGGREGATOR
@@ -165,11 +142,10 @@ class TraverseTest extends AlgoTestBase {
      */
     @Test
     void testDfsToTargetIn() {
-        long source = id("g");
-        long target = id("a");
-        Graph graph = graphs.getGraph(RelationshipType.of("REL_IN"), Optional.of("cost"));
+        long source = reverseGraph.toMappedNodeId("g");
+        long target = reverseGraph.toMappedNodeId("a");
         long[] nodes = Traverse.dfs(
-            graph,
+            reverseGraph,
             source,
             (s, t, w) -> t == target ? Result.BREAK : Result.FOLLOW,
             DEFAULT_AGGREGATOR
@@ -184,11 +160,10 @@ class TraverseTest extends AlgoTestBase {
      */
     @Test
     void testBfsToTargetIn() {
-        long source = id("g");
-        long target = id("a");
-        Graph graph = graphs.getGraph(RelationshipType.of("REL_IN"), Optional.of("cost"));
+        long source = reverseGraph.toMappedNodeId("g");
+        long target = reverseGraph.toMappedNodeId("a");
         long[] nodes = Traverse.bfs(
-            graph,
+            reverseGraph,
             source,
             (s, t, w) -> t == target ? Result.BREAK : Result.FOLLOW,
             DEFAULT_AGGREGATOR
@@ -204,11 +179,10 @@ class TraverseTest extends AlgoTestBase {
      */
     @Test
     void testBfsMaxDepthOut() {
-        long source = id("a");
+        long source = naturalGraph.toMappedNodeId("a");
         double maxHops = 3.;
-        Graph graph = graphs.getGraph(RelationshipType.of("REL_OUT"), Optional.of("cost"));
         long[] nodes = Traverse.bfs(
-            graph,
+            naturalGraph,
             source,
             (s, t, w) -> w >= maxHops ? Result.CONTINUE : Result.FOLLOW,
             (s, t, w) -> w + 1.
@@ -217,37 +191,13 @@ class TraverseTest extends AlgoTestBase {
     }
 
     @Test
-    void testBfsMaxCostOut() {
-        long source = id("a");
-        double maxCost = 3.;
-        Graph graph = graphs.getGraph(RelationshipType.of("REL_OUT"), Optional.of("cost"));
-        long[] nodes = Traverse.bfs(
-            graph,
-            source,
-            (s, t, w) -> w > maxCost ? Result.CONTINUE : Result.FOLLOW,
-            (s, t, w) -> {
-                final double v = graph.relationshipProperty(s, t, Double.NaN);
-                return w + v;
-            }
-        ).compute().resultNodes();
-        assertEquals(4, nodes.length);
+    void testBfsOnLoopGraph() {
+        Traverse.bfs(loopGraph, 0, (s, t, w) -> Result.FOLLOW, Traverse.DEFAULT_AGGREGATOR).compute();
     }
 
     @Test
-    void testDfsMaxCostOut() {
-        long source = id("a");
-        double maxCost = 3.;
-        Graph graph = graphs.getGraph(RelationshipType.of("REL_OUT"), Optional.of("cost"));
-        long[] nodes = Traverse.dfs(
-            graph,
-            source,
-            (s, t, w) -> w > maxCost ? Result.CONTINUE : Result.FOLLOW,
-            (s, t, w) -> {
-                final double v = graph.relationshipProperty(s, t, Double.NaN);
-                return w + v;
-            }
-        ).compute().resultNodes();
-        assertEquals(4, nodes.length);
+    void testDfsOnLoopGraph() {
+        Traverse.dfs(loopGraph, 0, (s, t, w) -> Result.FOLLOW, Traverse.DEFAULT_AGGREGATOR).compute();
     }
 
     /**
@@ -256,24 +206,13 @@ class TraverseTest extends AlgoTestBase {
      */
     void assertContains(String[] expected, long[] given) {
         Arrays.sort(given);
-        assertEquals(expected.length, given.length, "expected " + Arrays.toString(expected) + " | given [" + toNameString(given) + "]");
+        assertEquals(expected.length, given.length, "expected " + Arrays.toString(expected) + " | given " + Arrays.toString(given));
 
         for (String ex : expected) {
-            final long id = id(ex);
+            final long id = naturalGraph.toMappedNodeId(ex);
             if (Arrays.binarySearch(given, id) == -1) {
                 fail(ex + " not in " + Arrays.toString(expected));
             }
         }
-    }
-
-    String toNameString(long[] nodes) {
-        final StringBuilder builder = new StringBuilder();
-        for (long node : nodes) {
-            if (builder.length() > 0) {
-                builder.append(", ");
-            }
-            builder.append(name(node));
-        }
-        return builder.toString();
     }
 }

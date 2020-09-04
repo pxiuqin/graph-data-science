@@ -24,6 +24,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.provider.Arguments;
 import org.neo4j.graphalgo.AlgoBaseProcTest;
 import org.neo4j.graphalgo.BaseProcTest;
+import org.neo4j.graphalgo.GdsCypher;
+import org.neo4j.graphalgo.Orientation;
+import org.neo4j.graphalgo.catalog.GraphCreateProc;
 import org.neo4j.graphalgo.core.CypherMapWrapper;
 import org.neo4j.kernel.internal.GraphDatabaseAPI;
 
@@ -39,17 +42,31 @@ import static org.neo4j.graphalgo.utils.ExceptionUtil.rootCause;
 
 public abstract class RandomProjectionProcTest<CONFIG extends RandomProjectionBaseConfig> extends BaseProcTest implements AlgoBaseProcTest<RandomProjection, CONFIG, RandomProjection> {
 
-    private static final String DB_CYPHER = "CREATE" +
-                                            "  (a:Node)" +
-                                            ", (b:Node)" +
-                                            ", (c:Isolated)" +
-                                            ", (d:Isolated)" +
-                                            ", (a)-[:REL]->(b)";
+    private static final String DB_CYPHER =
+        "CREATE" +
+        "  (a:Node {name: 'a'})" +
+        ", (b:Node {name: 'b'})" +
+        ", (c:Isolated {name: 'c'})" +
+        ", (d:Isolated {name: 'd'})" +
+        ", (a)-[:REL]->(b)" +
+
+        // Used for the weighted case
+        ", (e:Node2 {name: 'e'})" +
+        ", (a)<-[:REL2 {weight: 2.0}]-(b)" +
+        ", (a)<-[:REL2 {weight: 1.0}]-(e)";
+
+    @Override
+    public String createQuery() {
+        return DB_CYPHER;
+    }
 
     @BeforeEach
     void setUp() throws Exception {
-        runQuery(DB_CYPHER);
-        registerProcedures(getProcedureClazz());
+        runQuery(createQuery());
+        registerProcedures(
+            getProcedureClazz(),
+            GraphCreateProc.class
+        );
     }
 
     public GraphDatabaseAPI graphDb() {
@@ -112,5 +129,15 @@ public abstract class RandomProjectionProcTest<CONFIG extends RandomProjectionBa
                 );
             });
         });
+    }
+
+    @Override
+    public void loadGraph(String graphName) {
+        String graphCreateQuery = GdsCypher.call()
+            .withNodeLabel("Node")
+            .withRelationshipType("REL", Orientation.UNDIRECTED)
+            .graphCreate(graphName)
+            .yields();
+        runQuery(graphCreateQuery);
     }
 }

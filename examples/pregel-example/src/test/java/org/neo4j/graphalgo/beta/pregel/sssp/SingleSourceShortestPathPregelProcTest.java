@@ -30,6 +30,7 @@ import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.neo4j.graphalgo.TestSupport.mapEquals;
+import static org.neo4j.graphalgo.beta.pregel.sssp.SingleSourceShortestPathPregel.DISTANCE;
 
 class SingleSourceShortestPathPregelProcTest extends BaseProcTest {
 
@@ -72,11 +73,14 @@ class SingleSourceShortestPathPregelProcTest extends BaseProcTest {
             .streamMode()
             .addParameter("maxIterations", 10)
             .addParameter("startNode", 0)
-            .yields("nodeId", "value");
+            .yields("nodeId", "values");
 
         HashMap<Long, Long> actual = new HashMap<>();
         runQueryWithRowConsumer(query, r -> {
-            actual.put(r.getNumber("nodeId").longValue(), r.getNumber("value").longValue());
+            actual.put(
+                r.getNumber("nodeId").longValue(),
+                ((Map<String, Long>) r.get("values")).get(DISTANCE)
+            );
         });
 
         var expected = Map.of(

@@ -21,17 +21,19 @@ package org.neo4j.graphalgo.doc;
 
 import org.junit.jupiter.api.Test;
 import org.neo4j.graphalgo.beta.generator.RandomGraphGenerator;
+import org.neo4j.graphalgo.beta.generator.RelationshipDistribution;
 import org.neo4j.graphalgo.beta.pregel.Pregel;
 import org.neo4j.graphalgo.beta.pregel.cc.ConnectedComponentsPregel;
 import org.neo4j.graphalgo.beta.pregel.cc.ImmutableConnectedComponentsConfig;
 import org.neo4j.graphalgo.core.concurrency.Pools;
-import org.neo4j.graphalgo.core.utils.paged.AllocationTracker;
-import org.neo4j.graphalgo.core.utils.paged.HugeDoubleArray;
+import org.neo4j.graphalgo.core.utils.mem.AllocationTracker;
+import org.neo4j.graphalgo.core.utils.paged.HugeLongArray;
 
-public class PregelConnectedComponentsDocExample {
+import static org.neo4j.graphalgo.beta.pregel.cc.ConnectedComponentsPregel.COMPONENT;
+
+class PregelConnectedComponentsDocExample {
     @Test
-    public void testDoc() {
-        int batchSize = 10;
+    void testDoc() {
         int maxIterations = 10;
 
         var config = ImmutableConnectedComponentsConfig.builder()
@@ -39,16 +41,24 @@ public class PregelConnectedComponentsDocExample {
             .isAsynchronous(true)
             .build();
 
-        var pregelJob = Pregel.withDefaultNodeValues(
-            RandomGraphGenerator.generate(100, 10),
+        var randomGraph = RandomGraphGenerator
+            .builder()
+            .nodeCount(100)
+            .averageDegree(10)
+            .relationshipDistribution(RelationshipDistribution.POWER_LAW)
+            .allocationTracker(AllocationTracker.empty())
+            .build()
+            .generate();
+
+        var pregelJob = Pregel.create(
+            randomGraph,
             config,
             new ConnectedComponentsPregel(),
-            batchSize,
             Pools.DEFAULT,
-            AllocationTracker.EMPTY
+            AllocationTracker.empty()
         );
 
-        HugeDoubleArray nodeValues = pregelJob.run().nodeValues();
+        HugeLongArray nodeValues = pregelJob.run().nodeValues().longProperties(COMPONENT);
         System.out.println(nodeValues.toString());
     }
 }
