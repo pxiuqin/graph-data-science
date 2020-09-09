@@ -41,6 +41,7 @@ final class WccProc {
         AbstractCommunityResultBuilder<PROC_RESULT> procResultBuilder,
         AlgoBaseProc.ComputationResult<Wcc, DisjointSetStruct, CONFIG> computationResult
     ) {
+        //去生成社区统计数据
         return procResultBuilder.withCommunityFunction(!computationResult.isGraphEmpty() ? computationResult.result()::setIdOf : null);
     }
 

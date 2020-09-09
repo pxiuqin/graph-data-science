@@ -32,6 +32,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.LongUnaryOperator;
 
+//基于社区统计信息结构构建
 public abstract class AbstractCommunityResultBuilder<WRITE_RESULT> extends AbstractResultBuilder<WRITE_RESULT> {
 
     private final AllocationTracker tracker;
@@ -131,7 +132,7 @@ public abstract class AbstractCommunityResultBuilder<WRITE_RESULT> extends Abstr
         var componentSizeBuilder = HugeSparseLongArray.GrowingBuilder.create(0L, tracker);
 
         for (long nodeId = 0L; nodeId < nodeCount; nodeId++) {
-            componentSizeBuilder.addTo(communityFunction.applyAsLong(nodeId), 1L);
+            componentSizeBuilder.addTo(communityFunction.applyAsLong(nodeId), 1L);   //自定义具体返回社区ID
         }
         return componentSizeBuilder.build();
     }

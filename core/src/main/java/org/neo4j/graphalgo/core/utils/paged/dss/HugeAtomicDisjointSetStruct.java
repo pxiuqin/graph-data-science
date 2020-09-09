@@ -63,6 +63,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * <li>[3]: <a href="https://github.com/tov/disjoint-sets-rs/blob/88ab08df21f04fcf7c157b6e042efd561ee873ba/src/concurrent.rs">{@code https://github.com/tov/disjoint-sets-rs/blob/88ab08df21f04fcf7c157b6e042efd561ee873ba/src/concurrent.rs}</a></li>
  * <li>[4]: <a href="https://en.wikipedia.org/wiki/Disjoint-set_data_structure#by_rank">{@code https://en.wikipedia.org/wiki/Disjoint-set_data_structure#by_rank}</a></li>
  * </ul>
+ *
+ * 1.makeSet(s)：建立一个新的并查集，其中包含 s 个单元素集合。
+ * 2.unionSet(x, y)：把元素 x 和元素 y 所在的集合合并，要求 x 和 y 所在的集合不相交，如果相交则不合并。
+ * 3.find(x)：找到元素 x 所在的集合的代表，该操作也可以用于判断两个元素是否位于同一个集合，只要将它们各自的代表比较一下就可以了。
+ * https://www.cnblogs.com/cyjb/p/UnionFindSets.html
  */
 public final class HugeAtomicDisjointSetStruct implements DisjointSetStruct {
 
@@ -133,17 +138,17 @@ public final class HugeAtomicDisjointSetStruct implements DisjointSetStruct {
     public long setIdOf(final long nodeId) {
         long setId = find(nodeId);
         if (communities == null) {
-            return setId;
+            return setId;  //直接返回当前ID
         }
 
         do {
             long providedSetId = communities.get(setId);
             if (providedSetId >= 0L) {
-                return providedSetId;
+                return providedSetId;    //返回记录的community_id
             }
-            long newSetId = maxCommunityId.incrementAndGet();
+            long newSetId = maxCommunityId.incrementAndGet();   //community_id 累加
             if (communities.compareAndSet(setId, providedSetId, newSetId)) {
-                return newSetId;
+                return newSetId;  //返回新的community_id
             }
         } while (true);
     }
@@ -154,14 +159,16 @@ public final class HugeAtomicDisjointSetStruct implements DisjointSetStruct {
             id1 = find(id1);
             id2 = find(id2);
             if (id1 == id2) {
-                return true;
+                return true;  //community_id相同
             }
-            if (parent(id1) == id1) {
+            if (parent(id1) == id1) {  //不在同一集合
                 return false;
             }
         }
     }
 
+    //这里也可以应用一个简单的启发式策略——按秩合并。该方法使用秩来表示树高度的上界，在合并时，总是将具有较小秩的树根指向具有较大秩的树根。
+    //简单的说，就是总是将比较矮的树作为子树，添加到较高的树中。为了保存秩，需要额外使用一个与 uset 同长度的数组，并将所有元素都初始化为 0。
     @Override
     public void union(long id1, long id2) {
         while (true) {

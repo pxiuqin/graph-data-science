@@ -115,7 +115,7 @@ public class Wcc extends Algorithm<Wcc, DisjointSetStruct> {
         final Collection<Runnable> tasks = new ArrayList<>(threadSize);
         for (long i = 0L; i < this.nodeCount; i += batchSize) {
             WCCTask wccTask = Double.isNaN(threshold()) || threshold() == 0
-                ? new WCCTask(dss, i)
+                ? new WCCTask(dss, i)   //可以分批并行计算
                 : new WCCWithThresholdTask(threshold(), dss, i);
             tasks.add(wccTask);
         }
@@ -153,14 +153,14 @@ public class Wcc extends Algorithm<Wcc, DisjointSetStruct> {
         WCCTask(DisjointSetStruct struct, long offset) {
             this.struct = struct;
             this.rels = graph.concurrentCopy();
-            this.offset = offset;
+            this.offset = offset;  //分批处理的标识
             this.end = Math.min(offset + batchSize, nodeCount);
         }
 
         @Override
         public void run() {
             for (long node = offset; node < end; node++) {
-                compute(node);
+                compute(node);   //每个节点处理下
                 if (node % RUN_CHECK_NODE_COUNT == 0) {
                     assertRunning();
                 }
@@ -175,7 +175,7 @@ public class Wcc extends Algorithm<Wcc, DisjointSetStruct> {
 
         @Override
         public boolean accept(final long sourceNodeId, final long targetNodeId) {
-            struct.union(sourceNodeId, targetNodeId);
+            struct.union(sourceNodeId, targetNodeId);  //因为图是连通的所以要合并
             return true;
         }
     }
@@ -196,7 +196,7 @@ public class Wcc extends Algorithm<Wcc, DisjointSetStruct> {
 
         @Override
         public boolean accept(final long sourceNodeId, final long targetNodeId, final double property) {
-            if (property > threshold) {
+            if (property > threshold) {  //大于阈值
                 struct.union(sourceNodeId, targetNodeId);
             }
             return true;

@@ -39,6 +39,7 @@ import java.util.stream.Stream;
 
 import static org.neo4j.procedure.Mode.READ;
 
+//对wcc的结果进行统计分析
 public class WccStatsProc extends StatsProc<Wcc, DisjointSetStruct, WccStatsProc.StatsResult, WccStatsConfig> {
 
     @Procedure(value = "gds.wcc.stats", mode = READ)
@@ -111,6 +112,7 @@ public class WccStatsProc extends StatsProc<Wcc, DisjointSetStruct, WccStatsProc
             this.configuration = configuration;
         }
 
+        //继承了社区信息统计结果构建
         static class Builder extends AbstractCommunityResultBuilder<StatsResult> {
 
             Builder(
